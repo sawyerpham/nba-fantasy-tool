@@ -1,0 +1,57 @@
+# nba-fantasy-tool
+
+Two independent apps for a Sleeper NBA fantasy league, sharing one Python package:
+
+- `draft-advisor/` — Phase 1: pre-draft rankings and live auction assistant (backend: Python + FastAPI, frontend: React).
+- `fantasy-tracker/` — Phase 2: in-season tracker (not started).
+- `shared/nba_fantasy_shared` — models, data providers (`nba_api`, Sleeper public API), player reconciliation, JSON storage, scoring.
+
+Data sources are free and need no keys: the `nba_api` package (NBA.com stats) for per-game logs and bios, and Sleeper's public API for fantasy position eligibility and injury status. All persistence is flat JSON under `draft-advisor/backend/data/` (gitignored).
+
+## Prerequisites
+
+- Python 3.13 (the backend venv lives at `draft-advisor/backend/venv`)
+- Node 20+ (frontend, Phase 1E — not yet wired up)
+- Windows users: set `PYTHONIOENCODING=utf-8` before running Python, or accented player names crash console output.
+
+## Backend setup
+
+```powershell
+cd draft-advisor\backend
+python -m venv venv                       # once, if the venv does not exist
+.\venv\Scripts\python.exe -m pip install -r requirements.txt   # installs ..\..\shared editable too
+$env:PYTHONIOENCODING = "utf-8"
+```
+
+## Pull player data (pre-draft)
+
+```powershell
+.\venv\Scripts\python.exe -m app.pull                 # nba_api pool + game logs, Sleeper players; ~1.5 min first time
+.\venv\Scripts\python.exe -m app.pull --skip-logs     # re-reconcile and re-seed overrides only (seconds)
+.\venv\Scripts\python.exe -m app.pull --force-sleeper # bypass the 24 h Sleeper cache guard
+.\venv\Scripts\python.exe -m app.pull --fixtures      # offline run from tests\fixtures
+```
+
+The pull writes to `data\`: `cache\nba_player_pool_<season>.json`, `cache\game_logs_<season>.json`, `cache\sleeper_players.json`, `cache\reconcile_<season>.json`, and the user-editable `player_overrides.json` (seeded from Sleeper; fields marked `manual` are never overwritten). The command prints a reconciliation summary: every player that could not be matched between NBA.com and Sleeper is listed, never dropped.
+
+## Tests
+
+```powershell
+cd draft-advisor\backend
+.\venv\Scripts\python.exe -m pytest -q tests
+```
+
+Tests are offline; `tests\fixtures` holds real API responses captured on 2026-09-02.
+
+## Status
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1A | shared package, both providers, reconciler, override seeding, budget reservation, pull CLI | done |
+| 1B | per-game scoring formula, avg / ceiling valuation, Sleeper scoring-key map | next |
+| 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | |
+| 1D | FastAPI routes, background pull with progress, export | |
+| 1E | React frontend | |
+| 1F | Definition-of-Done walkthrough | |
+
+Design details, decisions, and verified API facts: `DESIGN.md`. Enhancement ideas awaiting approval: `PROPOSALS.md`.
