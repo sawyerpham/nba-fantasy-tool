@@ -1,0 +1,42 @@
+{
+ "CommonPlayerInfo": [
+  {
+   "PERSON_ID": 1642392,
+   "FIRST_NAME": "Jameer",
+   "LAST_NAME": "Nelson Jr.",
+   "DISPLAY_FIRST_LAST": "Jameer Nelson Jr.",
+   "DISPLAY_LAST_COMMA_FIRST": "Nelson Jr., Jameer",
+   "DISPLAY_FI_LAST": "J. Nelson Jr.",
+   "PLAYER_SLUG": "jameer-nelson-jr",
+   "BIRTHDATE": "2001-08-07T00:00:00",
+   "SCHOOL": "TCU",
+   "COUNTRY": "USA",
+   "LAST_AFFILIATION": "TCU/USA",
+   "HEIGHT": "6-1",
+   "WEIGHT": "190",
+   "SEASON_EXP": 0,
+   "JERSEY": "",
+   "POSITION": "Guard",
+   "ROSTERSTATUS": "Active",
+   "GAMES_PLAYED_CURRENT_SEASON_FLAG": "N",
+   "TEAM_ID": 1610612755,
+   "TEAM_NAME": "76ers",
+   "TEAM_ABBREVIATION": "PHI",
+   "TEAM_CODE": "sixers",
+   "TEAM_CITY": "Philadelphia",
+   "PLAYERCODE": "jameer_nelson_jr",
+   "FROM_YEAR": 2026,
+   "TO_YEAR": 2026,
+   "DLEAGUE_FLAG": "Y",
+   "NBA_FLAG": "N",
+   "GAMES_PLAYED_FLAG": "N",
+   "DRAFT_YEAR": "Undrafted",
+   "DRAFT_ROUND": "Undrafted",
+   "DRAFT_NUMBER": "Undrafted",
+   "GREATEST_75_FLAG": "N",
+   "SUPPLEMENTAL_STATUS": 0
+  }
+ ],
+ "PlayerHeadlineStats": [],
+ "AvailableSeasons": []
+}

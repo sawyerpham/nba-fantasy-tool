@@ -57,3 +57,18 @@ pnpm-debug.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# ---------- Pulled / generated data (not source) ----------
+# JSON store and provider caches for every app backend (draft-advisor now, fantasy-tracker later).
+# tests/fixtures/ is source and stays tracked.
+draft-advisor/backend/data/
+draft-advisor/backend/cache/
+fantasy-tracker/backend/data/
+fantasy-tracker/backend/cache/
+**/backend/data/
+**/backend/cache/
+
+SPEC.md
+CLAUDE.md
+DESIGN.md
+PROPOSALS.md

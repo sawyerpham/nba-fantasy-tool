@@ -1,0 +1,170 @@
+[
+ {
+  "id": 203500,
+  "full_name": "Steven Adams",
+  "first_name": "Steven",
+  "last_name": "Adams",
+  "is_active": true
+ },
+ {
+  "id": 1630631,
+  "full_name": "Jose Alvarado",
+  "first_name": "Jose",
+  "last_name": "Alvarado",
+  "is_active": true
+ },
+ {
+  "id": 203507,
+  "full_name": "Giannis Antetokounmpo",
+  "first_name": "Giannis",
+  "last_name": "Antetokounmpo",
+  "is_active": true
+ },
+ {
+  "id": 1628973,
+  "full_name": "Jalen Brunson",
+  "first_name": "Jalen",
+  "last_name": "Brunson",
+  "is_active": true
+ },
+ {
+  "id": 202710,
+  "full_name": "Jimmy Butler III",
+  "first_name": "Jimmy",
+  "last_name": "Butler III",
+  "is_active": true
+ },
+ {
+  "id": 1630595,
+  "full_name": "Cade Cunningham",
+  "first_name": "Cade",
+  "last_name": "Cunningham",
+  "is_active": true
+ },
+ {
+  "id": 203552,
+  "full_name": "Seth Curry",
+  "first_name": "Seth",
+  "last_name": "Curry",
+  "is_active": false
+ },
+ {
+  "id": 201939,
+  "full_name": "Stephen Curry",
+  "first_name": "Stephen",
+  "last_name": "Curry",
+  "is_active": true
+ },
+ {
+  "id": 201942,
+  "full_name": "DeMar DeRozan",
+  "first_name": "DeMar",
+  "last_name": "DeRozan",
+  "is_active": true
+ },
+ {
+  "id": 1629029,
+  "full_name": "Luka Dončić",
+  "first_name": "Luka",
+  "last_name": "Dončić",
+  "is_active": true
+ },
+ {
+  "id": 1630162,
+  "full_name": "Anthony Edwards",
+  "first_name": "Anthony",
+  "last_name": "Edwards",
+  "is_active": true
+ },
+ {
+  "id": 1628983,
+  "full_name": "Shai Gilgeous-Alexander",
+  "first_name": "Shai",
+  "last_name": "Gilgeous-Alexander",
+  "is_active": true
+ },
+ {
+  "id": 1630169,
+  "full_name": "Tyrese Haliburton",
+  "first_name": "Tyrese",
+  "last_name": "Haliburton",
+  "is_active": true
+ },
+ {
+  "id": 203999,
+  "full_name": "Nikola Jokić",
+  "first_name": "Nikola",
+  "last_name": "Jokić",
+  "is_active": true
+ },
+ {
+  "id": 1630228,
+  "full_name": "Jonathan Kuminga",
+  "first_name": "Jonathan",
+  "last_name": "Kuminga",
+  "is_active": true
+ },
+ {
+  "id": 1631097,
+  "full_name": "Bennedict Mathurin",
+  "first_name": "Bennedict",
+  "last_name": "Mathurin",
+  "is_active": true
+ },
+ {
+  "id": 2749,
+  "full_name": "Jameer Nelson",
+  "first_name": "Jameer",
+  "last_name": "Nelson",
+  "is_active": false
+ },
+ {
+  "id": 1627734,
+  "full_name": "Domantas Sabonis",
+  "first_name": "Domantas",
+  "last_name": "Sabonis",
+  "is_active": true
+ },
+ {
+  "id": 1814,
+  "full_name": "Chris Smith",
+  "first_name": "Chris",
+  "last_name": "Smith",
+  "is_active": false
+ },
+ {
+  "id": 203147,
+  "full_name": "Chris Smith",
+  "first_name": "Chris",
+  "last_name": "Smith",
+  "is_active": false
+ },
+ {
+  "id": 1628369,
+  "full_name": "Jayson Tatum",
+  "first_name": "Jayson",
+  "last_name": "Tatum",
+  "is_active": true
+ },
+ {
+  "id": 1629022,
+  "full_name": "Lonnie Walker IV",
+  "first_name": "Lonnie",
+  "last_name": "Walker IV",
+  "is_active": false
+ },
+ {
+  "id": 1641705,
+  "full_name": "Victor Wembanyama",
+  "first_name": "Victor",
+  "last_name": "Wembanyama",
+  "is_active": true
+ },
+ {
+  "id": 1631119,
+  "full_name": "Jaylin Williams",
+  "first_name": "Jaylin",
+  "last_name": "Williams",
+  "is_active": true
+ }
+]
