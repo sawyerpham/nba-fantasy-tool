@@ -2,6 +2,7 @@ fastapi
 uvicorn
 pydantic>=2
 requests
+httpx
 nba_api
 pytest
 -e ../../shared

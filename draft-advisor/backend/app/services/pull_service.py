@@ -84,8 +84,8 @@ class PlayerDetailCache:
             return cached
         try:
             detail = self.stats.fetch_player_detail(player_id)
-        except CallFailed as exc:
-            log.warning("player detail %s failed: %s", player_id, exc)
+        except (CallFailed, OSError, ValueError, KeyError) as exc:
+            log.warning("player detail %s unavailable: %s: %s", player_id, type(exc).__name__, exc)
             return None
         self.store.write_model(rel, detail)
         return detail
