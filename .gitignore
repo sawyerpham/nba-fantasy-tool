@@ -72,3 +72,8 @@ SPEC.md
 CLAUDE.md
 DESIGN.md
 PROPOSALS.md
+
+# ---------- Frontend build / e2e output ----------
+draft-advisor/frontend/dist/
+draft-advisor/frontend/e2e/screenshots/
+draft-advisor/frontend/e2e/last-run.json
