@@ -217,14 +217,56 @@ class DraftEngine:
         return last
 
     def reassign_slot(self, pick_number: int, slot: str) -> Pick:
+        return self.edit_pick(pick_number, slot=slot)
+
+    def edit_pick(
+        self, pick_number: int, manager_id: str | None = None, price: int | None = None, slot: str | None = None
+    ) -> Pick:
+        """Fix who drafted whom after the fact: move a recorded pick (keepers included) to another manager
+        and/or change its price or slot. The new manager must afford it under the reservation rule and
+        have a slot that fits; the pick keeps its number, nomination and timestamp."""
+        pick = self._pick(pick_number)
+        target = self.manager(manager_id or pick.manager_id)
+        new_price = pick.price if price is None else price
+        others = [p for p in self.draft.picks if p.pick_number != pick_number]
+        error = validate_bid(new_price, manager_budget(self.league, target, others), self.league.min_bid)
+        if error:
+            raise DraftError(error)
+        if self.league.bid_increment > 1 and (new_price - self.league.min_bid) % self.league.bid_increment:
+            raise DraftError(f"bid ${new_price} is not a multiple of the ${self.league.bid_increment} increment")
+        own = [p for p in others if p.manager_id == target.manager_id]
+        eligibility = self.eligibility(pick.player_id)
+        if slot is None:
+            keep = pick.slot if target.manager_id == pick.manager_id else None
+            if keep is None or roster.validate_slot(self.league, own, eligibility, keep):
+                keep = roster.assign_slot(self.league, own, eligibility)
+            if keep is None:
+                raise DraftError(f"{target.manager_id} has no open slot that fits {', '.join(eligibility) or 'this player'}")
+            slot = keep
+        else:
+            error = roster.validate_slot(self.league, own, eligibility, slot)
+            if error:
+                raise DraftError(error)
+        pick.manager_id = target.manager_id
+        pick.price = new_price
+        pick.slot = slot  # type: ignore[assignment]
+        return pick
+
+    def remove_pick(self, pick_number: int) -> Pick:
+        """Delete any recorded pick, not just the last one; later picks are renumbered and the player is
+        available again. Auction picks move the nomination pointer back one step, keepers do not."""
+        pick = self._pick(pick_number)
+        self.draft.picks = [p for p in self.draft.picks if p.pick_number != pick_number]
+        for i, p in enumerate(self.draft.picks, 1):
+            p.pick_number = i
+        if not pick.is_keeper:
+            self.draft.nomination_pointer = max(0, self.draft.nomination_pointer - 1)
+        return pick
+
+    def _pick(self, pick_number: int) -> Pick:
         pick = next((p for p in self.draft.picks if p.pick_number == pick_number), None)
         if pick is None:
             raise DraftError(f"no pick #{pick_number}")
-        others = [p for p in self.picks_for(pick.manager_id) if p.pick_number != pick_number]
-        error = roster.validate_slot(self.league, others, self.eligibility(pick.player_id), slot)
-        if error:
-            raise DraftError(error)
-        pick.slot = slot  # type: ignore[assignment]
         return pick
 
     def complete(self) -> None:

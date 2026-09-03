@@ -83,6 +83,12 @@ class ReassignIn(BaseModel):
     slot: SlotType
 
 
+class EditPickIn(BaseModel):
+    manager_id: str | None = None
+    price: int | None = None
+    slot: SlotType | None = None
+
+
 class NominationOrderIn(BaseModel):
     order: list[str]
 

@@ -258,3 +258,70 @@ def test_progress_and_keeper_records():
     recs = e.keeper_records("2026-27")
     assert len(recs) == 1 and recs[0].manager_id == "m2" and recs[0].player_name == "Bo Guard"
     assert recs[0].cost.type == "auction" and recs[0].cost.amount == 9
+
+
+# ------------------------------------------------------------------ editing recorded picks (who drafted whom)
+
+def live_engine() -> DraftEngine:
+    e = engine()
+    e.start([KeeperAssignment("m1", 1, 20)])   # Ace Center kept by m1 for $20 (C)
+    e.nominate(2)
+    e.pick(2, "m2", 15)                        # Bo Guard -> m2 $15 (PG)
+    e.nominate(3)
+    e.pick(3, "m3", 10)                        # Cy Wing -> m3 $10 (UTIL)
+    return e
+
+
+def test_edit_pick_moves_a_pick_to_another_manager_with_an_auto_slot():
+    e = live_engine()
+    p = e.edit_pick(2, manager_id="m3")
+    assert (p.manager_id, p.price, p.slot, p.pick_number) == ("m3", 15, "PG", 2)
+    assert e.budget("m2").remaining == 50 and e.budget("m3").remaining == 25
+    assert [x.manager_id for x in e.draft.picks] == ["m1", "m3", "m3"]
+    assert e.draft.nomination_pointer == 2  # unchanged: the same number of auction picks happened
+
+
+def test_edit_pick_changes_price_and_slot_for_the_same_manager():
+    e = live_engine()
+    p = e.edit_pick(2, price=22)
+    assert p.price == 22 and p.slot == "PG" and e.budget("m2").remaining == 28
+    p = e.edit_pick(2, slot="UTIL")
+    assert p.slot == "UTIL" and e.open_slots("m2")["PG"] == 1 and e.open_slots("m2")["UTIL"] == 0
+
+
+def test_edit_pick_enforces_the_reservation_rule_for_the_new_manager():
+    e = live_engine()
+    with pytest.raises(DraftError, match="exceeds max bid"):
+        e.edit_pick(2, manager_id="m3", price=37)   # m3: $40 left, 5 open slots after this pick -> max $36
+    e.edit_pick(2, manager_id="m3", price=36)
+    assert e.budget("m3").remaining == 4 and e.budget("m3").max_bid == 1
+
+
+def test_edit_pick_rejects_a_slot_that_does_not_fit_and_unknown_picks():
+    e = live_engine()
+    with pytest.raises(DraftError, match="not eligible"):
+        e.edit_pick(2, slot="C")   # Bo Guard is PG/SG
+    with pytest.raises(DraftError, match="no pick #9"):
+        e.edit_pick(9, price=5)
+    assert e.draft.picks[1].slot == "PG" and e.draft.picks[1].price == 15
+
+
+def test_keeper_pick_can_move_between_managers():
+    e = live_engine()
+    p = e.edit_pick(1, manager_id="m2", price=25)
+    assert p.is_keeper and (p.manager_id, p.price, p.slot) == ("m2", 25, "C")
+    assert e.budget("m1").remaining == 50 and e.budget("m2").remaining == 10
+    assert [(r.manager_id, r.cost.amount) for r in e.keeper_records("2026-27")] == [("m2", 25)]
+
+
+def test_remove_pick_renumbers_frees_the_player_and_steps_the_pointer_back():
+    e = live_engine()
+    removed = e.remove_pick(2)
+    assert removed.player_id == 2 and e.is_available(2)
+    assert [(p.pick_number, p.player_id) for p in e.draft.picks] == [(1, 1), (2, 3)]
+    assert e.budget("m2").remaining == 50 and e.draft.nomination_pointer == 1
+    e.remove_pick(1)   # keepers can be removed too; the pointer only tracks auction picks
+    assert [(p.pick_number, p.player_id) for p in e.draft.picks] == [(1, 3)] and e.draft.nomination_pointer == 1
+    with pytest.raises(DraftError, match="no pick #5"):
+        e.remove_pick(5)
+

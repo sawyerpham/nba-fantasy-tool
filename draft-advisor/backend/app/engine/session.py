@@ -164,11 +164,26 @@ class DraftSession:
 
     def start(self, keepers: list[KeeperAssignment]) -> None:
         self.engine.start(keepers)
-        season_rows = self.engine.keeper_records(self.league.roster_season)
-        kept = {(r.season, r.manager_id) for r in season_rows}
+        self.sync_keeper_history()
+
+    def sync_keeper_history(self) -> None:
+        """This season's keeper rows in the history mirror the keeper picks in the draft."""
+        season = self.league.roster_season
         self.keeper_history.records = [
-            r for r in self.keeper_history.records if (r.season, r.manager_id) not in kept
-        ] + season_rows
+            r for r in self.keeper_history.records if r.season != season
+        ] + self.engine.keeper_records(season)
+
+    def edit_pick(self, pick_number: int, manager_id: str | None = None, price: int | None = None, slot: str | None = None):
+        pick = self.engine.edit_pick(pick_number, manager_id, price, slot)
+        if pick.is_keeper:
+            self.sync_keeper_history()
+        return pick
+
+    def remove_pick(self, pick_number: int):
+        pick = self.engine.remove_pick(pick_number)
+        if pick.is_keeper:
+            self.sync_keeper_history()
+        return pick
 
     # ------------------------------------------------------------------ export / import
 

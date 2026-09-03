@@ -154,7 +154,9 @@ try {
   assert((await nextId()) === "m2", "m2 nominates after m1");
   assert((await page.getByTestId("next-nominator").textContent()) === "Early Eddie", "next nominator shown by name, not id");
   for (let k = 0; k < 11; k++) await page.getByTestId("order-left-m12").click();  // each click waits for the previous save (arrows disable while busy)
-  await page.waitForFunction(() => document.querySelector('[data-testid="order-next-m12"]')?.textContent.startsWith("1."));
+  // wait for the last save to land: the chip shows "1." and the arrows are enabled again (not busy)
+  await page.waitForFunction(() => document.querySelector('[data-testid="order-next-m12"]')?.textContent.startsWith("1.")
+    && !document.querySelector('[data-testid="order-right-m12"]')?.disabled);
   let order = (await apiGet(`/leagues/${LEAGUE}/draft`)).nomination_order;
   assert(order[0] === "m12" && order[1] === "m1", `m12 moved to the front: ${order}`);
   assert((await nextId()) === "m2", "reordering keeps whose turn it is");
@@ -186,6 +188,22 @@ try {
   await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
   log("rankings: position chip filter and column sort work");
+  // adjust who drafted whom: Jokić is pick #3 (after two keepers); move it to m2 through the edit dialog, then back
+  await page.getByTestId("pick-chip-3").click();
+  await page.getByTestId("edit-pick-dialog").waitFor();
+  await page.getByTestId("edit-pick-manager").selectOption("m2");
+  await page.getByTestId("edit-pick-save").click();
+  await page.getByTestId("edit-pick-dialog").waitFor({ state: "detached" });
+  let moved = (await apiGet(`/leagues/${LEAGUE}/draft`)).picks.find((p) => p.pick_number === 3);
+  assert(moved.manager_id === "m2" && moved.price === recMax, `pick #3 moved to m2 at the same price: ${JSON.stringify(moved)}`);
+  await page.getByTestId("pick-chip-3").click();
+  await page.getByTestId("edit-pick-manager").selectOption("m1");
+  await page.getByTestId("edit-pick-save").click();
+  await page.getByTestId("edit-pick-dialog").waitFor({ state: "detached" });
+  moved = (await apiGet(`/leagues/${LEAGUE}/draft`)).picks.find((p) => p.pick_number === 3);
+  assert(moved.manager_id === "m1", "pick #3 moved back to m1");
+  log("who-drafted-whom fixed through the pick chip: #3 m1 -> m2 -> m1");
+  summary.steps.push("pick moved between managers via the edit dialog");
 
   // ---------------------------------------------------------------- 6. full mock auction through the UI
   let n = 1;
