@@ -29,6 +29,10 @@ def reconcile_rel(roster_season: str) -> str:
     return f"cache/reconcile_{roster_season}.json"
 
 
+def valuations_rel(stats_season: str, scoring_hash: str) -> str:
+    return f"cache/valuations_{stats_season}_{scoring_hash}.json"
+
+
 def player_detail_rel(player_id: int) -> str:
     return f"cache/player_detail/{player_id}.json"
 

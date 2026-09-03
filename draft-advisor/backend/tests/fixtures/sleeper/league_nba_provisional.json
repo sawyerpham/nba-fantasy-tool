@@ -1,0 +1,38 @@
+{
+  "_fixture_note": "HAND-WRITTEN, PROVISIONAL. Not a real Sleeper response. Key names follow Sleeper's conventional NBA scoring keys as best known and are UNVERIFIED because no sleeper_league_id was available (DESIGN.md decision 11). Values mirror SPEC.md defaults. Replace with a captured /v1/league/<id> response when a league id is available.",
+  "league_id": "000000000000000000",
+  "name": "Provisional NBA league fixture",
+  "sport": "nba",
+  "season": "2026",
+  "status": "pre_draft",
+  "total_rosters": 12,
+  "roster_positions": ["PG", "SG", "SF", "PF", "C", "UTIL", "UTIL", "BN", "BN", "BN", "BN", "BN", "BN", "BN", "BN", "IR", "IR"],
+  "settings": {
+    "num_teams": 12,
+    "max_keepers": 1,
+    "reserve_slots": 2,
+    "type": 1,
+    "waiver_budget": 100
+  },
+  "scoring_settings": {
+    "pts": 0.25,
+    "reb": 0.4,
+    "ast": 0.5,
+    "stl": 0.75,
+    "blk": 0.75,
+    "to": -0.5,
+    "fgm": 0.25,
+    "fga": -0.1,
+    "ftm": 0.05,
+    "fta": 0.0,
+    "tpm": 0.3,
+    "dd": 0.0,
+    "td": 2.0,
+    "bonus_pt_40": 4.0,
+    "bonus_pt_50": 1.0,
+    "bonus_ast_15": 4.0,
+    "bonus_reb_20": 4.0
+  },
+  "draft_id": null,
+  "previous_league_id": null
+}
