@@ -267,7 +267,11 @@ def test_full_draft_flow_over_the_api(pulled):
     assert len(everyone) == 23 - 3
     r = client.put("/api/leagues/lg-draft/draft/nomination-order", json={"order": ["m12"] + [f"m{i}" for i in range(1, 12)]})
     assert r.status_code == 200 and r.json()["nomination_order"][0] == "m12"
+    assert r.json()["next_nominator"] == "m3"  # reordering on the fly keeps whose turn it is
     assert client.put("/api/leagues/lg-draft/draft/nomination-order", json={"order": ["m1"]}).status_code == 400
+    r = client.put("/api/leagues/lg-draft/draft/next-nominator", json={"manager_id": "m8"})
+    assert r.status_code == 200 and r.json()["next_nominator"] == "m8"
+    assert client.put("/api/leagues/lg-draft/draft/next-nominator", json={"manager_id": "m99"}).status_code == 400
 
     # persisted: a fresh AppState over the same store sees the same draft
     fresh = AppState(state.store, state.stats, state.platform)

@@ -15,6 +15,7 @@ export default function PickDialog({ leagueId, view, player, onClose, onPicked }
   const manager = managers.find((m) => m.manager_id === managerId);
   const maxBid = manager?.budget?.max_bid ?? 0;
   const slots = useMemo(() => Object.keys(manager?.open_slots || {}).filter((s) => s !== "IR"), [manager]);
+  const clamp = (v) => Math.max(1, Math.min(Number(v) || 1, maxBid || 1));
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +31,12 @@ export default function PickDialog({ leagueId, view, player, onClose, onPicked }
     const suggested = rec?.recommended_max ?? 1;
     setPrice(Math.max(1, Math.min(suggested || 1, maxBid || 1)));
   }, [rec, maxBid]);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const submit = async (e) => {
     e?.preventDefault();
@@ -65,6 +72,14 @@ export default function PickDialog({ leagueId, view, player, onClose, onPicked }
           <label>Price $
             <input type="number" min="1" max={maxBid} value={price} onChange={(e) => setPrice(e.target.value)} data-testid="pick-price" autoFocus />
             <span className="small muted"> max for this manager: <span data-testid="pick-max-bid">${maxBid}</span></span>
+            <div className="row" style={{ marginTop: 4 }}>
+              <button type="button" className="small" onClick={() => setPrice(clamp(rec?.recommended_max ?? 1))} disabled={!rec} title="recommended max">rec</button>
+              <button type="button" className="small" onClick={() => setPrice(clamp(maxBid))} title="this manager's max bid">max</button>
+              <button type="button" className="small" onClick={() => setPrice(clamp(Number(price) - 1))}>−1</button>
+              <button type="button" className="small" onClick={() => setPrice(clamp(Number(price) + 1))}>+1</button>
+              <button type="button" className="small" onClick={() => setPrice(clamp(Number(price) + 5))}>+5</button>
+              <button type="button" className="small" onClick={() => setPrice(1)}>$1</button>
+            </div>
           </label>
           <label>Slot
             <select value={slot} onChange={(e) => setSlot(e.target.value)} data-testid="pick-slot">
@@ -75,8 +90,8 @@ export default function PickDialog({ leagueId, view, player, onClose, onPicked }
         </div>
         {error && <div className="error" data-testid="pick-error">{error}</div>}
         <div className="row" style={{ marginTop: 10 }}>
-          <button type="submit" className="primary" disabled={busy || !managerId} data-testid="pick-submit">Record pick</button>
-          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={busy || !managerId} data-testid="pick-submit">Record pick (Enter)</button>
+          <button type="button" onClick={onClose}>Cancel (Esc)</button>
         </div>
       </form>
     </div>

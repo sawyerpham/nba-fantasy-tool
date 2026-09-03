@@ -10,7 +10,7 @@ from ..engine.draft_state import DraftError, KeeperAssignment
 from ..services.app_state import AppState
 from ..services.league_repository import LeagueNotFound
 from .deps import get_state
-from .schemas import NominateIn, NominationOrderIn, PickIn, ReassignIn, StartDraft
+from .schemas import NextNominatorIn, NominateIn, NominationOrderIn, PickIn, ReassignIn, StartDraft
 
 router = APIRouter(prefix="/leagues/{league_id}", tags=["draft"])
 
@@ -91,6 +91,11 @@ def reset(league_id: str, state: AppState = Depends(get_state)) -> dict:
 @router.put("/draft/nomination-order")
 def set_nomination_order(league_id: str, body: NominationOrderIn, state: AppState = Depends(get_state)) -> dict:
     return _mutate(state, league_id, lambda s: s.engine.set_nomination_order(body.order))
+
+
+@router.put("/draft/next-nominator")
+def set_next_nominator(league_id: str, body: NextNominatorIn, state: AppState = Depends(get_state)) -> dict:
+    return _mutate(state, league_id, lambda s: s.engine.set_next_nominator(body.manager_id))
 
 
 @router.get("/rankings")

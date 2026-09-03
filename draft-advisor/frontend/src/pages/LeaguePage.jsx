@@ -134,33 +134,47 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   );
 }
 
-function KeeperHistoryEditor({ leagueId, history, reload }) {
+function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
   const [rows, setRows] = useState(history);
   const [msg, setMsg] = useState("");
+  const [season, setSeason] = useState("2025-26");
   useEffect(() => setRows(history), [history]);
   const dirty = JSON.stringify(rows) !== JSON.stringify(history);
   const update = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const add = () => setRows([...rows, { season: "2025-26", manager_id: "m1", player_id: 0, player_name: "", cost: { type: "auction", amount: 1, round: null, pick: null } }]);
+  const blank = (managerId) => ({ season, manager_id: managerId, player_id: 0, player_name: "", cost: { type: "auction", amount: 1, round: null, pick: null } });
+  const add = () => setRows([...rows, blank("m1")]);
+  const addAllManagers = () => setRows([...rows, ...managers.filter((m) => !rows.some((r) => r.season === season && r.manager_id === m.manager_id)).map((m) => blank(m.manager_id))]);
   const save = async () => {
     setMsg("");
     try {
-      await api.put(`/leagues/${leagueId}/keepers/history`, { records: rows });
-      setMsg("Keeper history saved");
+      await api.put(`/leagues/${leagueId}/keepers/history`, { records: rows.filter((r) => r.player_id) });
+      setMsg("Keeper history saved (rows without a player were dropped)");
       reload();
     } catch (e) {
       setMsg(e.message);
     }
   };
+  const managerName = (id) => managers.find((m) => m.manager_id === id)?.name || id;
   return (
     <div className="panel">
       <h3>Keeper history (prior seasons) <span className="muted small">— what each keeper cost in that season; this year's keepers and their prices are entered when you start the draft</span></h3>
+      <div className="row small" style={{ marginBottom: 6 }}>
+        season <input type="text" value={season} onChange={(e) => setSeason(e.target.value)} style={{ width: 80, minWidth: 0 }} />
+        <button onClick={addAllManagers} data-testid="history-add-all">Add a row for every manager</button>
+        <span className="muted">then just pick each player and the price; empty rows are ignored</span>
+      </div>
       <table>
         <thead><tr><th>season</th><th>manager</th><th>player</th><th>cost type</th><th>$ paid (auction) / round (draft)</th><th>pick</th><th></th></tr></thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={i}>
               <td><input type="text" value={r.season} onChange={(e) => update(i, { season: e.target.value })} style={{ width: 80, minWidth: 0 }} /></td>
-              <td><input type="text" value={r.manager_id} onChange={(e) => update(i, { manager_id: e.target.value })} style={{ width: 60, minWidth: 0 }} /></td>
+              <td>
+                <select value={r.manager_id} onChange={(e) => update(i, { manager_id: e.target.value })}>
+                  {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name}</option>)}
+                  {!managers.some((m) => m.manager_id === r.manager_id) && <option value={r.manager_id}>{r.manager_id}</option>}
+                </select>
+              </td>
               <td>
                 {r.player_name || <em className="muted">pick a player</em>} <span className="muted small">#{r.player_id || "?"}</span>
                 <PlayerSearch onSelect={(p) => update(i, { player_id: p.player_id, player_name: p.full_name })} placeholder="find…" testId={`keeper-history-search-${i}`} />
@@ -252,7 +266,7 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
         <>
           <h2>{doc.league.name} <span className="muted small">({doc.league.league_id}, draft {doc.draft.status})</span></h2>
           <ManagersEditor leagueId={leagueId} managers={doc.managers} draftStatus={doc.draft.status} reload={loadDoc} />
-          <KeeperHistoryEditor leagueId={leagueId} history={doc.keepers.history} reload={loadDoc} />
+          <KeeperHistoryEditor leagueId={leagueId} history={doc.keepers.history} managers={doc.managers} reload={loadDoc} />
         </>
       )}
     </div>

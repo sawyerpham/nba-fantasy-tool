@@ -107,21 +107,23 @@ try {
 
   await page.getByTestId("btn-start").click();
   await page.getByTestId("start-dialog").waitFor();
-  // keepers are entered with LAST year's price; the league rule (+$1 per full $5) computes this year's price
-  const keepers = [["m3", "doncic", 17, 20], ["m7", "gilgeous", 55, 66]];
-  for (let i = 0; i < keepers.length; i++) {
-    const [mgr, q, last, expected] = keepers[i];
-    await page.getByTestId("keeper-add").click();
-    await page.getByTestId(`keeper-manager-${i}`).selectOption(mgr);
+  // one row per manager is pre-filled: only the player and LAST year's price are typed;
+  // the league rule (+$1 per full $5) computes this year's price
+  assert((await page.locator('[data-testid^="keeper-row-"]').count()) === 12, "one keeper row per manager pre-filled");
+  const keepers = [["m3", 2, "doncic", 17, 20], ["m7", 6, "gilgeous", 55, 66]];
+  let verdictsSeen = 0;
+  for (const [mgr, i, q, last, expected] of keepers) {
+    assert((await page.getByTestId(`keeper-manager-${i}`).inputValue()) === mgr, `row ${i} belongs to ${mgr}`);
     await page.getByTestId(`keeper-search-${i}`).fill(q);
     await page.locator(`[data-testid^="search-result-"]`).first().click();
     await page.getByTestId(`keeper-player-${i}`).waitFor();
     await page.getByTestId(`keeper-last-${i}`).fill(String(last));
     await page.waitForFunction(([idx, exp]) => document.querySelector(`[data-testid="keeper-cost-${idx}"]`)?.value === String(exp), [i, expected]);
-    const verdict = await page.getByTestId("keeper-verdict").nth(i).textContent();
-    log(`keeper ${i}: last $${last} -> this year $${expected}; ${verdict.trim()}`);
+    const verdict = await page.getByTestId("keeper-verdict").nth(verdictsSeen++).textContent();
+    log(`keeper ${mgr}: last $${last} -> this year $${expected}; ${verdict.trim()}`);
     assert(/GOOD|EVEN|BAD/.test(verdict), "keeper verdict rendered");
   }
+  assert((await page.getByTestId("keepers-entered").textContent()).startsWith("2 keepers"), "entered counter");
   await page.getByTestId("start-confirm").click();
   await page.waitForFunction(() => document.querySelector('[data-testid="draft-status"]')?.textContent === "live");
   const started = await apiGet(`/leagues/${LEAGUE}/draft`);
@@ -146,6 +148,30 @@ try {
   await page.getByTestId("pick-dialog").waitFor({ state: "detached" });
   log(`user (m1) won ${first.full_name} for the recommended $${recMax}`);
   summary.picks.push({ n: 1, player: first.full_name, winner: "m1", price: recMax, rec: recMax, path: "nominate+record" });
+
+  // nomination order on the fly: move m12 to the front with the arrow buttons (next nominator m2 must stay), then make m5 next
+  assert((await page.getByTestId("next-nominator").textContent()) === "m2", "m2 nominates after m1");
+  for (let k = 0; k < 11; k++) await page.getByTestId("order-left-m12").click();  // each click waits for the previous save (arrows disable while busy)
+  await page.waitForFunction(() => document.querySelector('[data-testid="order-next-m12"]')?.textContent.startsWith("1."));
+  let order = (await apiGet(`/leagues/${LEAGUE}/draft`)).nomination_order;
+  assert(order[0] === "m12" && order[1] === "m1", `m12 moved to the front: ${order}`);
+  assert((await page.getByTestId("next-nominator").textContent()) === "m2", "reordering keeps whose turn it is");
+  await page.getByTestId("order-next-m5").click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="next-nominator"]')?.textContent === "m5");
+  log("nomination order reordered on the fly (m12 first, m2 kept its turn), then m5 made next");
+  summary.steps.push("nomination order reordered on the fly + make-next");
+  // rankings QoL: position chip + column sort
+  await page.getByTestId("pos-C").click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid^="rank-row-"]')].every((tr) => tr.children[3].textContent.includes("C")));
+  await page.getByTestId("pos-C").click();
+  await page.locator('[data-testid="rankings-table"] th', { hasText: "Best" }).click();
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('[data-testid^="rank-row-"]')];
+    return rows.length > 2 && Number(rows[0].children[8].textContent) >= Number(rows[1].children[8].textContent);
+  });
+  await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
+  await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
+  log("rankings: position chip filter and column sort work");
 
   // ---------------------------------------------------------------- 6. full mock auction through the UI
   let n = 1;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
@@ -6,6 +6,9 @@ import ManagersPanel from "../components/ManagersPanel.jsx";
 import PickDialog from "../components/PickDialog.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
+import NominationOrderBar from "../components/NominationOrderBar.jsx";
+
+const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
 export default function DraftPage({ leagueId }) {
   const [view, setView] = useState(null);
@@ -14,9 +17,12 @@ export default function DraftPage({ leagueId }) {
   const [showAll, setShowAll] = useState(false);
   const [limit, setLimit] = useState(150);
   const [filter, setFilter] = useState("");
+  const [posFilter, setPosFilter] = useState("");
+  const [sort, setSort] = useState({ key: "rank", dir: "asc" });
   const [selected, setSelected] = useState(null);
   const [pick, setPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
+  const [showManagers, setShowManagers] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -33,16 +39,43 @@ export default function DraftPage({ leagueId }) {
     Promise.all([loadView(), loadRankings(), api.get(`/leagues/${leagueId}/settings`).then(setSettings)]).catch((e) => setError(e.message));
   }, [leagueId, loadView, loadRankings]);
 
+  // "/" focuses the mark-drafted search box (when not already typing somewhere).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        document.querySelector('[data-testid="search-input"]')?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const visible = useMemo(() => {
+    let rows = rankings;
+    if (filter) rows = rows.filter((r) => r.full_name.toLowerCase().includes(filter.toLowerCase()));
+    if (posFilter) rows = rows.filter((r) => r.eligibility.includes(posFilter));
+    const { key, dir } = sort;
+    const sign = dir === "asc" ? 1 : -1;
+    return rows.slice().sort((a, b) => {
+      const x = a[key], y = b[key];
+      if (x === y) return a.rank - b.rank;
+      if (x === null || x === undefined) return 1;
+      if (y === null || y === undefined) return -1;
+      return (x < y ? -1 : 1) * sign;
+    });
+  }, [rankings, filter, posFilter, sort]);
+
   if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
   if (!view) return <p>{error || "Loading…"}</p>;
 
   const live = view.status === "live";
   const bump = () => setRefreshKey((k) => k + 1);
 
-  const act = async (path, body) => {
+  const act = async (path, body, method = "post") => {
     setError(""); setNotice("");
     try {
-      const v = await api.post(`/leagues/${leagueId}/draft/${path}`, body || {});
+      const v = await api[method](`/leagues/${leagueId}/draft/${path}`, body || {});
       setView(v);
       await loadRankings();
       bump();
@@ -58,6 +91,7 @@ export default function DraftPage({ leagueId }) {
     setView(v);
     await loadRankings();
     bump();
+    setTimeout(() => document.querySelector('[data-testid="search-input"]')?.focus(), 0);
   };
 
   const exportLeague = async () => {
@@ -70,10 +104,11 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
+  const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : (["rank", "full_name", "team_abbr", "injury_status"].includes(key) ? "asc" : "desc") }));
   const onOverridesChanged = () => { loadRankings(); loadView(); };
   const nominated = view.current_nomination;
   const nominatedName = nominated ? (rankings.find((r) => r.player_id === nominated.player_id)?.full_name || `#${nominated.player_id}`) : null;
-  const visible = filter ? rankings.filter((r) => r.full_name.toLowerCase().includes(filter.toLowerCase())) : rankings;
+  const userName = view.managers.find((m) => m.is_user)?.name || "you";
 
   return (
     <div>
@@ -88,6 +123,14 @@ export default function DraftPage({ leagueId }) {
           {view.status !== "setup" && <button className="danger" onClick={() => window.confirm("Reset the draft? All picks are removed.") && act("reset")} data-testid="btn-reset">Reset</button>}
           <button onClick={exportLeague} data-testid="btn-export">Export JSON</button>
         </div>
+        <NominationOrderBar
+          managers={view.managers}
+          order={view.nomination_order}
+          nextNominator={view.next_nominator}
+          live={live}
+          onReorder={(order) => act("nomination-order", { order }, "put")}
+          onMakeNext={(manager_id) => act("next-nominator", { manager_id }, "put")}
+        />
         {live && (
           <div className="row" style={{ marginTop: 6 }}>
             <span>On the block:</span>
@@ -98,7 +141,7 @@ export default function DraftPage({ leagueId }) {
                 <button className="primary" onClick={() => setPick({ player_id: nominated.player_id, full_name: nominatedName })} data-testid="btn-record-bid">Record winning bid…</button>
               </>
             ) : <span className="muted">nobody — nominate from the table, or mark a drafted player via search</span>}
-            <span style={{ marginLeft: 12 }}>Mark drafted:</span>
+            <span style={{ marginLeft: 12 }}>Mark drafted (press <kbd>/</kbd>):</span>
             <PlayerSearch leagueId={leagueId} onSelect={(p) => (p.drafted_by ? setError(`${p.full_name} is already drafted by ${p.drafted_by}`) : setPick(p))} placeholder="type a name…" />
           </div>
         )}
@@ -109,8 +152,12 @@ export default function DraftPage({ leagueId }) {
       <div className="cols">
         <div>
           <div className="row" style={{ marginBottom: 6 }}>
-            <h3 style={{ margin: 0 }}>Rankings (for {view.managers.find((m) => m.is_user)?.name || "you"})</h3>
+            <h3 style={{ margin: 0 }}>Rankings (for {userName})</h3>
             <input type="text" placeholder="filter…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
+            <span className="chips">
+              <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>all</button>
+              {POSITIONS.map((p) => <button key={p} className={`small chip ${posFilter === p ? "on" : ""}`} onClick={() => setPosFilter(posFilter === p ? "" : p)} data-testid={`pos-${p}`}>{p}</button>)}
+            </span>
             <label className="inline"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> include players I cannot roster</label>
             <label className="inline">show <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
             <button onClick={() => { loadRankings(); loadView(); }}>Refresh</button>
@@ -123,12 +170,17 @@ export default function DraftPage({ leagueId }) {
               onNominate={(r) => act("nominate", { player_id: r.player_id })}
               onDraft={(r) => setPick(r)}
               live={live}
+              sort={sort}
+              onSort={onSort}
             />
           </div>
         </div>
         <div>
           <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} />
-          <ManagersPanel managers={view.managers} />
+          <div className="row" style={{ marginBottom: 4 }}>
+            <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
+          </div>
+          {showManagers && <ManagersPanel managers={view.managers} />}
         </div>
       </div>
 

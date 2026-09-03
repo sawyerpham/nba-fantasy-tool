@@ -87,6 +87,10 @@ class NominationOrderIn(BaseModel):
     order: list[str]
 
 
+class NextNominatorIn(BaseModel):
+    manager_id: str
+
+
 class KeeperHistoryIn(BaseModel):
     records: list[KeeperRecord]
 
