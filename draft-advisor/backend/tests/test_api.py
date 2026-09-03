@@ -288,6 +288,36 @@ def test_full_draft_flow_over_the_api(pulled):
     assert client.post("/api/leagues/lg-draft/draft/pick", json={"player_id": SETH, "manager_id": "m4", "price": 1}).status_code == 400
 
 
+def test_picks_can_be_moved_between_managers_edited_and_removed(pulled):
+    """Fixing 'who drafted whom' after the fact: PATCH / DELETE a recorded pick; keeper history follows."""
+    client, state, *_ = pulled
+    league(client, "lg-edit", "Pick edits")
+    assert client.post("/api/leagues/lg-edit/draft/start", json={"keepers": [{"manager_id": "m3", "player_id": DONCIC, "cost": 50}]}).status_code == 200
+    assert client.post("/api/leagues/lg-edit/draft/pick", json={"player_id": JOKIC, "manager_id": "m1", "price": 70}).status_code == 200
+    assert client.post("/api/leagues/lg-edit/draft/pick", json={"player_id": BUTLER, "manager_id": "m2", "price": 12}).status_code == 200
+
+    r = client.patch("/api/leagues/lg-edit/draft/picks/2", json={"manager_id": "m2", "price": 65})
+    assert r.status_code == 200
+    pick = next(p for p in r.json()["picks"] if p["pick_number"] == 2)
+    budgets = {m["manager_id"]: m["budget"]["remaining"] for m in r.json()["managers"]}
+    assert pick["manager_id"] == "m2" and pick["price"] == 65 and pick["slot"] == "C"
+    assert budgets["m1"] == 200 and budgets["m2"] == 200 - 12 - 65
+    assert client.patch("/api/leagues/lg-edit/draft/picks/2", json={"price": 500}).status_code == 400
+    assert client.patch("/api/leagues/lg-edit/draft/picks/42", json={"price": 5}).status_code == 400
+
+    r = client.patch("/api/leagues/lg-edit/draft/picks/1", json={"manager_id": "m4"})  # keeper moves; history follows
+    assert r.status_code == 200 and next(p for p in r.json()["picks"] if p["pick_number"] == 1)["manager_id"] == "m4"
+    rows = [k for k in state.get_session("lg-edit").keeper_history.records if k.season == "2026-27"]
+    assert [(k.manager_id, k.player_id, k.cost.amount) for k in rows] == [("m4", DONCIC, 50)]
+
+    r = client.delete("/api/leagues/lg-edit/draft/picks/3")
+    assert r.status_code == 200 and [p["pick_number"] for p in r.json()["picks"]] == [1, 2]
+    assert any(row["player_id"] == BUTLER for row in client.get("/api/leagues/lg-edit/rankings").json())
+    assert client.delete("/api/leagues/lg-edit/draft/picks/3").status_code == 400
+    fresh = AppState(state.store, state.stats, state.platform)
+    assert len(fresh.get_session("lg-edit").draft.picks) == 2  # persisted
+
+
 def test_settings_managers_keepers_and_scoring_are_editable_mid_draft(pulled):
     """SPEC Definition of Done: league settings editable both at setup and mid-draft."""
     client, state, *_ = pulled

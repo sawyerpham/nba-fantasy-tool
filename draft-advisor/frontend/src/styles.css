@@ -104,3 +104,8 @@ kbd { border: 1px solid var(--input-border); border-radius: 3px; padding: 0 4px;
 .bid-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .bid-grid.four .bid-num { font-size: 18px; }
 .guide-lines { margin: 4px 0 4px 16px; padding: 0; }
+.pick-chip { display: inline-block; margin: 1px 6px 1px 0; padding: 0 4px; border-radius: 8px; white-space: nowrap; }
+.pick-chip.editable { cursor: grab; border: 1px solid transparent; }
+.pick-chip.editable:hover { background: var(--hover); border-color: var(--border); }
+.pick-chip.dragging { opacity: 0.4; }
+.manager-card.over { outline: 2px dashed var(--primary); }

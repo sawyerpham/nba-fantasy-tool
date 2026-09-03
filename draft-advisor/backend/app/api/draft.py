@@ -10,7 +10,7 @@ from ..engine.draft_state import DraftError, KeeperAssignment
 from ..services.app_state import AppState
 from ..services.league_repository import LeagueNotFound
 from .deps import get_state
-from .schemas import NextNominatorIn, NominateIn, NominationOrderIn, PickIn, ReassignIn, StartDraft
+from .schemas import EditPickIn, NextNominatorIn, NominateIn, NominationOrderIn, PickIn, ReassignIn, StartDraft
 
 router = APIRouter(prefix="/leagues/{league_id}", tags=["draft"])
 
@@ -76,6 +76,18 @@ def undo(league_id: str, state: AppState = Depends(get_state)) -> dict:
 @router.post("/draft/reassign")
 def reassign(league_id: str, body: ReassignIn, state: AppState = Depends(get_state)) -> dict:
     return _mutate(state, league_id, lambda s: s.engine.reassign_slot(body.pick_number, body.slot))
+
+
+@router.patch("/draft/picks/{pick_number}")
+def edit_pick(league_id: str, pick_number: int, body: EditPickIn, state: AppState = Depends(get_state)) -> dict:
+    """Fix who drafted whom: move a pick to another manager and/or change its price or slot."""
+    return _mutate(state, league_id, lambda s: s.edit_pick(pick_number, body.manager_id, body.price, body.slot))
+
+
+@router.delete("/draft/picks/{pick_number}")
+def remove_pick(league_id: str, pick_number: int, state: AppState = Depends(get_state)) -> dict:
+    """Remove any recorded pick (not only the last one); the player becomes available again."""
+    return _mutate(state, league_id, lambda s: s.remove_pick(pick_number))
 
 
 @router.post("/draft/complete")

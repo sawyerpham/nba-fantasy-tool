@@ -8,6 +8,7 @@ import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import NominationOrderBar from "../components/NominationOrderBar.jsx";
 import SpendingGuide from "../components/SpendingGuide.jsx";
+import EditPickDialog from "../components/EditPickDialog.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
@@ -22,6 +23,7 @@ export default function DraftPage({ leagueId }) {
   const [sort, setSort] = useState({ key: "rank", dir: "asc" });
   const [selected, setSelected] = useState(null);
   const [pick, setPick] = useState(null);
+  const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
   const [showManagers, setShowManagers] = useState(true);
   const [error, setError] = useState("");
@@ -185,11 +187,21 @@ export default function DraftPage({ leagueId }) {
           <div className="row" style={{ marginBottom: 4 }}>
             <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
           </div>
-          {showManagers && <ManagersPanel managers={view.managers} />}
+          {showManagers && (
+            <ManagersPanel
+              managers={view.managers}
+              onEditPick={view.status !== "setup" ? setEditPick : undefined}
+              onMovePick={(p, managerId) => act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch")}
+            />
+          )}
         </div>
       </div>
 
       {pick && <PickDialog leagueId={leagueId} view={view} player={pick} onClose={() => setPick(null)} onPicked={onPicked} />}
+      {editPick && (
+        <EditPickDialog leagueId={leagueId} view={view} pick={editPick} minBid={settings?.min_bid ?? 1} onClose={() => setEditPick(null)}
+          onSaved={async (v) => { setEditPick(null); setView(v); await loadRankings(); bump(); }} />
+      )}
       {startOpen && (
         <StartDraftDialog leagueId={leagueId} view={view} keeperSettings={settings?.keeper} onClose={() => setStartOpen(false)}
           onStarted={async (v) => { setStartOpen(false); setView(v); await loadRankings(); bump(); }} />
