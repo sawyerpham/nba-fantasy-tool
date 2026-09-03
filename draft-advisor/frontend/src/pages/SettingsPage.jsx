@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api.js";
+import useSaveShortcut from "../useSaveShortcut.js";
 
 const SLOT_TYPES = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL", "BN", "IR"];
 const BASE_KEYS = ["pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "ftm", "fg3m"];
@@ -13,6 +14,7 @@ function Num({ value, onChange, step = "any", ...rest }) {
 
 export default function SettingsPage({ leagueId }) {
   const [s, setS] = useState(null);
+  const [saved, setSaved] = useState(null);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [sleeperId, setSleeperId] = useState("");
@@ -21,9 +23,24 @@ export default function SettingsPage({ leagueId }) {
 
   const load = useCallback(() => {
     if (!leagueId) return;
-    api.get(`/leagues/${leagueId}/settings`).then((data) => { setS(data); setSleeperId(data.sleeper_league_id || ""); }).catch((e) => setError(e.message));
+    api.get(`/leagues/${leagueId}/settings`).then((data) => { setS(data); setSaved(data); setSleeperId(data.sleeper_league_id || ""); }).catch((e) => setError(e.message));
   }, [leagueId]);
   useEffect(() => { load(); }, [load]);
+
+  const dirty = s && saved && JSON.stringify(s) !== JSON.stringify(saved);
+
+  const save = useCallback(async () => {
+    if (!s) return;
+    setMsg(""); setError("");
+    try {
+      const result = await api.put(`/leagues/${leagueId}/settings`, s);
+      setS(result); setSaved(result);
+      setMsg("Settings saved. Valuations recompute automatically when scoring changed.");
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [leagueId, s]);
+  useSaveShortcut(save, !!s);
 
   if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
   if (!s) return <p>{error || "Loading…"}</p>;
@@ -36,17 +53,6 @@ export default function SettingsPage({ leagueId }) {
     set({ roster_slots: count > 0 ? [...others, { slot, count }] : others });
   };
   const mandatory = s.roster_slots.filter((r) => r.slot !== "IR").reduce((a, r) => a + r.count, 0);
-
-  const save = async () => {
-    setMsg(""); setError("");
-    try {
-      const saved = await api.put(`/leagues/${leagueId}/settings`, s);
-      setS(saved);
-      setMsg("Settings saved. Valuations recompute automatically when scoring changed.");
-    } catch (e) {
-      setError(e.message);
-    }
-  };
 
   const doPreview = async () => {
     setError(""); setPreview(null);
@@ -75,7 +81,12 @@ export default function SettingsPage({ leagueId }) {
   return (
     <div>
       <h2>League settings <span className="muted small">— every value is editable, before and during the draft</span></h2>
-      <div className="row"><button className="primary" onClick={save} data-testid="settings-save">Save settings</button>{msg && <span className="ok">{msg}</span>}{error && <span className="error">{error}</span>}</div>
+      <div className="row sticky-bar">
+        <button className="primary" onClick={save} data-testid="settings-save">Save settings (Ctrl+S)</button>
+        {dirty ? <span className="badge dirty" data-testid="settings-dirty">unsaved changes</span> : <span className="muted small">all changes saved</span>}
+        {dirty && <button onClick={() => setS(saved)}>Discard</button>}
+        {msg && <span className="ok">{msg}</span>}{error && <span className="error">{error}</span>}
+      </div>
 
       <div className="panel">
         <h3>General</h3>
@@ -107,6 +118,13 @@ export default function SettingsPage({ leagueId }) {
           <label className="inline"><input type="checkbox" checked={s.keeper.enabled} onChange={(e) => setDeep("keeper", { enabled: e.target.checked })} /> enabled</label>
           <label className="inline">max per manager <Num value={s.keeper.max_per_manager} onChange={(v) => setDeep("keeper", { max_per_manager: v })} step="1" data-testid="max-keepers" /></label>
           <label className="inline">deadline <input type="date" value={s.keeper.deadline || ""} onChange={(e) => setDeep("keeper", { deadline: e.target.value || null })} /></label>
+        </div>
+        <div className="row">
+          <span>Keeper price rule: this year's price = last year's price</span>
+          <label className="inline">+ $<Num value={s.keeper.escalation?.increase_per_step ?? 1} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, increase_per_step: v ?? 0 } })} step="1" data-testid="esc-increase" /></label>
+          <label className="inline">per full $<Num value={s.keeper.escalation?.step_dollars ?? 5} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, step_dollars: v ?? 1 } })} step="1" data-testid="esc-step" /></label>
+          <label className="inline"><input type="checkbox" checked={s.keeper.escalation?.enabled ?? true} onChange={(e) => setDeep("keeper", { escalation: { ...s.keeper.escalation, enabled: e.target.checked } })} /> enabled</label>
+          <span className="muted small">(e.g. $17 → ${(s.keeper.escalation?.enabled ?? true) ? 17 + (s.keeper.escalation?.increase_per_step ?? 1) * Math.floor(17 / Math.max(1, s.keeper.escalation?.step_dollars ?? 5)) : 17})</span>
         </div>
       </div>
 

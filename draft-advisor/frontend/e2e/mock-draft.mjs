@@ -56,17 +56,28 @@ try {
   await page.getByTestId("create-league-name").fill("Mock Auction 2026-27");
   await page.getByTestId("create-league-submit").click();
   await page.getByTestId(`manager-row-m2`).waitFor();
+  // bulk: paste 12 names, set everyone's pace, then one Save all
+  const names = ["Sawyer", "Early Eddie", "Manager Three", "Four", "Late Lucy", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
+  await page.getByTestId("bulk-names").fill(names.join("\n"));
+  await page.getByTestId("bulk-names-apply").click();
+  await page.getByTestId("bulk-pace").selectOption("even");
+  await page.getByTestId("bulk-apply").click();
   const row2 = page.getByTestId("manager-row-m2");
-  await row2.locator('input[type="text"]').fill("Early Eddie");
   await row2.locator("select").selectOption("early");
-  await row2.getByRole("button", { name: "Save" }).click();
   const row5 = page.getByTestId("manager-row-m5");
-  await row5.locator('input[type="text"]').fill("Late Lucy");
   await row5.locator("select").selectOption("late");
-  await row5.getByRole("button", { name: "Save" }).click();
-  await page.waitForTimeout(300);
+  await page.getByTestId("managers-save-all").click();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="managers-save-all"]:not([disabled])'));
+  const savedManagers = await apiGet(`/leagues/${LEAGUE}/managers`);
+  assert(savedManagers.map((m) => m.name).join(",") === names.join(","), "bulk names saved in one go");
+  assert(savedManagers[1].behavior.spend_pace === "early" && savedManagers[4].behavior.spend_pace === "late", "paces saved");
+  // theme toggle (dark is the default)
+  assert((await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "dark", "dark theme by default");
+  await page.getByTestId("theme-toggle").click();
+  assert((await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "light", "theme toggles to light");
+  await page.getByTestId("theme-toggle").click();
   await shot("02-league");
-  summary.steps.push("league created, managers edited");
+  summary.steps.push("league created, 12 managers named/paced in bulk and saved with one click, theme toggled");
 
   // ---------------------------------------------------------------- 3. settings (defaults, save round trip)
   await page.getByTestId("tab-settings").click();
@@ -96,20 +107,26 @@ try {
 
   await page.getByTestId("btn-start").click();
   await page.getByTestId("start-dialog").waitFor();
-  const keepers = [["m3", "doncic", 60], ["m7", "gilgeous", 55]];
+  // keepers are entered with LAST year's price; the league rule (+$1 per full $5) computes this year's price
+  const keepers = [["m3", "doncic", 17, 20], ["m7", "gilgeous", 55, 66]];
   for (let i = 0; i < keepers.length; i++) {
-    const [mgr, q, cost] = keepers[i];
+    const [mgr, q, last, expected] = keepers[i];
     await page.getByTestId("keeper-add").click();
     await page.getByTestId(`keeper-manager-${i}`).selectOption(mgr);
     await page.getByTestId(`keeper-search-${i}`).fill(q);
     await page.locator(`[data-testid^="search-result-"]`).first().click();
     await page.getByTestId(`keeper-player-${i}`).waitFor();
-    await page.getByTestId(`keeper-cost-${i}`).fill(String(cost));
+    await page.getByTestId(`keeper-last-${i}`).fill(String(last));
+    await page.waitForFunction(([idx, exp]) => document.querySelector(`[data-testid="keeper-cost-${idx}"]`)?.value === String(exp), [i, expected]);
+    const verdict = await page.getByTestId("keeper-verdict").nth(i).textContent();
+    log(`keeper ${i}: last $${last} -> this year $${expected}; ${verdict.trim()}`);
+    assert(/GOOD|EVEN|BAD/.test(verdict), "keeper verdict rendered");
   }
   await page.getByTestId("start-confirm").click();
   await page.waitForFunction(() => document.querySelector('[data-testid="draft-status"]')?.textContent === "live");
   const started = await apiGet(`/leagues/${LEAGUE}/draft`);
   assert(started.picks.length === 2 && started.picks.every((p) => p.is_keeper), "two keeper picks recorded");
+  assert(started.picks.map((p) => p.price).join(",") === "20,66", `keeper prices follow the rule: ${started.picks.map((p) => p.price)}`);
   log("draft live with keepers:", started.picks.map((p) => `${p.manager_id} $${p.price}`).join(", "));
   await shot("04-started");
   summary.steps.push("draft started with 2 keepers");

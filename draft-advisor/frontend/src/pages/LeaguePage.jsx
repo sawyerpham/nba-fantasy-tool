@@ -1,27 +1,66 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import PlayerSearch from "../components/PlayerSearch.jsx";
+import useSaveShortcut from "../useSaveShortcut.js";
 
 const PACES = ["early", "even", "late"];
 
 function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   const [rows, setRows] = useState(managers);
   const [msg, setMsg] = useState("");
+  const [names, setNames] = useState("");
+  const [allBudget, setAllBudget] = useState("");
+  const [allPace, setAllPace] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => setRows(managers), [managers]);
 
-  const update = (i, patch) => setRows(rows.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  const dirty = useMemo(() => JSON.stringify(rows) !== JSON.stringify(managers), [rows, managers]);
+  const update = (i, patch) => setRows((rs) => rs.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+
+  const patchBody = (m) => ({ name: m.name, is_user: m.is_user, budget_total: Number(m.budget_total), behavior: m.behavior });
 
   const saveRow = async (m) => {
     setMsg("");
     try {
-      await api.patch(`/leagues/${leagueId}/managers/${m.manager_id}`, {
-        name: m.name, is_user: m.is_user, budget_total: Number(m.budget_total), behavior: m.behavior,
-      });
+      await api.patch(`/leagues/${leagueId}/managers/${m.manager_id}`, patchBody(m));
       setMsg(`Saved ${m.manager_id}`);
       reload();
     } catch (e) {
       setMsg(e.message);
     }
+  };
+
+  const saveAll = useCallback(async () => {
+    if (!dirty || busy) return;
+    setMsg(""); setBusy(true);
+    try {
+      if (draftStatus === "setup") {
+        await api.put(`/leagues/${leagueId}/managers`, rows.map((m) => ({ ...m, budget_total: Number(m.budget_total) })));
+      } else {
+        for (const m of rows) await api.patch(`/leagues/${leagueId}/managers/${m.manager_id}`, patchBody(m));
+      }
+      setMsg(`Saved all ${rows.length} managers`);
+      reload();
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }, [dirty, busy, draftStatus, leagueId, rows, reload]);
+  useSaveShortcut(saveAll);
+
+  const applyNames = () => {
+    const list = names.split(/\r?\n|,|;/).map((s) => s.trim()).filter(Boolean);
+    if (!list.length) return;
+    setRows((rs) => rs.map((m, i) => (list[i] ? { ...m, name: list[i] } : m)));
+    setNames("");
+  };
+  const applyAll = () => {
+    setRows((rs) => rs.map((m) => ({
+      ...m,
+      budget_total: allBudget !== "" ? Number(allBudget) : m.budget_total,
+      behavior: allPace ? { ...m.behavior, spend_pace: allPace } : m.behavior,
+    })));
   };
 
   const setCount = async (n) => {
@@ -43,14 +82,34 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
 
   return (
     <div className="panel">
-      <h3>Managers ({rows.length})</h3>
-      {draftStatus === "setup" && (
-        <div className="row small">
-          Number of managers: <input type="number" min="2" max="30" defaultValue={rows.length} data-testid="manager-count"
-            onBlur={(e) => Number(e.target.value) !== rows.length && setCount(Number(e.target.value))} />
-          <span className="muted">(only while the draft is in setup)</span>
+      <div className="row sticky-bar">
+        <h3 style={{ margin: 0 }}>Managers ({rows.length})</h3>
+        <button className="primary" onClick={saveAll} disabled={!dirty || busy} data-testid="managers-save-all">Save all (Ctrl+S)</button>
+        {dirty && <span className="badge dirty">unsaved changes</span>}
+        {msg && <span className="small">{msg}</span>}
+      </div>
+      <div className="grid2" style={{ marginBottom: 8 }}>
+        <div>
+          <div className="small muted">Paste names, one per line (or comma-separated), in manager order:</div>
+          <textarea rows="3" style={{ width: "100%" }} value={names} onChange={(e) => setNames(e.target.value)} placeholder={"Sawyer\nEddie\nLucy\n…"} data-testid="bulk-names" />
+          <button onClick={applyNames} disabled={!names.trim()} data-testid="bulk-names-apply">Apply names</button>
         </div>
-      )}
+        <div>
+          <div className="small muted">Set every manager at once:</div>
+          <div className="row">
+            <label className="inline">budget $<input type="number" value={allBudget} onChange={(e) => setAllBudget(e.target.value)} placeholder="200" data-testid="bulk-budget" /></label>
+            <label className="inline">pace <select value={allPace} onChange={(e) => setAllPace(e.target.value)} data-testid="bulk-pace"><option value="">(keep)</option>{PACES.map((p) => <option key={p}>{p}</option>)}</select></label>
+            <button onClick={applyAll} disabled={allBudget === "" && !allPace} data-testid="bulk-apply">Apply to all</button>
+          </div>
+          {draftStatus === "setup" && (
+            <div className="row small" style={{ marginTop: 6 }}>
+              Number of managers: <input type="number" min="2" max="30" defaultValue={rows.length} data-testid="manager-count"
+                onBlur={(e) => Number(e.target.value) !== rows.length && setCount(Number(e.target.value))} />
+              <span className="muted">(only while the draft is in setup)</span>
+            </div>
+          )}
+        </div>
+      </div>
       <table>
         <thead><tr><th>id</th><th>name</th><th>you</th><th>budget</th><th>spend pace</th><th>aggression</th><th></th></tr></thead>
         <tbody>
@@ -71,7 +130,6 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
           ))}
         </tbody>
       </table>
-      {msg && <div className="small">{msg}</div>}
     </div>
   );
 }
@@ -80,6 +138,7 @@ function KeeperHistoryEditor({ leagueId, history, reload }) {
   const [rows, setRows] = useState(history);
   const [msg, setMsg] = useState("");
   useEffect(() => setRows(history), [history]);
+  const dirty = JSON.stringify(rows) !== JSON.stringify(history);
   const update = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const add = () => setRows([...rows, { season: "2025-26", manager_id: "m1", player_id: 0, player_name: "", cost: { type: "auction", amount: 1, round: null, pick: null } }]);
   const save = async () => {
@@ -94,14 +153,14 @@ function KeeperHistoryEditor({ leagueId, history, reload }) {
   };
   return (
     <div className="panel">
-      <h3>Keeper history (prior seasons)</h3>
+      <h3>Keeper history (prior seasons) <span className="muted small">— what each keeper cost in that season; this year's keepers and their prices are entered when you start the draft</span></h3>
       <table>
-        <thead><tr><th>season</th><th>manager</th><th>player</th><th>cost type</th><th>$ / round</th><th>pick</th><th></th></tr></thead>
+        <thead><tr><th>season</th><th>manager</th><th>player</th><th>cost type</th><th>$ paid (auction) / round (draft)</th><th>pick</th><th></th></tr></thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={i}>
-              <td><input type="text" value={r.season} onChange={(e) => update(i, { season: e.target.value })} style={{ width: 80 }} /></td>
-              <td><input type="text" value={r.manager_id} onChange={(e) => update(i, { manager_id: e.target.value })} style={{ width: 60 }} /></td>
+              <td><input type="text" value={r.season} onChange={(e) => update(i, { season: e.target.value })} style={{ width: 80, minWidth: 0 }} /></td>
+              <td><input type="text" value={r.manager_id} onChange={(e) => update(i, { manager_id: e.target.value })} style={{ width: 60, minWidth: 0 }} /></td>
               <td>
                 {r.player_name || <em className="muted">pick a player</em>} <span className="muted small">#{r.player_id || "?"}</span>
                 <PlayerSearch onSelect={(p) => update(i, { player_id: p.player_id, player_name: p.full_name })} placeholder="find…" testId={`keeper-history-search-${i}`} />
@@ -122,7 +181,7 @@ function KeeperHistoryEditor({ leagueId, history, reload }) {
           ))}
         </tbody>
       </table>
-      <div className="row"><button onClick={add}>Add row</button><button className="primary" onClick={save}>Save history</button>{msg && <span className="small">{msg}</span>}</div>
+      <div className="row"><button onClick={add}>Add row</button><button className="primary" onClick={save} disabled={!dirty}>Save history</button>{dirty && <span className="badge dirty">unsaved</span>}{msg && <span className="small">{msg}</span>}</div>
     </div>
   );
 }

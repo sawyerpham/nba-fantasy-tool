@@ -15,7 +15,7 @@ from ..engine import roster
 from ..services.app_state import AppState
 from ..services.league_repository import LeagueNotFound, default_managers, validate_league_id
 from .deps import get_state
-from .schemas import CreateLeague, KeeperHistoryIn, ManagerPatch, SleeperApplyIn, SleeperPreviewIn
+from .schemas import CreateLeague, KeeperEvaluateIn, KeeperHistoryIn, ManagerPatch, SleeperApplyIn, SleeperPreviewIn
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 
@@ -137,6 +137,19 @@ def put_keeper_history(league_id: str, body: KeeperHistoryIn, state: AppState = 
     session.keeper_history.records = list(body.records)
     state.save_session(league_id)
     return {"records": [r.model_dump(mode="json") for r in session.keeper_history.records]}
+
+
+@router.post("/{league_id}/keepers/evaluate")
+def evaluate_keepers_route(league_id: str, body: KeeperEvaluateIn, state: AppState = Depends(get_state)) -> list[dict]:
+    from ..engine.draft_state import DraftError
+    from ..engine.keepers import KeeperCandidate, evaluate_keepers
+
+    session = _session(state, league_id)
+    candidates = [KeeperCandidate(c.manager_id, c.player_id, c.last_price, c.keeper_price) for c in body.candidates]
+    try:
+        return [asdict(e) for e in evaluate_keepers(session, candidates)]
+    except DraftError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 # ------------------------------------------------------------------ Sleeper preview / apply
