@@ -34,6 +34,16 @@ $env:PYTHONIOENCODING = "utf-8"
 
 The pull writes to `data\`: `cache\nba_player_pool_<season>.json`, `cache\game_logs_<season>.json`, `cache\sleeper_players.json`, `cache\reconcile_<season>.json`, and the user-editable `player_overrides.json` (seeded from Sleeper; fields marked `manual` are never overwritten). The command prints a reconciliation summary: every player that could not be matched between NBA.com and Sleeper is listed, never dropped.
 
+## Valuations (scoring formula over the cached game logs)
+
+```powershell
+.\venv\Scripts\python.exe -m app.valuate                  # top 25 by blended value (SPEC scoring defaults)
+.\venv\Scripts\python.exe -m app.valuate --sort ceiling --top 40
+.\venv\Scripts\python.exe -m app.valuate --player 203999  # one player's per-game points and bonus counts
+```
+
+Valuations are cached per scoring hash in `data\cache\valuations_<season>_<hash>.json`; editing any scoring value recomputes from the cached logs without a network call.
+
 ## Tests
 
 ```powershell
@@ -48,8 +58,8 @@ Tests are offline; `tests\fixtures` holds real API responses captured on 2026-09
 | Phase | Scope | Status |
 |---|---|---|
 | 1A | shared package, both providers, reconciler, override seeding, budget reservation, pull CLI | done |
-| 1B | per-game scoring formula, avg / ceiling valuation, Sleeper scoring-key map | next |
-| 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | |
+| 1B | per-game scoring formula, avg / ceiling valuation, confidence factor, provisional Sleeper scoring-key map | done |
+| 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | next |
 | 1D | FastAPI routes, background pull with progress, export | |
 | 1E | React frontend | |
 | 1F | Definition-of-Done walkthrough | |
