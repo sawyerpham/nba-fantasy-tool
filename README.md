@@ -11,7 +11,7 @@ Data sources are free and need no keys: the `nba_api` package (NBA.com stats) fo
 ## Prerequisites
 
 - Python 3.13 (the backend venv lives at `draft-advisor/backend/venv`)
-- Node 20+ (frontend, Phase 1E — not yet wired up)
+- Node 20+ and npm (frontend; Playwright uses the installed Edge or Chrome for the mock draft, no browser download)
 - Windows users: set `PYTHONIOENCODING=utf-8` before running Python, or accented player names crash console output.
 
 ## Backend setup
@@ -62,6 +62,35 @@ Interactive docs at `http://127.0.0.1:8000/docs`. Main routes (all under `/api`)
 | `GET /leagues/{id}/rankings`, `GET /leagues/{id}/recommend/{player_id}` | ranked available players and bid recommendation |
 | `POST /leagues/{id}/export` | versioned `schema_version: 1` export (also the on-disk league file) |
 
+## Frontend (React + Vite)
+
+```powershell
+cd draft-advisor\frontend
+npm install
+npm run dev            # http://localhost:5173, proxies /api to the backend on port 8000
+npm run build          # production build into dist\
+```
+
+Run the backend first (`python -m app.serve` in `draft-advisor\backend`). Tabs: **Data** (pull with per-source progress, cache ages, reconcile report), **League** (create/select leagues, managers, keeper history), **Settings** (every league, roster, keeper, scoring, and ranking value; Sleeper preview/apply), **Draft** (rankings, autocomplete search, nominate / record winning bid, player sidebar with eligibility and injury editing plus bid recommendation, managers panel with budgets, open slots and stacks, undo, complete, export).
+
+### Running a draft (walkthrough)
+
+1. **Data tab** → *Pull now*. First run takes about 1.5 minutes (one league-wide game-log call plus per-player fallbacks; Sleeper is fetched at most once per 24 h). Check the reconcile report for players that need manual eligibility.
+2. **League tab** → create a league (12 managers, SPEC defaults). Name the managers, mark yourself, set each rival's spend pace (early / even / late) and budget. Enter prior-season keeper history if you have it.
+3. **Settings tab** → confirm roster slots (PG SG SF PF C UTIL×2 BN×8 IR×2), budget, min bid, keeper limit, scoring values, and ranking knobs. With a Sleeper league id, *Preview* and *Apply* the live settings. Everything here stays editable during the draft.
+4. **Draft tab** → *Start draft…* and enter keepers (manager, player, cost). Then, lot by lot: click *Nominate* on a player (fixed rotation tells you whose turn it is), open the sidebar for the bid recommendation, and *Record winning bid* with the winner and price. Any player can also be marked drafted from the search box. Rankings, budgets, open slots, and stacks update after every pick; *Undo* reverts the last one.
+5. When the room finishes, *Complete draft* and *Export JSON*. The file under `data\exports\` is the `schema_version: 1` document the Fantasy Tracker will import.
+
+### End-to-end mock draft (Playwright)
+
+With the backend and `npm run dev` running:
+
+```powershell
+npm run e2e            # drives a full 12-manager auction through the UI; screenshots in e2e\screenshots
+```
+
+Uses the installed Edge (`DA_BROWSER=chrome` to switch); set `DA_SKIP_PULL=1` to reuse cached data instead of pulling through the UI first.
+
 ## Tests
 
 ```powershell
@@ -79,7 +108,7 @@ Tests are offline; `tests\fixtures` holds real API responses captured on 2026-09
 | 1B | per-game scoring formula, avg / ceiling valuation, confidence factor, provisional Sleeper scoring-key map | done |
 | 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | done |
 | 1D | FastAPI routes, background pull with progress, export | done |
-| 1E | React frontend | next |
-| 1F | Definition-of-Done walkthrough | |
+| 1E | React frontend (Vite), Playwright mock draft | done |
+| 1F | Definition-of-Done walkthrough | done (see DESIGN.md) |
 
 Design details, decisions, and verified API facts: `DESIGN.md`. Enhancement ideas awaiting approval: `PROPOSALS.md`.

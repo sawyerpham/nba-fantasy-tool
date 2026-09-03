@@ -2,8 +2,20 @@
   "name": "draft-advisor-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "e2e": "node e2e/mock-draft.mjs"
+  },
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.52.0",
+    "vite": "^6.3.5"
   }
 }

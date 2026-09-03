@@ -1,0 +1,190 @@
+import React, { useCallback, useEffect, useState } from "react";
+import { api } from "../api.js";
+
+const SLOT_TYPES = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL", "BN", "IR"];
+const BASE_KEYS = ["pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "ftm", "fg3m"];
+const INJURY_STATUSES = ["healthy", "day_to_day", "out_short_term", "out_long_term", "out_season"];
+const SLEEPER_RAW = ["DTD", "Out", "IR"];
+const STATS = ["pts", "reb", "ast", "stl", "blk"];
+
+function Num({ value, onChange, step = "any", ...rest }) {
+  return <input type="number" step={step} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} {...rest} />;
+}
+
+export default function SettingsPage({ leagueId }) {
+  const [s, setS] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [sleeperId, setSleeperId] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [applyFields, setApplyFields] = useState({ name: false, scoring: true, roster_slots: true, num_managers: false, keepers: true });
+
+  const load = useCallback(() => {
+    if (!leagueId) return;
+    api.get(`/leagues/${leagueId}/settings`).then((data) => { setS(data); setSleeperId(data.sleeper_league_id || ""); }).catch((e) => setError(e.message));
+  }, [leagueId]);
+  useEffect(() => { load(); }, [load]);
+
+  if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
+  if (!s) return <p>{error || "Loading…"}</p>;
+
+  const set = (patch) => setS({ ...s, ...patch });
+  const setDeep = (key, patch) => setS({ ...s, [key]: { ...s[key], ...patch } });
+  const slotCount = (slot) => s.roster_slots.find((r) => r.slot === slot)?.count ?? 0;
+  const setSlot = (slot, count) => {
+    const others = s.roster_slots.filter((r) => r.slot !== slot);
+    set({ roster_slots: count > 0 ? [...others, { slot, count }] : others });
+  };
+  const mandatory = s.roster_slots.filter((r) => r.slot !== "IR").reduce((a, r) => a + r.count, 0);
+
+  const save = async () => {
+    setMsg(""); setError("");
+    try {
+      const saved = await api.put(`/leagues/${leagueId}/settings`, s);
+      setS(saved);
+      setMsg("Settings saved. Valuations recompute automatically when scoring changed.");
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const doPreview = async () => {
+    setError(""); setPreview(null);
+    try {
+      setPreview(await api.post(`/leagues/${leagueId}/sleeper/preview`, { sleeper_league_id: sleeperId.trim() }));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  const doApply = async () => {
+    setError("");
+    try {
+      const saved = await api.post(`/leagues/${leagueId}/sleeper/apply`, {
+        sleeper_league_id: sleeperId.trim(), apply: Object.keys(applyFields).filter((k) => applyFields[k]),
+      });
+      setS(saved); setPreview(null);
+      setMsg("Applied Sleeper league settings.");
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const bonus = s.scoring.bonuses;
+  const setBonus = (i, patch) => setDeep("scoring", { bonuses: bonus.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
+
+  return (
+    <div>
+      <h2>League settings <span className="muted small">— every value is editable, before and during the draft</span></h2>
+      <div className="row"><button className="primary" onClick={save} data-testid="settings-save">Save settings</button>{msg && <span className="ok">{msg}</span>}{error && <span className="error">{error}</span>}</div>
+
+      <div className="panel">
+        <h3>General</h3>
+        <div className="grid3">
+          <label>Name <input type="text" value={s.name} onChange={(e) => set({ name: e.target.value })} /></label>
+          <label>Roster season <input type="text" value={s.roster_season} onChange={(e) => set({ roster_season: e.target.value })} /></label>
+          <label>Stats season <input type="text" value={s.stats_season} onChange={(e) => set({ stats_season: e.target.value })} /></label>
+          <label>Game mode <select value={s.game_mode} onChange={(e) => set({ game_mode: e.target.value })}><option value="lock_in">Lock-In</option><option value="standard">Standard</option></select></label>
+          <label>Draft type <select value={s.draft_type} onChange={(e) => set({ draft_type: e.target.value })}><option value="auction">Auction</option><option value="snake">Snake</option></select></label>
+          <label>Nomination order <select value={s.nomination_order_type} onChange={(e) => set({ nomination_order_type: e.target.value })}><option value="fixed_rotation">Fixed rotation</option><option value="snake">Snake</option></select></label>
+          <label>Scoring format <select value={s.scoring_format} onChange={(e) => set({ scoring_format: e.target.value })}><option value="h2h_points">H2H points</option></select></label>
+          <label>Budget per manager $<Num value={s.budget_per_manager} onChange={(v) => set({ budget_per_manager: v })} data-testid="budget" /></label>
+          <label>Minimum bid $<Num value={s.min_bid} onChange={(v) => set({ min_bid: v })} /></label>
+          <label>Bid increment $<Num value={s.bid_increment} onChange={(v) => set({ bid_increment: v })} /></label>
+          <label>Managers <span className="muted">{s.num_managers} (edit on the League tab)</span></label>
+        </div>
+      </div>
+
+      <div className="panel">
+        <h3>Roster slots <span className="muted small">— {mandatory} mandatory (non-IR) slots must be filled by draft's end; IR is optional</span></h3>
+        <div className="row">
+          {SLOT_TYPES.map((slot) => <label key={slot} className="inline">{slot} <Num value={slotCount(slot)} onChange={(v) => setSlot(slot, v || 0)} step="1" data-testid={`slot-${slot}`} /></label>)}
+        </div>
+      </div>
+
+      <div className="panel">
+        <h3>Keepers</h3>
+        <div className="row">
+          <label className="inline"><input type="checkbox" checked={s.keeper.enabled} onChange={(e) => setDeep("keeper", { enabled: e.target.checked })} /> enabled</label>
+          <label className="inline">max per manager <Num value={s.keeper.max_per_manager} onChange={(v) => setDeep("keeper", { max_per_manager: v })} step="1" data-testid="max-keepers" /></label>
+          <label className="inline">deadline <input type="date" value={s.keeper.deadline || ""} onChange={(e) => setDeep("keeper", { deadline: e.target.value || null })} /></label>
+        </div>
+      </div>
+
+      <div className="panel">
+        <h3>Scoring — base values per stat <span className="badge">{s.scoring.source}</span></h3>
+        <div className="row">
+          {BASE_KEYS.map((k) => <label key={k} className="inline">{k} <Num value={s.scoring.base[k]} onChange={(v) => setDeep("scoring", { base: { ...s.scoring.base, [k]: v ?? 0 } })} data-testid={`base-${k}`} /></label>)}
+        </div>
+        <h3>Per-game bonuses <span className="muted small">(stack; triggered by a single game's line)</span></h3>
+        <table>
+          <thead><tr><th>id</th><th>kind</th><th>stat</th><th>threshold</th><th>bonus</th><th></th></tr></thead>
+          <tbody>
+            {bonus.map((b, i) => (
+              <tr key={i}>
+                <td><input type="text" value={b.id} onChange={(e) => setBonus(i, { id: e.target.value })} style={{ width: 110 }} /></td>
+                <td><select value={b.kind} onChange={(e) => setBonus(i, { kind: e.target.value })}><option value="stat_threshold">stat threshold</option><option value="triple_double">triple-double</option></select></td>
+                <td>{b.kind === "stat_threshold" && <select value={b.stat || "pts"} onChange={(e) => setBonus(i, { stat: e.target.value })}>{STATS.map((x) => <option key={x}>{x}</option>)}</select>}</td>
+                <td>{b.kind === "stat_threshold" && <Num value={b.threshold} onChange={(v) => setBonus(i, { threshold: v })} step="1" />}</td>
+                <td><Num value={b.bonus} onChange={(v) => setBonus(i, { bonus: v ?? 0 })} data-testid={`bonus-${b.id}`} /></td>
+                <td><button className="danger" onClick={() => setDeep("scoring", { bonuses: bonus.filter((_, j) => j !== i) })}>remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button onClick={() => setDeep("scoring", { bonuses: [...bonus, { id: `bonus_${bonus.length + 1}`, kind: "stat_threshold", stat: "pts", threshold: 30, bonus: 1 }] })}>Add bonus rule</button>
+      </div>
+
+      <div className="panel">
+        <h3>Ranking</h3>
+        <div className="row">
+          <label className="inline">weight avg <Num value={s.ranking.weight_avg} onChange={(v) => setDeep("ranking", { weight_avg: v })} /></label>
+          <label className="inline">weight ceiling <Num value={s.ranking.weight_ceiling} onChange={(v) => setDeep("ranking", { weight_ceiling: v })} /></label>
+          <label className="inline">min games for full confidence <Num value={s.ranking.min_games_full_confidence} onChange={(v) => setDeep("ranking", { min_games_full_confidence: v })} step="1" /></label>
+          <label className="inline"><input type="checkbox" checked={s.ranking.hide_unrosterable} onChange={(e) => setDeep("ranking", { hide_unrosterable: e.target.checked })} /> hide players I cannot roster</label>
+        </div>
+        <div className="row">
+          <span>Injury multipliers:</span>
+          {INJURY_STATUSES.map((k) => <label key={k} className="inline">{k} <Num value={s.ranking.injury_multipliers[k]} onChange={(v) => setDeep("ranking", { injury_multipliers: { ...s.ranking.injury_multipliers, [k]: v ?? 1 } })} /></label>)}
+        </div>
+        <div className="row">
+          <span>Sleeper injury seed map:</span>
+          {SLEEPER_RAW.map((k) => (
+            <label key={k} className="inline">{k} → <select value={s.ranking.sleeper_injury_map[k] || "day_to_day"} onChange={(e) => setDeep("ranking", { sleeper_injury_map: { ...s.ranking.sleeper_injury_map, [k]: e.target.value } })}>{INJURY_STATUSES.map((x) => <option key={x}>{x}</option>)}</select></label>
+          ))}
+        </div>
+        <div className="row">
+          <label className="inline">age penalty starts at <Num value={s.ranking.age_penalty_start} onChange={(v) => setDeep("ranking", { age_penalty_start: v })} step="1" /></label>
+          <label className="inline">per year <Num value={s.ranking.age_penalty_per_year} onChange={(v) => setDeep("ranking", { age_penalty_per_year: v })} /></label>
+          <label className="inline">max <Num value={s.ranking.age_penalty_max} onChange={(v) => setDeep("ranking", { age_penalty_max: v })} /></label>
+        </div>
+      </div>
+
+      <div className="panel">
+        <h3>Sleeper league (optional) <span className="muted small">— pulls the live league's scoring and roster; NBA scoring key names are provisional until verified</span></h3>
+        <div className="row">
+          <input type="text" placeholder="sleeper league id" value={sleeperId} onChange={(e) => setSleeperId(e.target.value)} data-testid="sleeper-league-id" />
+          <button onClick={doPreview} disabled={!sleeperId.trim()} data-testid="sleeper-preview">Preview</button>
+        </div>
+        {preview && (
+          <div>
+            <p className="small">{preview.league.name} · {preview.league.sport} · season {preview.league.season} · {preview.league.total_rosters} rosters · status {preview.league.status}</p>
+            {preview.scoring_map.provisional && <p className="small badge warn">provisional key map: {preview.scoring_map.note}</p>}
+            <p className="small">Unknown keys: {preview.scoring_map.unknown_keys.join(", ") || "none"} · unsupported non-zero: {JSON.stringify(preview.scoring_map.unsupported_nonzero)} · missing expected: {preview.scoring_map.missing_expected.join(", ") || "none"}</p>
+            <table>
+              <thead><tr><th>field</th><th>current</th><th>Sleeper</th></tr></thead>
+              <tbody>
+                {preview.diffs.length === 0 && <tr><td colSpan="3" className="ok">No differences from the current settings.</td></tr>}
+                {preview.diffs.map((d, i) => <tr key={i}><td>{d.field}</td><td><code>{JSON.stringify(d.current)}</code></td><td><code>{JSON.stringify(d.sleeper)}</code></td></tr>)}
+              </tbody>
+            </table>
+            <div className="row">
+              Apply:
+              {Object.keys(applyFields).map((k) => <label key={k} className="inline"><input type="checkbox" checked={applyFields[k]} onChange={(e) => setApplyFields({ ...applyFields, [k]: e.target.checked })} /> {k}</label>)}
+              <button className="primary" onClick={doApply} data-testid="sleeper-apply">Apply selected</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
