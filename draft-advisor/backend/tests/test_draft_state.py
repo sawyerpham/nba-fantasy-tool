@@ -115,6 +115,34 @@ def test_rotation_skips_managers_who_cannot_draft():
     assert e.next_nominator() == "m1"
 
 
+def test_reorder_mid_draft_keeps_the_current_nominator_and_make_next_skips_ahead():
+    e = engine()
+    e.start()
+    e.pick(1, "m1", 5)  # m1 nominated -> m2 is next
+    assert e.next_nominator() == "m2"
+    e.set_nomination_order(["m3", "m2", "m1"])  # reorder on the fly: m2 still nominates next
+    assert e.next_nominator() == "m2"
+    e.pick(2, "m2", 5)
+    assert e.next_nominator() == "m1"  # then the new rotation continues: m3 m2 m1 -> after m2 comes m1
+    e.set_next_nominator("m3")  # the room skipped ahead
+    assert e.next_nominator() == "m3"
+    e.pick(3, "m3", 5)
+    assert e.next_nominator() == "m2"
+    with pytest.raises(DraftError, match="unknown manager"):
+        e.set_next_nominator("m9")
+    for pid in (4, 5, 6, 7, 8):
+        e.pick(pid, "m1", 1)  # fill m1 (6 slots incl. pick 1)
+    with pytest.raises(DraftError, match="cannot draft"):
+        e.set_next_nominator("m1")
+
+
+def test_reorder_before_start_sets_first_nominator():
+    e = engine()
+    e.set_nomination_order(["m2", "m3", "m1"])
+    e.start()
+    assert e.next_nominator() == "m2"
+
+
 def test_set_nomination_order_must_cover_every_manager_once():
     e = engine()
     with pytest.raises(DraftError):

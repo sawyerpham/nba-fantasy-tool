@@ -103,11 +103,30 @@ class DraftEngine:
 
     # ------------------------------------------------------------------ nomination order
 
-    def set_nomination_order(self, order: list[str]) -> None:
+    def set_nomination_order(self, order: list[str], keep_next: bool = True) -> None:
+        """Replace the rotation. While live, the manager whose turn it is stays next (keep_next)."""
         ids = {m.manager_id for m in self.managers}
         if sorted(order) != sorted(ids):
             raise DraftError("nomination order must list every manager exactly once")
+        current = self.next_nominator() if keep_next and self.draft.status == "live" else None
         self.draft.nomination_order = list(order)
+        if current is not None:
+            self.set_next_nominator(current)
+
+    def set_next_nominator(self, manager_id: str) -> str:
+        """Move the pointer forward so `manager_id` nominates next (e.g. the room skipped someone)."""
+        self.manager(manager_id)
+        n = len(self.draft.nomination_order)
+        if n == 0:
+            raise DraftError("nomination order is empty")
+        if not self.can_draft(manager_id) and self.draft.status == "live":
+            raise DraftError(f"{manager_id} cannot draft any more players")
+        for step in range(2 * n):  # snake rotations need up to two rounds to reach a manager
+            index = self.draft.nomination_pointer + step
+            if self._nominator_at(index) == manager_id:
+                self.draft.nomination_pointer = index
+                return manager_id
+        raise DraftError(f"{manager_id} is not in the nomination order")
 
     def _nominator_at(self, index: int) -> str:
         order = self.draft.nomination_order

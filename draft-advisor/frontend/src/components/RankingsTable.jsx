@@ -2,12 +2,22 @@ import React from "react";
 
 const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_term: "OUT-LT", out_season: "SEASON" };
 
-export default function RankingsTable({ rows, selectedId, onSelect, onNominate, onDraft, live }) {
+const COLS = [
+  ["rank", "#"], ["full_name", "Player"], ["team_abbr", "Tm"], [null, "Elig"], ["injury_status", "Inj"], ["age", "Age"],
+  ["games_played", "GP"], ["avg_fpts", "Avg"], ["best_game_fpts", "Best"], ["value", "Value"], ["stack_if_added", "Stack"], [null, "Slot"], [null, ""],
+];
+
+export default function RankingsTable({ rows, selectedId, onSelect, onNominate, onDraft, live, sort, onSort }) {
+  const arrow = (key) => (sort && sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
   return (
     <table data-testid="rankings-table">
       <thead>
         <tr>
-          <th>#</th><th>Player</th><th>Tm</th><th>Elig</th><th>Inj</th><th>Age</th><th>GP</th><th>Avg</th><th>Best</th><th>Value</th><th>Stack</th><th>Slot</th><th></th>
+          {COLS.map(([key, label]) => (
+            <th key={label || "actions"} onClick={() => key && onSort && onSort(key)} style={{ cursor: key && onSort ? "pointer" : "default" }} title={key ? "click to sort" : ""}>
+              {label}{key ? arrow(key) : ""}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
