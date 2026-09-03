@@ -33,11 +33,13 @@ def test_player_value_composition():
     rec = record(1, "Test Player", "DEN", age=34.0)
     v = valuation(1, avg=50.0, best=80.0, gp=65)
     r = RankingSettings()
-    value, blended, conf, inj, age = player_value(rec, override(1, ["C"]), v, r)
-    assert blended == pytest.approx(62.0) and conf == 1.0 and inj == 1.0 and age == pytest.approx(0.91)
-    assert value == pytest.approx(62.0 * 0.91)
+    value, blended, conf, inj, age, avail = player_value(rec, override(1, ["C"]), v, r)
+    assert blended == pytest.approx(65.0) and conf == 1.0 and inj == 1.0 and age == pytest.approx(0.91) and avail == 1.0
+    assert value == pytest.approx(65.0 * 0.91)
     value_out, *_ = player_value(rec, override(1, ["C"], injury="out_long_term"), v, r)
-    assert value_out == pytest.approx(62.0 * 0.91 * 0.6)
+    assert value_out == pytest.approx(65.0 * 0.91 * 0.6)
+    value_avail, *_ = player_value(rec, override(1, ["C"]), valuation(1, 50.0, 80.0, weeks=10), RankingSettings(availability_weight=1.0))
+    assert value_avail == pytest.approx(65.0 * 0.91 * 0.4)
     assert player_value(rec, override(1, ["C"]), None, r)[0] == 0.0  # no stats -> zero value
     small = valuation(1, avg=60.0, best=95.0, gp=3)
     assert player_value(rec, override(1, ["C"]), small, r)[0] < value  # 3-game sample cannot out-rank a full season
@@ -51,7 +53,8 @@ def test_rank_order_and_flags():
     assert names[:3] == ["Ace Center", "Bo Guard", "Cy Wing"]
     assert names.index("Lou Rookie") > names.index("Gus Bench")  # 3 games, confidence 0.15
     rookie = next(r for r in rows if r.full_name == "Lou Rookie")
-    assert rookie.confidence == 0.15 and rookie.value == pytest.approx((0.6 * 30 + 0.4 * 70) * 0.15, abs=0.01)
+    assert rookie.confidence == 0.15 and rookie.value == pytest.approx((0.5 * 30 + 0.5 * 70) * 0.15, abs=0.01)
+    assert rookie.ceiling_metric == "weekly_best" and rookie.ceiling == 70.0 and rookie.total_fpts == pytest.approx(90.0)
     fay = next(r for r in rows if r.full_name == "Fay Big")
     assert fay.injury_multiplier == 0.95 and fay.injury_status == "day_to_day"
     hal = next(r for r in rows if r.full_name == "Hal Bench")

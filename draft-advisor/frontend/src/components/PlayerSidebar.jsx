@@ -8,7 +8,7 @@ function SourceBadge({ source }) {
   return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
 }
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [error, setError] = useState("");
@@ -99,11 +99,29 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       </div>
       <div><textarea rows="2" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
-      <h3>Valuation <span className="muted small">({data.scoring_hash})</span></h3>
+      <h3>Fantasy points <span className="muted small">(scoring {data.scoring_hash})</span></h3>
       {val ? (
         <div className="small">
-          {val.games_played} games · avg <strong>{val.avg_fpts}</strong> · best game <strong>{val.best_game_fpts}</strong> · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}
-          <div>Bonuses: {Object.entries(val.bonus_counts).filter(([, n]) => n).map(([k, n]) => `${k}×${n}`).join(", ") || "none"}</div>
+          <div>
+            <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
+          </div>
+          <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
+          {scoring && (
+            <details style={{ marginTop: 4 }} open>
+              <summary>How the {val.avg_fpts} FP/G is made (per-game averages × your point values)</summary>
+              <table className="small">
+                <thead><tr><th>stat</th><th>avg / game</th><th>× points</th><th>= FP</th></tr></thead>
+                <tbody>
+                  {Object.entries(scoring.base).map(([k, w]) => {
+                    const avg = val.stat_averages?.[k] ?? 0;
+                    return <tr key={k}><td>{k}</td><td>{avg.toFixed(1)}</td><td>{w}</td><td>{(avg * w).toFixed(2)}</td></tr>;
+                  })}
+                  <tr><td>bonuses</td><td colSpan="2">{Object.entries(val.bonus_counts).filter(([, n]) => n).map(([k, n]) => `${k}×${n}`).join(", ") || "none"}</td><td>{val.bonus_fpts_per_game.toFixed(2)}</td></tr>
+                  <tr><th colSpan="3">FP per game</th><th>{val.avg_fpts}</th></tr>
+                </tbody>
+              </table>
+            </details>
+          )}
           <div className="muted">Per game: {val.per_game_fpts.slice(-15).join(", ")}{val.per_game_fpts.length > 15 ? " (last 15)" : ""}</div>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}

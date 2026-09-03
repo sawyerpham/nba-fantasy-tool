@@ -29,9 +29,12 @@ def override(pid: int, eligibility: list[str], injury: str = "healthy", source: 
                            injury_status=injury, injury_source=source, updated_at=NOW)  # type: ignore[arg-type]
 
 
-def valuation(pid: int, avg: float, best: float, gp: int = 65) -> PlayerValuation:
+def valuation(pid: int, avg: float, best: float, gp: int = 65, wk_best: float | None = None, weeks: int = 22) -> PlayerValuation:
+    """Synthetic valuation. wk_best defaults to `best` so ordering by ceiling matches the single-best-game view."""
     return PlayerValuation(player_id=pid, stats_season="2025-26", games_played=gp, per_game_fpts=[], avg_fpts=avg,
-                           best_game_fpts=best, bonus_counts={}, minutes_avg=30.0, teams_played_for=["DEN"])
+                           best_game_fpts=best, weekly_best_avg=best if wk_best is None else wk_best, top_quarter_avg=best,
+                           total_fpts=avg * gp, weeks_played=weeks, season_weeks=25, availability=round(weeks / 25, 3),
+                           bonus_counts={}, minutes_avg=30.0, teams_played_for=["DEN"])
 
 
 def small_league(num_managers: int = 3, budget: int = 50, **kw) -> LeagueSettings:

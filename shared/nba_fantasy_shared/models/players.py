@@ -157,14 +157,25 @@ class GameLine(BaseModel):
 
 
 class PlayerValuation(BaseModel):
-    """Derived from GameLine[] + ScoringSettings; recomputed whenever scoring changes."""
+    """Derived from GameLine[] + ScoringSettings; recomputed whenever scoring changes.
+
+    All *_fpts fields are fantasy points under the configured scoring (base values + per-game bonuses).
+    """
 
     player_id: int
     stats_season: str
     games_played: int
     per_game_fpts: list[float]
-    avg_fpts: float
-    best_game_fpts: float
+    avg_fpts: float                     # FP per game played
+    best_game_fpts: float               # single best game
+    weekly_best_avg: float = 0.0        # mean of the best game in each fantasy week played (Lock-In estimator)
+    top_quarter_avg: float = 0.0        # mean of the top 25 % of games
+    total_fpts: float = 0.0             # season total
+    weeks_played: int = 0               # fantasy weeks (Mon-Sun) with at least one game
+    season_weeks: int = 0               # fantasy weeks in the league season
+    availability: float = 0.0           # weeks_played / season_weeks
+    stat_averages: dict[str, float] = Field(default_factory=dict)   # pts, reb, ast, ... per game
+    bonus_fpts_per_game: float = 0.0    # FP from bonus rules, per game
     bonus_counts: dict[str, int]
     minutes_avg: float
     teams_played_for: list[str]

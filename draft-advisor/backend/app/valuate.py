@@ -46,9 +46,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"no valuation for {args.player}")
             return 1
         rec = names.get(args.player)
-        print(f"{rec.full_name if rec else args.player}: gp={v.games_played} avg={v.avg_fpts} best={v.best_game_fpts} "
-              f"min={v.minutes_avg} teams={v.teams_played_for} bonuses={v.bonus_counts} "
+        print(f"{rec.full_name if rec else args.player}: gp={v.games_played} FP/G={v.avg_fpts} weekly-best={v.weekly_best_avg} "
+              f"best={v.best_game_fpts} top25%={v.top_quarter_avg} total={v.total_fpts} weeks={v.weeks_played}/{v.season_weeks} "
+              f"min={v.minutes_avg} teams={v.teams_played_for} bonuses={v.bonus_counts} bonusFP/G={v.bonus_fpts_per_game} "
               f"confidence={confidence_factor(v.games_played, ranking.min_games_full_confidence):.2f}")
+        print("stat averages:", v.stat_averages)
         print("per game:", v.per_game_fpts)
         return 0
 
@@ -58,14 +60,14 @@ def main(argv: list[str] | None = None) -> int:
         "ceiling": lambda v: v.best_game_fpts,
     }[args.sort]
     rows = sorted(valuations.values(), key=keyfn, reverse=True)[: args.top]
-    print(f"{'#':>3} {'player':28} {'team':5} {'gp':>3} {'avg':>7} {'best':>7} {'conf':>5} {'value':>7}  bonuses")
+    print(f"{'#':>3} {'player':28} {'team':5} {'gp':>3} {'FP/G':>7} {'wk-best':>8} {'best':>6} {'avail':>6} {'conf':>5} {'value':>7}  bonuses")
     for i, v in enumerate(rows, 1):
         rec = names.get(v.player_id)
         name = rec.full_name if rec else str(v.player_id)
         team = (rec.team_abbr if rec else None) or "-"
         conf = confidence_factor(v.games_played, ranking.min_games_full_confidence)
         hits = {k: n for k, n in v.bonus_counts.items() if n}
-        print(f"{i:>3} {name:28.28} {team:5} {v.games_played:>3} {v.avg_fpts:>7.2f} {v.best_game_fpts:>7.2f} {conf:>5.2f} {blended_value(v, ranking):>7.2f}  {hits}")
+        print(f"{i:>3} {name:28.28} {team:5} {v.games_played:>3} {v.avg_fpts:>7.2f} {v.weekly_best_avg:>8.2f} {v.best_game_fpts:>6.1f} {v.availability:>6.0%} {conf:>5.2f} {blended_value(v, ranking):>7.2f}  {hits}")
     return 0
 
 
