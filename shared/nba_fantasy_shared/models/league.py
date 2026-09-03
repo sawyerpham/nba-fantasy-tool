@@ -74,9 +74,21 @@ def default_sleeper_injury_map() -> dict[str, InjuryStatus]:
     return {"DTD": "day_to_day", "Out": "out_short_term", "IR": "out_long_term"}
 
 
+CeilingMetric = Literal["weekly_best", "best_game", "top_quarter"]
+
+
 class RankingSettings(BaseModel):
-    weight_avg: float = 0.6
-    weight_ceiling: float = 0.4
+    """value = (weight_avg × FP/G + weight_ceiling × ceiling) × games confidence × injury × age × availability.
+
+    ceiling defaults to the average of each week's best game (what Lock-In scores); 'best_game' is the single
+    best game (noisy: one outlier night can lift a role player over a star), 'top_quarter' the mean of the
+    top 25 % of games.
+    """
+
+    weight_avg: float = 0.5
+    weight_ceiling: float = 0.5
+    ceiling_metric: CeilingMetric = "weekly_best"
+    availability_weight: float = 0.0                   # 0 = ignore missed weeks; 1 = scale fully by weeks played
     injury_multipliers: dict[str, float] = Field(default_factory=default_injury_multipliers)
     sleeper_injury_map: dict[str, InjuryStatus] = Field(default_factory=default_sleeper_injury_map)
     age_penalty_start: int = 31

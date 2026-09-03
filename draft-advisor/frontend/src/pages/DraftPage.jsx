@@ -162,6 +162,15 @@ export default function DraftPage({ leagueId }) {
             <label className="inline">show <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
             <button onClick={() => { loadRankings(); loadView(); }}>Refresh</button>
           </div>
+          {settings && (
+            <div className="small muted" style={{ marginBottom: 4 }} data-testid="value-legend">
+              FP = fantasy points under your scoring (
+              {Object.entries(settings.scoring.base).map(([k, v]) => `${k} ${v >= 0 ? "+" : ""}${v}`).join(", ")}
+              {settings.scoring.bonuses.length ? "; bonuses " + settings.scoring.bonuses.map((b) => `${b.id} +${b.bonus}`).join(", ") : ""}).
+              {" "}Value = {settings.ranking.weight_avg} × FP/G + {settings.ranking.weight_ceiling} × {({ weekly_best: "weekly-best FP", best_game: "best-game FP", top_quarter: "top-25% FP" })[settings.ranking.ceiling_metric]},
+              × games confidence (full at {settings.ranking.min_games_full_confidence} GP) × injury × age{settings.ranking.availability_weight > 0 ? ` × availability (weight ${settings.ranking.availability_weight})` : ""}. Change any of it on the Settings tab.
+            </div>
+          )}
           <div className="panel scroll" style={{ padding: 0 }}>
             <RankingsTable
               rows={visible}
@@ -172,11 +181,12 @@ export default function DraftPage({ leagueId }) {
               live={live}
               sort={sort}
               onSort={onSort}
+              ceilingMetric={settings?.ranking?.ceiling_metric}
             />
           </div>
         </div>
         <div>
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} />
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} />
           <div className="row" style={{ marginBottom: 4 }}>
             <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
           </div>

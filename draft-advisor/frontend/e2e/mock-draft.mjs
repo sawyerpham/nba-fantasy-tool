@@ -164,11 +164,12 @@ try {
   await page.getByTestId("pos-C").click();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid^="rank-row-"]')].every((tr) => tr.children[3].textContent.includes("C")));
   await page.getByTestId("pos-C").click();
-  await page.locator('[data-testid="rankings-table"] th', { hasText: "Best" }).click();
+  await page.locator('[data-testid="rankings-table"] th', { hasText: "Wk-best" }).click();
   await page.waitForFunction(() => {
     const rows = [...document.querySelectorAll('[data-testid^="rank-row-"]')];
     return rows.length > 2 && Number(rows[0].children[8].textContent) >= Number(rows[1].children[8].textContent);
   });
+  assert((await page.getByTestId("value-legend").textContent()).includes("weekly-best FP"), "value legend explains the formula in FP");
   await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
   log("rankings: position chip filter and column sort work");

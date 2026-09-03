@@ -28,8 +28,11 @@ def reconcile_rel(roster_season: str) -> str:
     return f"cache/reconcile_{roster_season}.json"
 
 
+VALUATION_MODEL_VERSION = "v2"  # bump when PlayerValuation gains fields so stale caches are recomputed
+
+
 def valuations_rel(stats_season: str, scoring_hash: str) -> str:
-    return f"cache/valuations_{stats_season}_{scoring_hash}.json"
+    return f"cache/valuations_{stats_season}_{scoring_hash}_{VALUATION_MODEL_VERSION}.json"
 
 
 def player_detail_rel(player_id: int) -> str:

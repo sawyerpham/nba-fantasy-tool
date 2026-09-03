@@ -154,10 +154,21 @@ export default function SettingsPage({ leagueId }) {
 
       <div className="panel">
         <h3>Ranking</h3>
+        <div className="small muted">Value = weight avg × FP/G + weight ceiling × ceiling, × games confidence × injury × age × availability. All in fantasy points under the scoring above.</div>
         <div className="row">
-          <label className="inline">weight avg <Num value={s.ranking.weight_avg} onChange={(v) => setDeep("ranking", { weight_avg: v })} /></label>
+          <label className="inline">weight avg (FP/G) <Num value={s.ranking.weight_avg} onChange={(v) => setDeep("ranking", { weight_avg: v })} /></label>
           <label className="inline">weight ceiling <Num value={s.ranking.weight_ceiling} onChange={(v) => setDeep("ranking", { weight_ceiling: v })} /></label>
+          <label className="inline">ceiling =
+            <select value={s.ranking.ceiling_metric || "weekly_best"} onChange={(e) => setDeep("ranking", { ceiling_metric: e.target.value })} data-testid="ceiling-metric">
+              <option value="weekly_best">average of each week's best game (Lock-In)</option>
+              <option value="top_quarter">average of the top 25% of games</option>
+              <option value="best_game">single best game (noisy)</option>
+            </select>
+          </label>
+        </div>
+        <div className="row">
           <label className="inline">min games for full confidence <Num value={s.ranking.min_games_full_confidence} onChange={(v) => setDeep("ranking", { min_games_full_confidence: v })} step="1" /></label>
+          <label className="inline">availability weight (0 = ignore missed weeks, 1 = scale fully) <Num value={s.ranking.availability_weight ?? 0} onChange={(v) => setDeep("ranking", { availability_weight: v ?? 0 })} data-testid="availability-weight" /></label>
           <label className="inline"><input type="checkbox" checked={s.ranking.hide_unrosterable} onChange={(e) => setDeep("ranking", { hide_unrosterable: e.target.checked })} /> hide players I cannot roster</label>
         </div>
         <div className="row">

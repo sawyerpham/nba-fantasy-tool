@@ -84,6 +84,7 @@ button.small { font-size: 11px; padding: 1px 6px; }
 label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
 pre { font-size: 11px; background: var(--panel-2); padding: 6px; overflow: auto; max-height: 240px; }
 details summary { cursor: pointer; }
+.warn-text { color: var(--danger); }
 kbd { border: 1px solid var(--input-border); border-radius: 3px; padding: 0 4px; font-size: 11px; background: var(--panel-2); }
 .chips .chip { margin-right: 2px; }
 .chips .chip.on { background: var(--primary); color: #fff; border-color: var(--primary-border); }
