@@ -109,6 +109,7 @@ export default function DraftPage({ leagueId }) {
   const nominated = view.current_nomination;
   const nominatedName = nominated ? (rankings.find((r) => r.player_id === nominated.player_id)?.full_name || `#${nominated.player_id}`) : null;
   const userName = view.managers.find((m) => m.is_user)?.name || "you";
+  const nameOf = (id) => (id ? view.managers.find((m) => m.manager_id === id)?.name || id : null);
 
   return (
     <div>
@@ -116,7 +117,7 @@ export default function DraftPage({ leagueId }) {
         <div className="row">
           <strong>Draft: <span data-testid="draft-status">{view.status}</span></strong>
           <span className="small">progress {(view.progress * 100).toFixed(1)}% · {view.picks.length} picks · {view.available_count} available</span>
-          {live && <span>Nominates next: <strong data-testid="next-nominator">{view.next_nominator || "—"}</strong></span>}
+          {live && <span>Nominates next: <strong data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong></span>}
           {view.status === "setup" && <button className="primary" onClick={() => setStartOpen(true)} data-testid="btn-start">Start draft…</button>}
           {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo">Undo last pick</button>}
           {live && <button onClick={() => window.confirm("Complete the draft?") && act("complete")} data-testid="btn-complete">Complete draft</button>}
@@ -137,7 +138,7 @@ export default function DraftPage({ leagueId }) {
             {nominated ? (
               <>
                 <strong data-testid="on-the-block">{nominatedName}</strong>
-                <span className="small muted">nominated by {nominated.nominated_by}</span>
+                <span className="small muted">nominated by {nameOf(nominated.nominated_by)}</span>
                 <button className="primary" onClick={() => setPick({ player_id: nominated.player_id, full_name: nominatedName })} data-testid="btn-record-bid">Record winning bid…</button>
               </>
             ) : <span className="muted">nobody — nominate from the table, or mark a drafted player via search</span>}
@@ -162,15 +163,6 @@ export default function DraftPage({ leagueId }) {
             <label className="inline">show <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
             <button onClick={() => { loadRankings(); loadView(); }}>Refresh</button>
           </div>
-          {settings && (
-            <div className="small muted" style={{ marginBottom: 4 }} data-testid="value-legend">
-              FP = fantasy points under your scoring (
-              {Object.entries(settings.scoring.base).map(([k, v]) => `${k} ${v >= 0 ? "+" : ""}${v}`).join(", ")}
-              {settings.scoring.bonuses.length ? "; bonuses " + settings.scoring.bonuses.map((b) => `${b.id} +${b.bonus}`).join(", ") : ""}).
-              {" "}Value = {settings.ranking.weight_avg} × FP/G + {settings.ranking.weight_ceiling} × {({ weekly_best: "weekly-best FP", best_game: "best-game FP", top_quarter: "top-25% FP" })[settings.ranking.ceiling_metric]},
-              × games confidence (full at {settings.ranking.min_games_full_confidence} GP) × injury × age{settings.ranking.availability_weight > 0 ? ` × availability (weight ${settings.ranking.availability_weight})` : ""}. Change any of it on the Settings tab.
-            </div>
-          )}
           <div className="panel scroll" style={{ padding: 0 }}>
             <RankingsTable
               rows={visible}
@@ -186,7 +178,7 @@ export default function DraftPage({ leagueId }) {
           </div>
         </div>
         <div>
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} />
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} userName={userName} />
           <div className="row" style={{ marginBottom: 4 }}>
             <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
           </div>

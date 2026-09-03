@@ -8,7 +8,7 @@ function SourceBadge({ source }) {
   return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
 }
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [error, setError] = useState("");
@@ -81,6 +81,40 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       </div>
       {error && <div className="error">{error}</div>}
 
+      {rec && (
+        <div data-testid="recommendation">
+          <h3>Bid guide <span className="badge info">for {userName || "you"}</span></h3>
+          <div className="bid-grid">
+            <div className="bid-cell primary">
+              <div className="bid-label">Pay up to</div>
+              <div className="bid-num" data-testid="rec-max">{rec.can_bid ? `$${rec.recommended_max}` : "—"}</div>
+            </div>
+            <div className="bid-cell">
+              <div className="bid-label">Fair value (league)</div>
+              <div className="bid-num">${Math.round(rec.fair_value)}</div>
+            </div>
+            <div className="bid-cell">
+              <div className="bid-label">Your cap</div>
+              <div className="bid-num">${rec.my_max_bid}</div>
+            </div>
+          </div>
+          {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
+          <div className="small muted">
+            ${rec.my_budget_remaining} left · {rec.my_open_mandatory} slot{rec.my_open_mandatory === 1 ? "" : "s"} to fill ·{" "}
+            {rec.competitors.length
+              ? `${rec.competitors.length} rival${rec.competitors.length === 1 ? "" : "s"} can afford it: ` +
+                rec.competitors.slice().sort((a, b) => b.max_bid - a.max_bid).slice(0, 3).map((c) => `${c.name} $${c.max_bid}`).join(", ") +
+                (rec.competitors.length > 3 ? ` +${rec.competitors.length - 3} more` : "")
+              : "no rival can afford it"}
+          </div>
+          <details className="small" style={{ marginTop: 4 }}>
+            <summary>show the math</summary>
+            <ul>{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
+          </details>
+          {live && <button className="primary" style={{ marginTop: 6 }} onClick={() => onDraft({ player_id: rec_.player_id, full_name: rec_.full_name, team_abbr: rec_.team_abbr })} data-testid="sidebar-draft">Drafted…</button>}
+        </div>
+      )}
+
       <h3>Eligibility <SourceBadge source={ov.eligibility_source} /> <button className="small" onClick={() => reset("eligibility")} data-testid="reset-eligibility">reset to Sleeper</button></h3>
       <div className="row">
         {POSITIONS.map((p) => (
@@ -107,8 +141,8 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           </div>
           <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
           {scoring && (
-            <details style={{ marginTop: 4 }} open>
-              <summary>How the {val.avg_fpts} FP/G is made (per-game averages × your point values)</summary>
+            <details style={{ marginTop: 4 }}>
+              <summary>How the {val.avg_fpts} FP/G is made</summary>
               <table className="small">
                 <thead><tr><th>stat</th><th>avg / game</th><th>× points</th><th>= FP</th></tr></thead>
                 <tbody>
@@ -125,19 +159,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <div className="muted">Per game: {val.per_game_fpts.slice(-15).join(", ")}{val.per_game_fpts.length > 15 ? " (last 15)" : ""}</div>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}
-
-      {rec && (
-        <div data-testid="recommendation">
-          <h3>Bid recommendation</h3>
-          <div className="small">
-            Fair value <strong>${rec.fair_value}</strong> · recommended max <strong data-testid="rec-max">${rec.recommended_max}</strong> · your max bid ${rec.my_max_bid} (${rec.my_budget_remaining} left, {rec.my_open_mandatory} mandatory open)
-            {!rec.can_bid && <span className="badge warn">cannot bid</span>}
-          </div>
-          <div className="small">Competitors ({rec.competitors.length}): {rec.competitors.map((c) => `${c.name} ≤$${c.max_bid}×${c.weight}`).join(", ") || "none"}</div>
-          <ul className="small">{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
-          {live && <button className="primary" onClick={() => onDraft({ player_id: rec_.player_id, full_name: rec_.full_name, team_abbr: rec_.team_abbr })} data-testid="sidebar-draft">Drafted…</button>}
-        </div>
-      )}
 
       {data.detail?.season_totals?.length > 0 && (
         <>
