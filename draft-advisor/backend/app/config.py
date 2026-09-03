@@ -14,7 +14,6 @@ DEFAULT_STATS_SEASON = "2025-26"
 
 # Relative paths inside the data directory (DESIGN.md 1.8).
 OVERRIDES_REL = "player_overrides.json"
-KEEPER_HISTORY_REL = "keeper_history.json"
 
 
 def nba_pool_rel(roster_season: str) -> str:

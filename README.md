@@ -44,6 +44,24 @@ The pull writes to `data\`: `cache\nba_player_pool_<season>.json`, `cache\game_l
 
 Valuations are cached per scoring hash in `data\cache\valuations_<season>_<hash>.json`; editing any scoring value recomputes from the cached logs without a network call.
 
+## API server
+
+```powershell
+.\venv\Scripts\python.exe -m app.serve --port 8000        # or: uvicorn app.main:app --port 8000
+```
+
+Interactive docs at `http://127.0.0.1:8000/docs`. Main routes (all under `/api`):
+
+| Route | Purpose |
+|---|---|
+| `POST /data/pull`, `GET /data/pull/status`, `GET /data/status` | start the background pull, poll progress, cache ages and reconcile report |
+| `GET /players?q=`, `GET /players/{id}`, `PATCH /players/{id}/overrides`, `POST /players/{id}/overrides/reset` | autocomplete, sidebar detail, manual eligibility / injury edits |
+| `POST /leagues`, `GET/PUT /leagues/{id}/settings`, `.../managers`, `.../keepers/history` | league setup, editable any time |
+| `POST /leagues/{id}/sleeper/preview` and `/apply` | pull a real Sleeper league's settings and diff/apply them |
+| `GET /leagues/{id}/draft`, `POST .../draft/start|nominate|pick|undo|reassign|complete|reset` | live auction draft |
+| `GET /leagues/{id}/rankings`, `GET /leagues/{id}/recommend/{player_id}` | ranked available players and bid recommendation |
+| `POST /leagues/{id}/export` | versioned `schema_version: 1` export (also the on-disk league file) |
+
 ## Tests
 
 ```powershell
@@ -60,8 +78,8 @@ Tests are offline; `tests\fixtures` holds real API responses captured on 2026-09
 | 1A | shared package, both providers, reconciler, override seeding, budget reservation, pull CLI | done |
 | 1B | per-game scoring formula, avg / ceiling valuation, confidence factor, provisional Sleeper scoring-key map | done |
 | 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | done |
-| 1D | FastAPI routes, background pull with progress, export | next |
-| 1E | React frontend | |
+| 1D | FastAPI routes, background pull with progress, export | done |
+| 1E | React frontend | next |
 | 1F | Definition-of-Done walkthrough | |
 
 Design details, decisions, and verified API facts: `DESIGN.md`. Enhancement ideas awaiting approval: `PROPOSALS.md`.

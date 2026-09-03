@@ -163,9 +163,14 @@ class FixturePlatformProvider:
 
     def fetch_league(self, sleeper_league_id: str) -> PlatformLeague | None:
         path = self.root / f"league_{sleeper_league_id}.json"
-        if not path.is_file():
-            return None
-        return platform_league_from_json(_load(path))
+        if path.is_file():
+            return platform_league_from_json(_load(path))
+        # Hand-named fixtures (e.g. league_nba_provisional.json) are matched on their league_id field.
+        for candidate in sorted(self.root.glob("league_*.json")):
+            data = _load(candidate)
+            if str(data.get("league_id")) == str(sleeper_league_id):
+                return platform_league_from_json(data)
+        return None
 
     def search_players(self, query: str, limit: int = 20) -> list[PlayerRef]:
         refs = [
