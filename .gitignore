@@ -77,3 +77,4 @@ PROPOSALS.md
 draft-advisor/frontend/dist/
 draft-advisor/frontend/e2e/screenshots/
 draft-advisor/frontend/e2e/last-run.json
+draft-advisor/frontend/e2e/*.log
