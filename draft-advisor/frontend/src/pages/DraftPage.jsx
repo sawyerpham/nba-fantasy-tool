@@ -7,6 +7,7 @@ import PickDialog from "../components/PickDialog.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import NominationOrderBar from "../components/NominationOrderBar.jsx";
+import SpendingGuide from "../components/SpendingGuide.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
@@ -178,7 +179,9 @@ export default function DraftPage({ leagueId }) {
           </div>
         </div>
         <div>
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} userName={userName} />
+          <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} userName={userName}
+            onBlock={nominated?.player_id === selected} />
           <div className="row" style={{ marginBottom: 4 }}>
             <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
           </div>

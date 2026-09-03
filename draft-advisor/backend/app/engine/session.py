@@ -17,10 +17,11 @@ from nba_fantasy_shared.models.players import PlayerOverrides, PlayerRecord, Pla
 from nba_fantasy_shared.providers.base import utcnow
 
 from . import roster
-from .bidding import BidRecommendation, recommend_bid
+from .bidding import BidRecommendation, market_rate, recommend_bid
 from .budget import ManagerBudget
 from .draft_state import DraftEngine, DraftError, KeeperAssignment
 from .ranking import RankedPlayer, pool_values, rank_players
+from .spending import SpendingGuide, spending_guide
 
 
 @dataclass
@@ -47,6 +48,7 @@ class DraftSession:
     valuations: dict[int, PlayerValuation]
     now: Callable[[], datetime] = utcnow
     _pool_values: dict[int, float] | None = field(default=None, init=False, repr=False)
+    _opening_rate: float | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.engine = DraftEngine(self.league, self.managers, self.draft, self.players, self.overrides, now=self.now)
@@ -56,6 +58,7 @@ class DraftSession:
     def invalidate(self) -> None:
         """Call after any override, valuation, or league-settings change."""
         self._pool_values = None
+        self._opening_rate = None
         self.engine.league = self.league
         self.engine.managers = self.managers
 
@@ -110,6 +113,26 @@ class DraftSession:
         return recommend_bid(
             self.league, self.managers, self.draft.picks, manager_id, target, rows, self.pool_values(),
             self.engine.progress(),
+        )
+
+    def opening_rate(self) -> float:
+        """$/VAR with full budgets and nobody drafted: the baseline the spending guide measures inflation against."""
+        if self._opening_rate is None:
+            rows = rank_players(self.league, self.players, self.overrides, self.valuations, [], list(self.players))
+            self._opening_rate = market_rate(
+                self.league, self.managers, [], (r.value for r in rows), self.pool_values()
+            ).dollars_per_var
+        return self._opening_rate
+
+    def spending_guide(self, manager_id: str | None = None, player_id: int | None = None) -> SpendingGuide:
+        manager_id = manager_id or self.user_manager_id()
+        rows = rank_players(
+            self.league, self.players, self.overrides, self.valuations,
+            self.engine.picks_for(manager_id), self.available_ids(),
+        )
+        return spending_guide(
+            self.league, self.managers, self.draft.picks, manager_id, rows, self.pool_values(),
+            self.engine.progress(), self.opening_rate(), focus_player_id=player_id,
         )
 
     def manager_summaries(self) -> list[ManagerSummary]:

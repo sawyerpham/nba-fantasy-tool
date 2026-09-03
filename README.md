@@ -71,7 +71,7 @@ npm run dev            # http://localhost:5173, proxies /api to the backend on p
 npm run build          # production build into dist\
 ```
 
-Run the backend first (`python -m app.serve` in `draft-advisor\backend`). Tabs: **Data** (pull with per-source progress, cache ages, reconcile report), **League** (create/select leagues, managers, keeper history), **Settings** (every league, roster, keeper, scoring, and ranking value; Sleeper preview/apply), **Draft** (rankings, autocomplete search, nominate / record winning bid, player sidebar with eligibility and injury editing plus bid recommendation, managers panel with budgets, open slots and stacks, undo, complete, export).
+Run the backend first (`python -m app.serve` in `draft-advisor\backend`). Tabs: **Data** (pull with per-source progress, cache ages, reconcile report), **League** (create/select leagues, managers, keeper history), **Settings** (every league, roster, keeper, scoring, and ranking value; Sleeper preview/apply), **Draft** (rankings, autocomplete search, nominate / record winning bid, player sidebar with eligibility and injury editing plus a bid guide with a go/pass call on the selected player, spending guide (your money vs the room, price inflation vs the opening rate, a plan for your open slots, targets you can afford), managers panel with budgets, open slots and stacks, undo, complete, export).
 
 ### Running a draft (walkthrough)
 

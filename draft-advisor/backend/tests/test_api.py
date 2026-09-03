@@ -244,6 +244,13 @@ def test_full_draft_flow_over_the_api(pulled):
     rec = client.get(f"/api/leagues/lg-draft/recommend/{JOKIC}").json()
     assert rec["can_bid"] and rec["my_max_bid"] == 186 and 1 <= rec["recommended_max"] <= 186 and rec["rationale"]
     assert client.get("/api/leagues/lg-draft/recommend/1").status_code == 400
+    guide = client.get("/api/leagues/lg-draft/spending", params={"player_id": JOKIC}).json()
+    assert guide["name"] and guide["me"]["remaining"] == 200 and guide["me"]["open_mandatory"] == 15 and guide["room_open_mandatory"] == 179
+    assert guide["money_rank"] == 1 and guide["inflation"] > 0 and len(guide["advice"]) >= 3 and len(guide["plan"]) == 7
+    assert guide["focus"]["player_id"] == JOKIC and 1 <= guide["focus"]["suggested"] <= 186
+    assert guide["focus"]["verdict"] in {"go", "fair-only", "fits", "stretch", "pass"} and guide["focus"]["text"]
+    assert guide["targets"] and all(1 <= t["suggested"] <= 186 for t in guide["targets"])
+    assert client.get("/api/leagues/lg-draft/spending", params={"manager_id": "m3"}).json()["me"]["remaining"] == 150
 
     r = client.post("/api/leagues/lg-draft/draft/pick", json={"player_id": JOKIC, "manager_id": "m1", "price": 187})
     assert r.status_code == 400 and "exceeds max bid" in r.json()["detail"]

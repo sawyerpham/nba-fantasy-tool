@@ -176,6 +176,13 @@ try {
   await page.getByTestId("recommendation").waitFor();
   const guide = await page.getByTestId("recommendation").textContent();
   assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value (league)"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
+  await page.getByTestId("spend-verdict").waitFor();
+  const verdict = await page.getByTestId("spend-verdict").textContent();
+  assert(/GO|BID FAIR|FITS|STRETCH|PASS/.test(verdict), `go/pass call rendered in the bid guide: ${verdict.slice(0, 60)}`);
+  const spending = await page.getByTestId("spending-guide").textContent();
+  assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Prices vs opening"), "spending guide shows you vs the room");
+  assert((await page.locator('[data-testid^="spend-target-"]').count()) >= 1, "spending guide lists affordable targets");
+  log("spending guide:", spending.replace(/\s+/g, " ").slice(0, 160));
   await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
   log("rankings: position chip filter and column sort work");
