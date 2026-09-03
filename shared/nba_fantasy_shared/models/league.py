@@ -35,10 +35,28 @@ def default_roster_slots() -> list[RosterSlotSpec]:
     ]
 
 
+class KeeperEscalation(BaseModel):
+    """Next-year keeper price = last price + increase_per_step × floor(last price / step_dollars).
+
+    League rule (2026-09-03): +$1 per full $5 of last year's price, so $17 -> $20.
+    """
+
+    enabled: bool = True
+    step_dollars: int = Field(default=5, ge=1)
+    increase_per_step: int = Field(default=1, ge=0)
+
+    def price(self, last_price: int) -> int:
+        if not self.enabled:
+            return max(1, int(last_price))
+        last = max(0, int(last_price))
+        return max(1, last + self.increase_per_step * (last // self.step_dollars))
+
+
 class KeeperSettings(BaseModel):
     enabled: bool = True
     max_per_manager: int = 1
     deadline: date | None = None
+    escalation: KeeperEscalation = Field(default_factory=KeeperEscalation)
 
 
 def default_injury_multipliers() -> dict[str, float]:

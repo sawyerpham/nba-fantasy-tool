@@ -134,7 +134,7 @@ export default function DraftPage({ leagueId }) {
 
       {pick && <PickDialog leagueId={leagueId} view={view} player={pick} onClose={() => setPick(null)} onPicked={onPicked} />}
       {startOpen && (
-        <StartDraftDialog leagueId={leagueId} view={view} maxKeepers={settings?.keeper?.max_per_manager ?? 1} onClose={() => setStartOpen(false)}
+        <StartDraftDialog leagueId={leagueId} view={view} keeperSettings={settings?.keeper} onClose={() => setStartOpen(false)}
           onStarted={async (v) => { setStartOpen(false); setView(v); await loadRankings(); bump(); }} />
       )}
     </div>

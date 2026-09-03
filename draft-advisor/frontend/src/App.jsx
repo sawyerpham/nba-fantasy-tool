@@ -15,6 +15,7 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState(() => localStorage.getItem("da.tab") || "data");
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
+  const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
   const [health, setHealth] = useState(null);
 
   const setLeagueId = useCallback((id) => {
@@ -26,6 +27,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("da.tab", tab);
   }, [tab]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("da.theme", theme);
+  }, [theme]);
 
   const refreshHealth = useCallback(() => {
     api.get("/health").then(setHealth).catch(() => setHealth({ ok: false }));
@@ -48,9 +54,14 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <span className="meta" data-testid="health">
-          {health ? (health.ok ? `API ok · ${health.players} players in pool` : "API unreachable") : "…"}
-          {leagueId ? ` · league: ${leagueId}` : " · no league selected"}
+        <span className="meta">
+          <span data-testid="health">
+            {health ? (health.ok ? `API ok · ${health.players} players in pool` : "API unreachable") : "…"}
+            {leagueId ? ` · league: ${leagueId}` : " · no league selected"}
+          </span>
+          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="toggle theme" data-testid="theme-toggle">
+            {theme === "dark" ? "☀ light" : "☾ dark"}
+          </button>
         </span>
       </header>
       <main>

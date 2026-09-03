@@ -171,6 +171,27 @@ def test_managers_endpoints(pulled):
     assert client.put("/api/leagues/lg-managers/managers", json=[two[1]]).status_code == 400  # nobody is the user
 
 
+def test_keeper_evaluate_endpoint(pulled):
+    client, *_ = pulled
+    league(client, "lg-keep", "Keeper check")
+    r = client.post("/api/leagues/lg-keep/keepers/evaluate", json={"candidates": [
+        {"manager_id": "m1", "player_id": JOKIC, "last_price": 17},
+        {"manager_id": "m1", "player_id": WALKER, "last_price": 17, "keeper_price": 3},
+    ]})
+    assert r.status_code == 200, r.text
+    jokic, walker = r.json()
+    assert jokic["keeper_price"] == 20 and jokic["verdict"] == "good" and jokic["full_name"] == "Nikola Jokić"
+    assert walker["keeper_price"] == 3 and walker["computed_price"] == 20 and walker["verdict"] in ("bad", "even")
+    assert client.post("/api/leagues/lg-keep/keepers/evaluate", json={"candidates": [{"manager_id": "m1", "player_id": 1, "last_price": 5}]}).status_code == 400
+    # the rule itself is a league setting
+    settings = client.get("/api/leagues/lg-keep/settings").json()
+    assert settings["keeper"]["escalation"] == {"enabled": True, "step_dollars": 5, "increase_per_step": 1}
+    settings["keeper"]["escalation"]["increase_per_step"] = 2
+    assert client.put("/api/leagues/lg-keep/settings", json=settings).status_code == 200
+    r = client.post("/api/leagues/lg-keep/keepers/evaluate", json={"candidates": [{"manager_id": "m1", "player_id": JOKIC, "last_price": 17}]})
+    assert r.json()[0]["keeper_price"] == 23
+
+
 def test_keeper_history_put_validates_max_per_manager(pulled):
     client, *_ = pulled
     league(client, "lg-keepers", "Keepers")

@@ -54,6 +54,17 @@ class StartDraft(BaseModel):
     keepers: list[KeeperIn] = Field(default_factory=list)
 
 
+class KeeperCandidateIn(BaseModel):
+    manager_id: str
+    player_id: int
+    last_price: int = Field(ge=0)
+    keeper_price: int | None = Field(default=None, ge=1)
+
+
+class KeeperEvaluateIn(BaseModel):
+    candidates: list[KeeperCandidateIn]
+
+
 class NominateIn(BaseModel):
     player_id: int
     manager_id: str | None = None
