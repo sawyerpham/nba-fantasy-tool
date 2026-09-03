@@ -96,3 +96,8 @@ kbd { border: 1px solid var(--input-border); border-radius: 3px; padding: 0 4px;
 .order-chip.over { outline: 2px dashed var(--primary); }
 .order-chip.dragging { opacity: 0.4; }
 .order-chip .arrow { padding: 0 3px; font-size: 9px; line-height: 14px; }
+.bid-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 0; }
+.bid-cell { border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; background: var(--panel-2); }
+.bid-cell.primary { border-color: var(--primary-border); background: var(--sleeper); }
+.bid-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.bid-num { font-size: 20px; font-weight: 700; line-height: 1.2; }

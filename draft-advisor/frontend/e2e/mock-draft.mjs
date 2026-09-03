@@ -150,14 +150,16 @@ try {
   summary.picks.push({ n: 1, player: first.full_name, winner: "m1", price: recMax, rec: recMax, path: "nominate+record" });
 
   // nomination order on the fly: move m12 to the front with the arrow buttons (next nominator m2 must stay), then make m5 next
-  assert((await page.getByTestId("next-nominator").textContent()) === "m2", "m2 nominates after m1");
+  const nextId = () => page.getByTestId("next-nominator").getAttribute("data-manager-id");
+  assert((await nextId()) === "m2", "m2 nominates after m1");
+  assert((await page.getByTestId("next-nominator").textContent()) === "Early Eddie", "next nominator shown by name, not id");
   for (let k = 0; k < 11; k++) await page.getByTestId("order-left-m12").click();  // each click waits for the previous save (arrows disable while busy)
   await page.waitForFunction(() => document.querySelector('[data-testid="order-next-m12"]')?.textContent.startsWith("1."));
   let order = (await apiGet(`/leagues/${LEAGUE}/draft`)).nomination_order;
   assert(order[0] === "m12" && order[1] === "m1", `m12 moved to the front: ${order}`);
-  assert((await page.getByTestId("next-nominator").textContent()) === "m2", "reordering keeps whose turn it is");
+  assert((await nextId()) === "m2", "reordering keeps whose turn it is");
   await page.getByTestId("order-next-m5").click();
-  await page.waitForFunction(() => document.querySelector('[data-testid="next-nominator"]')?.textContent === "m5");
+  await page.waitForFunction(() => document.querySelector('[data-testid="next-nominator"]')?.getAttribute("data-manager-id") === "m5");
   log("nomination order reordered on the fly (m12 first, m2 kept its turn), then m5 made next");
   summary.steps.push("nomination order reordered on the fly + make-next");
   // rankings QoL: position chip + column sort
@@ -169,7 +171,11 @@ try {
     const rows = [...document.querySelectorAll('[data-testid^="rank-row-"]')];
     return rows.length > 2 && Number(rows[0].children[8].textContent) >= Number(rows[1].children[8].textContent);
   });
-  assert((await page.getByTestId("value-legend").textContent()).includes("weekly-best FP"), "value legend explains the formula in FP");
+  assert((await page.locator('[data-testid="value-legend"]').count()) === 0, "formula legend removed from the draft page");
+  await page.locator('[data-testid^="rank-row-"]').first().click();
+  await page.getByTestId("recommendation").waitFor();
+  const guide = await page.getByTestId("recommendation").textContent();
+  assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value (league)"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
   await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
   log("rankings: position chip filter and column sort work");

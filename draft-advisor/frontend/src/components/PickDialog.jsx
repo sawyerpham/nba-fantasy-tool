@@ -59,7 +59,7 @@ export default function PickDialog({ leagueId, view, player, onClose, onPicked }
         <h3>Mark drafted: {player.full_name} <span className="muted small">{player.team_abbr}</span></h3>
         {rec && (
           <p className="small">
-            Fair value <strong>${rec.fair_value}</strong> · recommended max for you <strong data-testid="pick-recommended">${rec.recommended_max}</strong> · your max bid ${rec.my_max_bid}
+            Pay up to <strong data-testid="pick-recommended">${rec.recommended_max}</strong> (for {user?.name || "you"}) · fair value ${Math.round(rec.fair_value)} · your cap ${rec.my_max_bid}
             {!rec.can_bid && <span className="badge warn">you cannot bid: {rec.rationale[rec.rationale.length - 1]}</span>}
           </p>
         )}
