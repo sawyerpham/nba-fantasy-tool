@@ -59,8 +59,8 @@ Tests are offline; `tests\fixtures` holds real API responses captured on 2026-09
 |---|---|---|
 | 1A | shared package, both providers, reconciler, override seeding, budget reservation, pull CLI | done |
 | 1B | per-game scoring formula, avg / ceiling valuation, confidence factor, provisional Sleeper scoring-key map | done |
-| 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | next |
-| 1D | FastAPI routes, background pull with progress, export | |
+| 1C | draft engine: rosters, nomination rotation, picks, keepers, stacking, ranking, bid recommendation | done |
+| 1D | FastAPI routes, background pull with progress, export | next |
 | 1E | React frontend | |
 | 1F | Definition-of-Done walkthrough | |
 
