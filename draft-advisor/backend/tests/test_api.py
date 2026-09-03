@@ -256,6 +256,47 @@ def test_full_draft_flow_over_the_api(pulled):
     assert client.post("/api/leagues/lg-draft/draft/pick", json={"player_id": SETH, "manager_id": "m4", "price": 1}).status_code == 400
 
 
+def test_settings_managers_keepers_and_scoring_are_editable_mid_draft(pulled):
+    """SPEC Definition of Done: league settings editable both at setup and mid-draft."""
+    client, state, *_ = pulled
+    league(client, "lg-mid", "Mid-draft edits")
+    assert client.post("/api/leagues/lg-mid/draft/start", json={"keepers": []}).status_code == 200
+    assert client.post("/api/leagues/lg-mid/draft/pick", json={"player_id": JOKIC, "manager_id": "m2", "price": 60}).status_code == 200
+    before = client.get("/api/leagues/lg-mid/rankings", params={"limit": 1}).json()[0]
+
+    # per-category point values + bonus threshold, while live -> valuations and rankings change immediately
+    settings = client.get("/api/leagues/lg-mid/settings").json()
+    settings["scoring"]["base"]["ast"] = 3.0
+    settings["scoring"]["bonuses"][1]["threshold"] = 30  # pts_40 -> 30+
+    settings["ranking"]["weight_ceiling"] = 0.0
+    assert client.put("/api/leagues/lg-mid/settings", json=settings).status_code == 200
+    after = client.get("/api/leagues/lg-mid/rankings", params={"limit": 1}).json()[0]
+    assert after["avg_fpts"] != before["avg_fpts"] or after["player_id"] != before["player_id"]
+    assert client.get("/api/leagues/lg-mid/draft").json()["status"] == "live"  # draft untouched
+
+    # roster slots + budget while live: budgets and open slots recompute for every manager
+    settings = client.get("/api/leagues/lg-mid/settings").json()
+    settings["roster_slots"] = [s for s in settings["roster_slots"] if s["slot"] != "BN"] + [{"slot": "BN", "count": 6}]
+    settings["budget_per_manager"] = 250
+    assert client.put("/api/leagues/lg-mid/settings", json=settings).status_code == 200
+    view = client.get("/api/leagues/lg-mid/draft").json()
+    m2 = next(m for m in view["managers"] if m["manager_id"] == "m2")
+    assert m2["budget"]["open_mandatory"] == 12 and m2["open_slots"]["BN"] == 6
+    # per-manager budget edit mid-draft (Sleeper budgets are per manager)
+    r = client.patch("/api/leagues/lg-mid/managers/m2", json={"budget_total": 250, "name": "Renamed"})
+    assert r.status_code == 200
+    m2 = next(m for m in client.get("/api/leagues/lg-mid/draft").json()["managers"] if m["manager_id"] == "m2")
+    assert m2["budget"]["remaining"] == 190 and m2["name"] == "Renamed"
+
+    # nomination order and keeper history while live
+    order = [f"m{i}" for i in range(12, 0, -1)]
+    assert client.put("/api/leagues/lg-mid/draft/nomination-order", json={"order": order}).json()["nomination_order"] == order
+    rec = {"season": "2025-26", "manager_id": "m4", "player_id": DONCIC, "player_name": "Luka Dončić", "cost": {"type": "auction", "amount": 61}}
+    assert client.put("/api/leagues/lg-mid/keepers/history", json={"records": [rec]}).status_code == 200
+    assert client.get("/api/leagues/lg-mid").json()["keepers"]["history"][0]["cost"]["amount"] == 61
+    assert client.get("/api/leagues/lg-mid/draft").json()["status"] == "live"
+
+
 # ------------------------------------------------------------------ gate: export round trip
 
 def _comparable(doc: DraftExport) -> dict:
