@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, qs } from "../api.js";
+import { VerdictBadge } from "./SpendingGuide.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const INJURY_STATUSES = ["healthy", "day_to_day", "out_short_term", "out_long_term", "out_season"];
@@ -8,9 +9,10 @@ function SourceBadge({ source }) {
   return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
 }
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName, onBlock }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
+  const [spend, setSpend] = useState(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState("");
@@ -24,8 +26,10 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     }).catch((e) => setError(e.message));
     if (live) {
       api.get(`/leagues/${leagueId}/recommend/${playerId}`).then(setRec).catch(() => setRec(null));
+      api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => setSpend(g.focus)).catch(() => setSpend(null));
     } else {
       setRec(null);
+      setSpend(null);
     }
   }, [leagueId, playerId, live]);
 
@@ -83,12 +87,18 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       {rec && (
         <div data-testid="recommendation">
-          <h3>Bid guide <span className="badge info">for {userName || "you"}</span></h3>
-          <div className="bid-grid">
+          <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
+          <div className={`bid-grid ${spend && spend.verdict !== "cannot" ? "four" : ""}`}>
             <div className="bid-cell primary">
               <div className="bid-label">Pay up to</div>
-              <div className="bid-num" data-testid="rec-max">{rec.can_bid ? `$${rec.recommended_max}` : "—"}</div>
+              <div className="bid-num" data-testid="rec-max">{rec.can_bid ? `$${spend && spend.verdict !== "cannot" ? spend.suggested : rec.recommended_max}` : "—"}</div>
             </div>
+            {spend && spend.verdict !== "cannot" && (
+              <div className="bid-cell">
+                <div className="bid-label">Market max</div>
+                <div className="bid-num">${rec.recommended_max}</div>
+              </div>
+            )}
             <div className="bid-cell">
               <div className="bid-label">Fair value (league)</div>
               <div className="bid-num">${Math.round(rec.fair_value)}</div>
@@ -98,6 +108,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
               <div className="bid-num">${rec.my_max_bid}</div>
             </div>
           </div>
+          {spend && rec.can_bid && (
+            <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict">
+              <VerdictBadge verdict={spend.verdict} /> {spend.text}
+              {spend.verdict !== "cannot" && (
+                <div className="muted">after ${spend.suggested}: ${spend.left_after} left · ${spend.per_starter_after}/starter vs room ${spend.room_per_starter} · stretch ${spend.stretch} · walk-away ${spend.walk_away} · {spend.rivals_above_market} rival{spend.rivals_above_market === 1 ? "" : "s"} can reach the market max</div>
+              )}
+            </div>
+          )}
           {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
           <div className="small muted">
             ${rec.my_budget_remaining} left · {rec.my_open_mandatory} slot{rec.my_open_mandatory === 1 ? "" : "s"} to fill ·{" "}

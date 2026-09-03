@@ -101,3 +101,6 @@ kbd { border: 1px solid var(--input-border); border-radius: 3px; padding: 0 4px;
 .bid-cell.primary { border-color: var(--primary-border); background: var(--sleeper); }
 .bid-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .bid-num { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.bid-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.bid-grid.four .bid-num { font-size: 18px; }
+.guide-lines { margin: 4px 0 4px 16px; padding: 0; }

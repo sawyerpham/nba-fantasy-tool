@@ -1,4 +1,4 @@
-"""Live draft: state, nomination, picks, undo, rankings, bid recommendation."""
+"""Live draft: state, nomination, picks, undo, rankings, bid recommendation, spending guide."""
 
 from __future__ import annotations
 
@@ -120,6 +120,21 @@ def rankings(
     except DraftError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return [asdict(r) for r in rows]
+
+
+@router.get("/spending")
+def spending(
+    league_id: str,
+    manager_id: str | None = Query(None),
+    player_id: int | None = Query(None, description="player to give a go/pass call on (the one on the block or selected)"),
+    state: AppState = Depends(get_state),
+) -> dict:
+    session = _session(state, league_id)
+    try:
+        guide = session.spending_guide(manager_id, player_id)
+    except DraftError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return asdict(guide)
 
 
 @router.get("/recommend/{player_id}")

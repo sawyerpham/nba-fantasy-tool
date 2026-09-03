@@ -79,6 +79,43 @@ def replacement_value(pool_values: Iterable[float], rosterable_n: int) -> float:
     return ordered[rosterable_n - 1]
 
 
+@dataclass
+class MarketRate:
+    """The room-wide price of value at one moment of the draft (shared by every player's fair value)."""
+
+    replacement: float
+    rosterable_n: int
+    free_dollars: int
+    open_total: int
+    var_pool: float
+    dollars_per_var: float
+    market_cap: int                     # largest legal bid anyone can make right now
+    budgets: dict[str, ManagerBudget]
+
+
+def market_rate(
+    league: LeagueSettings,
+    managers: list[Manager],
+    picks: list[Pick],
+    available_values: Iterable[float],
+    pool_values: Mapping[int, float],
+) -> MarketRate:
+    min_bid = league.min_bid
+    budgets = {m.manager_id: manager_budget(league, m, picks) for m in managers}
+    rosterable_n = league.mandatory_slot_count() * len(managers)
+    replacement = replacement_value(pool_values.values(), rosterable_n)
+    free_dollars = sum(b.discretionary for b in budgets.values())
+    open_total = sum(b.open_mandatory for b in budgets.values())
+    top_available = sorted(available_values, reverse=True)[: max(0, open_total)]
+    var_pool = sum(max(0.0, v - replacement) for v in top_available)
+    dollars_per_var = free_dollars / var_pool if var_pool > 0 else 0.0
+    market_cap = max((b.max_bid for b in budgets.values()), default=min_bid)
+    return MarketRate(
+        replacement=replacement, rosterable_n=rosterable_n, free_dollars=free_dollars, open_total=open_total,
+        var_pool=var_pool, dollars_per_var=dollars_per_var, market_cap=max(market_cap, min_bid), budgets=budgets,
+    )
+
+
 def recommend_bid(
     league: LeagueSettings,
     managers: list[Manager],
@@ -88,24 +125,20 @@ def recommend_bid(
     available: list[RankedPlayer],
     pool_values: Mapping[int, float],
     progress: float,
+    rate: MarketRate | None = None,
 ) -> BidRecommendation:
     min_bid = league.min_bid
-    budgets: dict[str, ManagerBudget] = {m.manager_id: manager_budget(league, m, picks) for m in managers}
+    if rate is None:
+        rate = market_rate(league, managers, picks, (p.value for p in available), pool_values)
+    budgets = rate.budgets
     me = budgets[my_manager_id]
 
-    rosterable_n = league.mandatory_slot_count() * len(managers)
-    replacement = replacement_value(pool_values.values(), rosterable_n)
+    rosterable_n, replacement = rate.rosterable_n, rate.replacement
     var = max(0.0, target.value - replacement)
-
-    free_dollars = sum(b.discretionary for b in budgets.values())
-    open_total = sum(b.open_mandatory for b in budgets.values())
-    top_available = sorted((p.value for p in available), reverse=True)[: max(0, open_total)]
-    var_pool = sum(max(0.0, v - replacement) for v in top_available)
-    dollars_per_var = free_dollars / var_pool if var_pool > 0 else 0.0
+    free_dollars, open_total, var_pool, dollars_per_var = rate.free_dollars, rate.open_total, rate.var_pool, rate.dollars_per_var
     uncapped_fair_value = min_bid + var * dollars_per_var
     # Nobody can pay more than the largest legal bid in the room (reservation rule applied to everyone).
-    market_cap = max((b.max_bid for b in budgets.values()), default=min_bid)
-    fair_value = min(uncapped_fair_value, float(max(market_cap, min_bid)))
+    fair_value = min(uncapped_fair_value, float(rate.market_cap))
 
     rationale: list[str] = []
     rationale.append(
