@@ -50,7 +50,7 @@ header.top .meta .dot.down { background: var(--danger); box-shadow: 0 0 0 3px va
 header.top .meta button { border-radius: 999px; padding: 5px 12px; }
 
 main { padding: 24px 28px 48px; max-width: 1720px; margin: 0 auto; }
-main:has(.draft-grid) { max-width: none; padding-bottom: 16px; }   /* draft page: full width; the columns end 16px above the bottom */
+main:has(.draft-grid) { max-width: none; padding-bottom: 16px; }   /* draft page: full width; page 1 ends at the bottom of the window, the room is below */
 
 /* ---------- type ---------- */
 h2 { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; margin: 28px 0 12px; }
@@ -122,7 +122,6 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .dg-left { grid-area: left; } .dg-side { grid-area: side; }
 .dg-left, .dg-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .dg-pane { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-.dg-profile { flex-grow: 1.4; }
 .dg-pane > .panel { padding: 14px 16px; margin-bottom: 0; overflow-x: auto; }
 .dg-rank { grid-area: rank; display: flex; flex-direction: column; min-height: 0; }
 .dg-rank > .block-bar { margin: 0 0 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
@@ -316,22 +315,47 @@ th.sorted { color: var(--primary); }
 /* Fit column */
 .fit-num.hi { color: var(--ok); } .fit-num.mid { color: var(--even-t); } .fit-num.lo { color: var(--danger); }
 
-/* team preview: one line per roster spot */
-.team-slots { display: grid; gap: 2px; }
-.team-slot { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 7px; font-size: 14px; }
-.team-slot.filled { background: var(--panel-2); }
-.team-slot.bench .team-slot-pos { color: var(--muted); }
-.team-slot-pos { font-size: 12px; font-weight: 700; color: var(--info-t); }
-.team-slot-player { display: flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; }
-.team-slot-player.editable { cursor: pointer; } .team-slot-player.editable:hover { color: var(--primary); }
-.team-slot-player.dragging { opacity: 0.4; }
-/* managers: one row each */
-.managers-table td, .managers-table th { padding: 5px 6px; white-space: nowrap; }
-.managers-table tr.user-row td { background: var(--user-card); }
-.managers-table tr.drop-over td { outline: 2px dashed var(--primary); outline-offset: -2px; }
-.managers-table .badge { margin-left: 6px; }
-.nom-dot { color: var(--primary); margin-right: 4px; font-size: 10px; }
 /* panes that should show everything: size to their content; the neighbour pane takes the rest and scrolls */
 .dg-pane.fit-content { flex: 0 1 auto; }
 .managers-table td, .managers-table th { padding: 3px 6px; font-size: 13.5px; }
 .managers-table td:last-child { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+
+/* page 1: the profile packs tighter so it rarely needs to scroll */
+.dg-side .bid-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.dg-side .bid-cell { padding: 6px 8px; }
+.dg-side .bid-num { font-size: 20px; }
+.dg-side .bid-label { font-size: 11px; letter-spacing: 0.02em; }
+.dg-side h3 { margin: 12px 0 6px; }
+
+/* page 2: the room */
+.room { min-height: calc(100vh - 80px); padding-top: 24px; scroll-margin-top: 70px; }
+.room-title { display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.room-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.room-card.user { background: var(--user-card); border-color: var(--user-b); }
+.room-card.next { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.room-card.over { outline: 2px dashed var(--primary); outline-offset: 2px; }
+.room-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 16px; }
+.room-head .badge { margin-left: 0; }
+.room-money { display: flex; align-items: baseline; gap: 12px; font-size: 13.5px; }
+.room-money .big { font-size: 22px; font-weight: 700; }
+.room-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.room-slot { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 4px; padding: 1px 4px; border-radius: 6px; font-size: 13px; min-width: 0; }
+.room-slot.filled { background: var(--panel-2); }
+.room-slot-pos { font-size: 11px; font-weight: 700; color: var(--info-t); }
+.room-slot.bench .room-slot-pos { color: var(--muted); }
+.room-slot-player { display: flex; gap: 4px; min-width: 0; }
+.room-slot-player.editable { cursor: pointer; } .room-slot-player.editable:hover { color: var(--primary); }
+.room-slot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.room-habits { line-height: 1.35; }
+.room-bait { margin-top: 2px; padding: 6px 8px; border-radius: 10px; background: var(--panel-2); }
+.room-bait-row { display: flex; align-items: baseline; gap: 6px; padding: 1px 0; font-size: 13.5px; white-space: nowrap; min-width: 0; }
+.room-bait-why { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fits-dot { font-size: 11px; font-weight: 700; color: var(--info-t); }
+.room-bench { line-height: 1.35; }
+.clickable-name { font-weight: 600; cursor: pointer; } .clickable-name:hover { color: var(--primary); }
+.room-slots { grid-template-columns: 1fr; }
+.dg-side .guide-lines { margin-top: 4px; margin-bottom: 4px; }
+.dg-side .guide-lines li { margin: 0; line-height: 1.35; }
+.dg-side .fit-card { margin: 8px 0 2px; padding: 8px 10px; }
+.dg-side .panel { padding: 12px 14px; }
