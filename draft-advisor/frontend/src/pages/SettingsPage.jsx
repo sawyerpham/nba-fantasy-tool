@@ -171,6 +171,8 @@ export default function SettingsPage({ leagueId }) {
           <label className="inline" title="bench spots per team that get real auction money; the rest are $1 fills">priced bench spots <Num value={s.ranking.priced_bench_slots ?? 2} onChange={(v) => setDeep("ranking", { priced_bench_slots: v ?? 0 })} step="1" data-testid="priced-bench" /></label>
           <label className="inline">min games for full confidence <Num value={s.ranking.min_games_full_confidence} onChange={(v) => setDeep("ranking", { min_games_full_confidence: v })} step="1" /></label>
           <label className="inline">availability weight (0 = ignore missed weeks, 1 = scale fully) <Num value={s.ranking.availability_weight ?? 0} onChange={(v) => setDeep("ranking", { availability_weight: v ?? 0 })} data-testid="availability-weight" /></label>
+          <label className="inline" title="Lock-In: more games in a week = more shots at a big night; fantasy playoff weeks count double">schedule weight (0 = off, 1 = full) <Num value={s.ranking.schedule_weight ?? 1} onChange={(v) => setDeep("ranking", { schedule_weight: v ?? 0 })} data-testid="schedule-weight" /></label>
+          <label className="inline" title="value measured against the replacement player at the scarcest position the player can fill">position scarcity weight (0 = off, 1 = full) <Num value={s.ranking.scarcity_weight ?? 1} onChange={(v) => setDeep("ranking", { scarcity_weight: v ?? 0 })} data-testid="scarcity-weight" /></label>
           <label className="inline"><input type="checkbox" checked={s.ranking.hide_unrosterable} onChange={(e) => setDeep("ranking", { hide_unrosterable: e.target.checked })} /> hide players I cannot roster</label>
         </div>
         <div className="row">

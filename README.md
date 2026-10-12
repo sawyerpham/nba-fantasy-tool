@@ -32,7 +32,8 @@ $env:PYTHONIOENCODING = "utf-8"
 .\venv\Scripts\python.exe -m app.pull --fixtures      # offline run from tests\fixtures
 ```
 
-The pull writes to `data\`: `cache\nba_player_pool_<season>.json`, `cache\game_logs_<season>.json`, `cache\sleeper_players.json`, `cache\sleeper_projections_<season>.json` (Sleeper's season projections; FP/G blends them with last season, see *projection weight* in Settings), `cache\reconcile_<season>.json`, `cache\sleeper_details_<sleeper league id>.json` (for every saved league with a linked Sleeper league, see below), and the user-editable `player_overrides.json` (seeded from Sleeper; fields marked `manual` are never overwritten). Before the regular season (Sleeper state `pre`/`off`), DTD/GTD tags (preseason rest days, minor knocks) seed as healthy with the Sleeper tag kept as a note; Out/IR still count, and a `Rest` tag never counts as an injury. The command prints a reconciliation summary: every player that could not be matched between NBA.com and Sleeper is listed, never dropped.
+The pull writes to `data\`: `cache\nba_player_pool_<season>.json`, `cache\game_logs_<season>.json`, `cache\sleeper_players.json`, `cache\sleeper_projections_<season>.json` (Sleeper's season projections; FP/G blends them with last season, see *projection weight* in Settings), `cache
+ba_schedule_<season>.json` (games per team per NBA week; under Lock-In a team with more games in a week, especially in the fantasy playoff weeks from the linked Sleeper league, gets a higher weekly-best ceiling, see *schedule weight*), `cache\reconcile_<season>.json`, `cache\sleeper_details_<sleeper league id>.json` (for every saved league with a linked Sleeper league, see below), and the user-editable `player_overrides.json` (seeded from Sleeper; fields marked `manual` are never overwritten). Before the regular season (Sleeper state `pre`/`off`), DTD/GTD tags (preseason rest days, minor knocks) seed as healthy with the Sleeper tag kept as a note; Out/IR still count, and a `Rest` tag never counts as an injury. The command prints a reconciliation summary: every player that could not be matched between NBA.com and Sleeper is listed, never dropped.
 
 ### Linked Sleeper league
 
@@ -47,6 +48,8 @@ Set **Settings → Sleeper league → linked league** to your Sleeper league id 
 - **Draft tab → Sleeper sync** (off by default): every 3 s the backend reads the Sleeper draft's picks and records any not recorded here yet, matched by Sleeper user/roster and player id. Manual entries win; picks it cannot match are listed for hand entry. The status shows how long after Sleeper registered the latest pick it landed here. To test before draft day, start a Sleeper mock draft and paste its id (from `sleeper.com/draft/nba/<id>`) into **sync draft id**; leave it empty for the real draft.
 
 ## Valuations (scoring formula over the cached game logs)
+
+In the app, value also counts **position scarcity** (*position scarcity weight* in Settings): every team's starting slots are filled greedily by value, and a player is measured against the best player left at the scarcest position he can fill instead of one league-wide replacement level. Hover a player's Value to see every factor (games confidence, injury, age, availability, schedule, scarcity).
 
 ```powershell
 .\venv\Scripts\python.exe -m app.valuate                  # top 25 by blended value (SPEC scoring defaults)

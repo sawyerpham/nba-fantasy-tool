@@ -121,6 +121,11 @@ def load_projections(store: JsonStore, roster_season: str) -> dict[str, dict[str
     return store.read_json(rel)["projections"] if store.exists(rel) else {}
 
 
+def load_schedule(store: JsonStore, roster_season: str) -> dict[str, dict[str, int]]:
+    rel = config.schedule_rel(roster_season)
+    return store.read_json(rel)["games"] if store.exists(rel) else {}
+
+
 def load_game_logs(store: JsonStore, stats_season: str) -> dict[int, list[GameLine]]:
     rel = config.game_logs_rel(stats_season)
     if not store.exists(rel):
@@ -174,6 +179,7 @@ class PullService:
             self._resolve_seasons(sources)
             assert self.roster_season and self.stats_season
             nba_bios = self._pull_nba_pool()
+            self._pull_schedule()
             sleeper_all, fantasy = self._pull_sleeper(sources, force_sleeper)
             self._pull_projections(sources)
             self._pull_sleeper_leagues(sources)
@@ -218,6 +224,19 @@ class PullService:
             indent=None,
         )
         return bios
+
+    def _pull_schedule(self) -> None:
+        if not hasattr(self.stats, "fetch_schedule"):
+            return
+        self._phase("nba_schedule")
+        try:
+            games = self.stats.fetch_schedule(self.roster_season)
+        except (CallFailed, ValueError, KeyError) as exc:  # the schedule is an upgrade, not a requirement
+            log.warning("NBA schedule unavailable (%s); keeping the previous cache", exc)
+            return
+        if games:
+            self.store.write_json(config.schedule_rel(self.roster_season),
+                                  {"pulled_at": utcnow().isoformat(), "games": games}, indent=None)
 
     def _pull_sleeper(self, sources: set[str], force: bool) -> tuple[list[PlayerBio], dict[str, FantasyAttributes]]:
         if self.platform is None or "sleeper" not in sources:

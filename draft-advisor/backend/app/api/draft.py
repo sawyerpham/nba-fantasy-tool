@@ -147,11 +147,8 @@ def rankings(
     session = _session(state, league_id)
     try:
         if include_unrosterable:
-            from ..engine.ranking import rank_players
-
             manager = manager_id or session.user_manager_id()
-            rows = rank_players(session.league, session.players, session.overrides, session.valuations,
-                                session.engine.picks_for(manager), session.available_ids())
+            rows = session.rank(session.engine.picks_for(manager), session.available_ids())
             rows = rows[:limit] if limit else rows
         else:
             rows = session.rankings(manager_id, limit)
@@ -173,11 +170,9 @@ def rankings(
 def _prices(session, rows, manager_id: str | None) -> dict[int, int]:
     """'Pay up to' for each listed player (the record bar's number), sharing one market rate across rows."""
     from ..engine.bidding import market_rate, recommend_bid
-    from ..engine.ranking import rank_players
 
     manager = manager_id or session.user_manager_id()
-    available = rank_players(session.league, session.players, session.overrides, session.valuations,
-                             session.engine.picks_for(manager), session.available_ids())
+    available = session.rank(session.engine.picks_for(manager), session.available_ids())
     pool = session.pool_values()
     rate = market_rate(session.league, session.managers, session.draft.picks, (p.value for p in available), pool)
     progress = session.engine.progress()

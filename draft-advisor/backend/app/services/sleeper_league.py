@@ -8,6 +8,7 @@ pull_details() follows previous_league_id back up to MAX_SEASONS and caches
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timezone
 from collections import Counter, defaultdict
 from typing import Any, Mapping
@@ -359,3 +360,17 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
         "errors": errors,
         "seconds_since_last_sleeper_pick": round((now_ms - last_picked) / 1000, 1) if last_picked else None,
     }
+
+
+def fantasy_weeks(details: dict | None, games: dict[str, dict[str, int]]) -> tuple[list[int], list[int]]:
+    """(scored weeks, playoff weeks) for this season. Sleeper legs are the NBA's Monday-Sunday weeks
+    (checked against 2025 transaction dates); playoffs run one week per round from playoff_week_start.
+    Without a linked league: every NBA week, no playoffs."""
+    all_weeks = sorted({int(w) for by_week in games.values() for w in by_week})
+    settings = (((details or {}).get("seasons") or [{}])[0].get("league") or {}).get("settings") or {}
+    start, playoff_start = settings.get("start_week") or 1, settings.get("playoff_week_start")
+    if not playoff_start:
+        return all_weeks, []
+    rounds = max(1, math.ceil(math.log2(max(2, settings.get("playoff_teams") or 2))))
+    playoffs = list(range(playoff_start, playoff_start + rounds))
+    return [w for w in all_weeks if start <= w <= playoffs[-1]], playoffs

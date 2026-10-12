@@ -3,7 +3,10 @@
 value = (w_avg × FP/G + w_ceiling × ceiling) × confidence(games) × availability × injury multiplier × age multiplier
 FP/G    = projection_weight × projected FP/G (Sleeper) + (1 − projection_weight) × last season's FP/G
 ceiling = average of each week's best game by default (Lock-In), or the single best game / top-quarter average,
-          scaled by FP/G ÷ last season's FP/G so a growing role lifts the ceiling too.
+          scaled by FP/G ÷ last season's FP/G so a growing role lifts the ceiling too. The weekly-best ceiling's
+          edge over FP/G is also scaled by the team's schedule (games per week, playoff weeks double).
+scarcity: value + (average replacement level − replacement level at the player's scarcest position), where a
+          position's replacement level is its best player left once every team's starting slots are filled.
 A player with a projection but no game logs (rookie, missed season) uses the projection alone at full confidence.
 Players who cannot fill any of the manager's open slots sink to the bottom (or are hidden by the UI).
 Everything is pure: re-running after a pick, an override edit, or a settings change re-sorts.
@@ -43,6 +46,8 @@ class RankedPlayer:
     proj_min: float | None      # Sleeper's projected minutes per game
     last_min: float | None      # last season's minutes per game
     owned_pct: float | None     # % of Sleeper leagues with him on a roster
+    schedule_factor: float      # Lock-In schedule vs an average team (1.0 = average)
+    scarcity: float             # FP added (or taken) for position scarcity
     best_game_fpts: float
     weekly_best_avg: float
     top_quarter_avg: float
@@ -98,9 +103,20 @@ def projected_fpts(record: PlayerRecord, valuation: PlayerValuation | None, scor
 
 
 def expected_fpts(
-    record: PlayerRecord, valuation: PlayerValuation | None, ranking: RankingSettings, scoring: ScoringSettings | None
+    record: PlayerRecord, valuation: PlayerValuation | None, ranking: RankingSettings, scoring: ScoringSettings | None,
+    schedule_factor: float = 1.0,
 ) -> tuple[float, float]:
     """Returns (FP/G used for ranking, ceiling scaled to match)."""
+    avg, ceiling = _expected_fpts(record, valuation, ranking, scoring)
+    if ranking.ceiling_metric == "weekly_best" and schedule_factor != 1.0:
+        w = min(1.0, max(0.0, ranking.schedule_weight))
+        ceiling = avg + (ceiling - avg) * (1 + w * (schedule_factor - 1))
+    return avg, ceiling
+
+
+def _expected_fpts(
+    record: PlayerRecord, valuation: PlayerValuation | None, ranking: RankingSettings, scoring: ScoringSettings | None
+) -> tuple[float, float]:
     proj = projected_fpts(record, valuation, scoring)
     last = valuation.avg_fpts if valuation else 0.0
     if proj is None:
@@ -112,15 +128,82 @@ def expected_fpts(
     return avg, ceiling_value(valuation, ranking) * avg / last
 
 
+# Expected best of N games, in standard deviations above a player's mean (max of N normal draws).
+BEST_OF_N = {1: 0.0, 2: 0.564, 3: 0.846, 4: 1.029, 5: 1.163, 6: 1.267}
+PLAYOFF_WEEK_WEIGHT = 2.0   # a fantasy playoff week decides more than a regular-season week
+
+
+def schedule_factors(games: Mapping[str, Mapping[str, int]], weeks: Iterable[int], playoff_weeks: Iterable[int] = ()) -> dict[str, float]:
+    """Each team's Lock-In schedule edge: average best-of-N over the fantasy weeks, divided by the league average.
+
+    Weeks where a team has no game yet (NBA Cup knockouts still to be scheduled) are skipped.
+    """
+    playoff = set(playoff_weeks)
+    edge: dict[str, float] = {}
+    for team, by_week in games.items():
+        num = den = 0.0
+        for w in weeks:
+            n = by_week.get(str(w), 0)
+            if n <= 0:
+                continue
+            weight = PLAYOFF_WEEK_WEIGHT if w in playoff else 1.0
+            num += weight * BEST_OF_N[min(n, 6)]
+            den += weight
+        if den:
+            edge[team] = num / den
+    mean = sum(edge.values()) / len(edge) if edge else 0.0
+    return {t: e / mean for t, e in edge.items()} if mean > 0 else {}
+
+
+def scarcity_bonus(
+    values: Mapping[int, float], eligibility: Mapping[int, list[str]], league: LeagueSettings,
+) -> dict[int, float]:
+    """FP to add per player for position scarcity (see module docstring); none for players with no position.
+
+    ponytail: static over the whole pool, like the replacement level; recompute from the available pool
+    during the draft if positions drain unevenly.
+    """
+    w = min(1.0, max(0.0, league.ranking.scarcity_weight))
+    caps = roster.slot_capacity(league)
+    remaining = {s: n * league.num_managers for s, n in caps.items() if s not in ("BN", "IR")}
+    total = dict(remaining)
+    if not w or not remaining:
+        return {}
+    placed: set[int] = set()
+    for pid, _ in sorted(values.items(), key=lambda kv: -kv[1]):
+        if not any(remaining.values()):
+            break
+        open_ = [s for s in roster.candidate_slots(eligibility.get(pid, [])) if remaining.get(s, 0) > 0]
+        if not open_:
+            continue
+        # Position slots before UTIL, then the emptiest one, so a PG/SG fills whichever guard spot is shorter.
+        slot = max(open_, key=lambda s: (s != "UTIL", remaining[s] / total[s]))
+        remaining[slot] -= 1
+        placed.add(pid)
+    positions = [p for p in roster.POSITION_SLOTS if p in total]
+    repl = {p: max((v for pid, v in values.items() if pid not in placed and p in eligibility.get(pid, [])), default=0.0)
+            for p in positions}
+    if not repl:
+        return {}
+    mean = sum(repl.values()) / len(repl)
+    out = {}
+    for pid in values:
+        mine = [repl[p] for p in eligibility.get(pid, []) if p in repl]
+        if mine:
+            out[pid] = w * (mean - min(mine))
+    return out
+
+
 def player_value(
     record: PlayerRecord,
     override: PlayerOverrides | None,
     valuation: PlayerValuation | None,
     ranking: RankingSettings,
     scoring: ScoringSettings | None = None,
+    schedule_factor: float = 1.0,
 ) -> tuple[float, float, float, float, float, float]:
     """Returns (value, blended, confidence, injury_mult, age_mult, availability_mult)."""
-    avg, ceiling = expected_fpts(record, valuation, ranking, scoring)
+    avg, ceiling = expected_fpts(record, valuation, ranking, scoring, schedule_factor)
     blended = ranking.weight_avg * avg + ranking.weight_ceiling * ceiling
     has_projection = projected_fpts(record, valuation, scoring) is not None
     if valuation is None:
@@ -144,10 +227,12 @@ def pool_values(
     valuations: Mapping[int, PlayerValuation],
     ranking: RankingSettings,
     scoring: ScoringSettings | None = None,
+    schedule: Mapping[str, float] | None = None,
 ) -> dict[int, float]:
-    """Roster-independent value of every player in the pool (drafted or not)."""
+    """Roster-independent value of every player in the pool (drafted or not), before position scarcity."""
+    schedule = schedule or {}
     return {
-        pid: player_value(rec, overrides.get(pid), valuations.get(pid), ranking, scoring)[0]
+        pid: player_value(rec, overrides.get(pid), valuations.get(pid), ranking, scoring, schedule.get(rec.team_abbr or "", 1.0))[0]
         for pid, rec in players.items()
     }
 
@@ -173,7 +258,10 @@ def rank_players(
     valuations: Mapping[int, PlayerValuation],
     my_picks: Iterable[Pick],
     available_ids: Iterable[int],
+    schedule: Mapping[str, float] | None = None,
+    scarcity: Mapping[int, float] | None = None,
 ) -> list[RankedPlayer]:
+    schedule, scarcity = schedule or {}, scarcity or {}
     my_picks = list(my_picks)
     stack = roster.team_stack(players, my_picks)
     ranking = league.ranking
@@ -184,8 +272,11 @@ def rank_players(
             continue
         override = overrides.get(pid)
         valuation = valuations.get(pid)
-        value, blended, confidence, inj, age_mult, avail = player_value(rec, override, valuation, ranking, league.scoring)
-        avg, ceiling = expected_fpts(rec, valuation, ranking, league.scoring)
+        sched = schedule.get(rec.team_abbr or "", 1.0)
+        value, blended, confidence, inj, age_mult, avail = player_value(rec, override, valuation, ranking, league.scoring, sched)
+        bonus = scarcity.get(pid, 0.0)
+        value = max(0.0, value + bonus)
+        avg, ceiling = expected_fpts(rec, valuation, ranking, league.scoring, sched)
         proj = projected_fpts(rec, valuation, league.scoring)
         eligibility = list(override.eligibility) if override else []
         slot = roster.assign_slot(league, my_picks, eligibility)
@@ -207,6 +298,8 @@ def rank_players(
                 proj_min=round(rec.projection["sp"] / 60, 1) if rec.projection and rec.projection.get("sp") else None,
                 last_min=valuation.minutes_avg if valuation else None,
                 owned_pct=rec.projection.get("owned") if rec.projection else None,
+                schedule_factor=round(sched, 3),
+                scarcity=round(bonus, 2),
                 best_game_fpts=valuation.best_game_fpts if valuation else 0.0,
                 weekly_best_avg=valuation.weekly_best_avg if valuation else 0.0,
                 top_quarter_avg=valuation.top_quarter_avg if valuation else 0.0,

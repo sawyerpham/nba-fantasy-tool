@@ -16,6 +16,16 @@ const COLS = [
 ];
 
 // ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
+// Hover text for the Value cell: every factor that moved this player away from plain FP.
+const valueWhy = (r) => [
+  r.confidence !== 1 && `× ${r.confidence} games confidence`,
+  r.injury_multiplier !== 1 && `× ${r.injury_multiplier} injury`,
+  r.age_multiplier !== 1 && `× ${r.age_multiplier} age`,
+  r.availability_factor !== 1 && `× ${r.availability_factor} availability`,
+  r.schedule_factor && r.schedule_factor !== 1 && `${r.team_abbr} schedule ${r.schedule_factor > 1 ? "+" : ""}${Math.round((r.schedule_factor - 1) * 100)}% on the Lock-In edge`,
+  r.scarcity && `${r.scarcity > 0 ? "+" : ""}${r.scarcity.toFixed(2)} position scarcity`,
+].filter(Boolean).join(" · ");
+
 const trend = (r) => (r.proj_fpts == null || !r.last_fpts ? "" : r.proj_fpts - r.last_fpts >= 0.5 ? "up" : r.last_fpts - r.proj_fpts >= 0.5 ? "down" : "");
 
 // Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
@@ -93,7 +103,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               <td className="num">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>
               <td className={`num ${r.proj_min == null ? "muted" : ""}`}>{(r.proj_min ?? r.last_min)?.toFixed(1) ?? "-"}</td>
-              <td className="num" title={(r.injury_multiplier !== 1 || r.age_multiplier !== 1 || r.confidence !== 1) ? `× ${r.confidence} games confidence × ${r.injury_multiplier} injury × ${r.age_multiplier} age` : ""}>
+              <td className="num" title={valueWhy(r)}>
                 <strong>{r.value.toFixed(1)}</strong>
               </td>
               <td className="num">{r.price != null ? <strong className="price">${r.price}</strong> : <span className="muted">—</span>}</td>
