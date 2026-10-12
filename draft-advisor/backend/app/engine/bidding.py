@@ -1,10 +1,11 @@
 """Auction bid recommendation (DESIGN.md section 3).
 
-rosterable_n   = managers × mandatory slots
+priced         = starter slots + priced_bench_slots (bench beyond that goes for the minimum in practice)
+rosterable_n   = managers × priced
 replacement    = value of the rosterable_n-th best player in the whole pool (drafted + available)
 VAR(p)         = max(0, value(p) - replacement)
 free_dollars   = Σ_m (budget_remaining_m - min_bid × open_mandatory_m)      # discretionary money
-VAR_pool       = Σ VAR over the top (Σ_m open_mandatory_m) available players
+VAR_pool       = Σ VAR over the top (Σ_m open_mandatory_m × priced / mandatory) available players
 fair_value(p)  = min_bid + VAR(p) × free_dollars / VAR_pool
 my_max_bid     = budget_remaining_me - min_bid × (open_mandatory_me - 1)     # reservation rule
 recommended    = clamp(fair_value × (1 + 0.15 × pressure / other_managers), min_bid, my_max_bid)
@@ -102,11 +103,16 @@ def market_rate(
 ) -> MarketRate:
     min_bid = league.min_bid
     budgets = {m.manager_id: manager_budget(league, m, picks) for m in managers}
-    rosterable_n = league.mandatory_slot_count() * len(managers)
+    mandatory = league.mandatory_slot_count()
+    bench = sum(s.count for s in league.roster_slots if s.slot == "BN")
+    priced = mandatory - bench + min(bench, league.ranking.priced_bench_slots)
+    rosterable_n = priced * len(managers)
     replacement = replacement_value(pool_values.values(), rosterable_n)
     free_dollars = sum(b.discretionary for b in budgets.values())
     open_total = sum(b.open_mandatory for b in budgets.values())
-    top_available = sorted(available_values, reverse=True)[: max(0, open_total)]
+    # ponytail: assumes open slots keep the league's starter/bench mix; per-manager open starters if it drifts.
+    priced_open = round(open_total * priced / mandatory) if mandatory else 0
+    top_available = sorted(available_values, reverse=True)[: max(0, priced_open)]
     var_pool = sum(max(0.0, v - replacement) for v in top_available)
     dollars_per_var = free_dollars / var_pool if var_pool > 0 else 0.0
     market_cap = max((b.max_bid for b in budgets.values()), default=min_bid)

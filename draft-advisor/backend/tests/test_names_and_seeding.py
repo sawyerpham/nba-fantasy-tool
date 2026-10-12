@@ -93,3 +93,18 @@ def test_seed_custom_injury_map():
     fa = FantasyAttributes(sleeper_id="9", fantasy_positions=["C"], injury_status_raw="Out")
     out = seed_overrides([record(1, fa)], {}, injury_map={"Out": "out_long_term"}, now=NOW)
     assert out[1].injury_status == "out_long_term"
+
+
+def test_preseason_short_term_tags_and_rest_seed_as_healthy_but_out_still_counts():
+    from nba_fantasy_shared.models.players import FantasyAttributes
+
+    def fa(raw, part=None):
+        return FantasyAttributes(sleeper_id="1", fantasy_positions=["PG"], injury_status_raw=raw, injury_body_part=part)
+
+    pre = lambda f: seed_overrides([record(1, f)], {}, now=NOW, ignore_short_term=True)[1]
+    assert pre(fa("DTD", "Ankle")).injury_status == "healthy" and pre(fa("DTD", "Ankle")).injury_sleeper_raw == "DTD"
+    assert pre(fa("GTD")).injury_status == "healthy"
+    assert pre(fa("Out", "Knee")).injury_status == "out_short_term"
+    in_season = seed_overrides([record(1, fa("DTD", "Ankle"))], {}, now=NOW)[1]
+    assert in_season.injury_status == "day_to_day"
+    assert seed_overrides([record(1, fa("DTD", "Rest"))], {}, now=NOW)[1].injury_status == "healthy"

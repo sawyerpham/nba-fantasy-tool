@@ -59,7 +59,8 @@ def test_full_pull_from_fixtures(service):
     assert overrides[JOKIC].injury_status == "healthy" and overrides[JOKIC].injury_source == "sleeper"
     assert overrides[BUTLER].injury_status == "out_short_term" and overrides[BUTLER].injury_note == "Knee — Surgery"
     assert overrides[BUTLER].injury_sleeper_raw == "Out"
-    assert overrides[ADAMS].injury_status == "day_to_day"
+    # fixture state is the off-season: DTD seeds as healthy, Sleeper's raw tag is kept
+    assert overrides[ADAMS].injury_status == "healthy" and overrides[ADAMS].injury_sleeper_raw == "DTD"
     assert overrides[BITTLE].eligibility == [] and overrides[BITTLE].eligibility_source == "none" and overrides[BITTLE].injury_source == "none"
     assert overrides[ODURO].eligibility_source == "sleeper"
     assert status.seeded_overrides == 22
@@ -87,7 +88,7 @@ def test_second_pull_preserves_manual_edits_and_reseeds_the_rest(service):
     assert after[JOKIC].injury_source == "sleeper"  # the other field still re-seeds
     assert after[BUTLER].injury_status == "out_long_term" and after[BUTLER].injury_note == "Knee — out until January"
     assert after[BUTLER].eligibility_source == "sleeper"
-    assert after[ADAMS].injury_status == "day_to_day"  # sleeper-sourced values are refreshed from Sleeper
+    assert after[ADAMS].injury_status == "healthy" and after[ADAMS].injury_source == "sleeper"  # refreshed (off-season DTD)
 
 
 def test_pull_without_sleeper_source_yields_nba_only_records(service):
