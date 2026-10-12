@@ -130,3 +130,22 @@ def test_export_round_trip(fixture_world):
     s3 = DraftSession.from_export(restored, {k: v for k, v in players.items() if k != JOKIC}, overrides, valuations)
     assert JOKIC in s3.players and s3.engine.picks_for("m1")[0].player_id == JOKIC
     json.loads(raw)  # plain JSON on disk
+
+
+def test_team_fit_reads_open_slot_price_and_bench_only(fixture_world):
+    from app.engine.fit import team_fit
+
+    s = make_session(fixture_world)
+    before = team_fit(s, "m1", JOKIC)
+    assert before.reasons[0] == "Fills your last open C starting spot." and not any("rice" in r for r in before.reasons)  # no price before the draft
+    s.start([])
+    live = team_fit(s, "m1", JOKIC)
+    assert any(r.startswith(("Price works", "Stretch", "Too pricey", "You can't")) for r in live.reasons)
+    # Fill every slot a center can start in (C, UTIL×2): another center is now bench only and a poorer fit.
+    centers = [pid for pid, o in s.overrides.items() if "C" in o.eligibility and pid in s.players and pid != JOKIC and s.engine.is_available(pid)][:3]
+    for pid, slot in zip(centers, ("C", "UTIL", "UTIL")):
+        s.engine.pick(pid, "m1", 1, slot)
+    s.invalidate()
+    bench = team_fit(s, "m1", JOKIC)
+    assert bench.reasons[0].startswith("Bench only") and "bench only" in bench.headline
+    assert ["poor", "okay", "good", "great"].index(bench.verdict) < ["poor", "okay", "good", "great"].index(live.verdict)
