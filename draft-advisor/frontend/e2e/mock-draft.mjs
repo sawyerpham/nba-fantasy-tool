@@ -197,12 +197,14 @@ try {
   await page.getByTestId("edit-pick-dialog").waitFor({ state: "detached" });
   let moved = (await apiGet(`/leagues/${LEAGUE}/draft`)).picks.find((p) => p.pick_number === 3);
   assert(moved.manager_id === "m2" && moved.price === recMax, `pick #3 moved to m2 at the same price: ${JSON.stringify(moved)}`);
+  await page.getByTestId("manager-card-m2").click();                  // Team preview now shows m2's roster
   await page.getByTestId("pick-chip-3").click();
   await page.getByTestId("edit-pick-manager").selectOption("m1");
   await page.getByTestId("edit-pick-save").click();
   await page.getByTestId("edit-pick-dialog").waitFor({ state: "detached" });
   moved = (await apiGet(`/leagues/${LEAGUE}/draft`)).picks.find((p) => p.pick_number === 3);
   assert(moved.manager_id === "m1", "pick #3 moved back to m1");
+  await page.getByTestId("manager-card-m1").click();
   log("who-drafted-whom fixed through the pick chip: #3 m1 -> m2 -> m1");
   summary.steps.push("pick moved between managers via the edit dialog");
 
