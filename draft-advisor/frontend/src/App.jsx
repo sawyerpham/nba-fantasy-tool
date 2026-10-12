@@ -46,7 +46,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <strong>Draft Advisor</strong>
+        <span className="brand"><span className="logo">🏀</span>Draft Advisor</span>
         <nav>
           {TABS.map(([id, label]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`tab-${id}`}>
@@ -56,11 +56,12 @@ export default function App() {
         </nav>
         <span className="meta">
           <span data-testid="health">
-            {health ? (health.ok ? `API ok · ${health.players} players in pool` : "API unreachable") : "…"}
-            {leagueId ? ` · league: ${leagueId}` : " · no league selected"}
+            {health && <span className={`dot ${health.ok ? "" : "down"}`} />}
+            {health ? (health.ok ? `${health.players} players` : "API unreachable") : "…"}
+            {leagueId ? ` · ${leagueId}` : " · no league selected"}
           </span>
           <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="toggle theme" data-testid="theme-toggle">
-            {theme === "dark" ? "☀ light" : "☾ dark"}
+            {theme === "dark" ? "☀ Light" : "☾ Dark"}
           </button>
         </span>
       </header>

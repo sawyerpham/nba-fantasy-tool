@@ -65,6 +65,24 @@ export default function StartDraftDialog({ leagueId, view, keeperSettings, onClo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, evaluate]);
 
+  // Keepers already set in Sleeper fill the first empty row of their manager (needs a data pull with the league linked).
+  const [fromSleeper, setFromSleeper] = useState(0);
+  useEffect(() => {
+    api.get(`/leagues/${leagueId}/sleeper/keepers`).then((ks) => {
+      if (!ks.length) return;
+      setRows((rs) => {
+        const next = rs.slice();
+        for (const k of ks) {
+          if (next.some((r) => r.player_id === k.player_id)) continue;
+          const i = next.findIndex((r) => r.manager_id === k.manager_id && !r.player_id);
+          if (i >= 0) next[i] = { ...next[i], player_id: k.player_id, player_name: k.full_name, last_price: k.last_price != null ? String(k.last_price) : "" };
+        }
+        return next;
+      });
+      setFromSleeper(ks.length);
+    }).catch(() => {});
+  }, [leagueId]);
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -88,6 +106,7 @@ export default function StartDraftDialog({ leagueId, view, keeperSettings, onClo
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ minWidth: 820 }} onClick={(e) => e.stopPropagation()} data-testid="start-dialog">
         <h3>Keepers &amp; start the draft <span className="badge" data-testid="keepers-entered">{entered} keeper{entered === 1 ? "" : "s"} entered</span></h3>
+        {fromSleeper > 0 && <p className="small ok" data-testid="keepers-from-sleeper">{fromSleeper} keeper{fromSleeper === 1 ? "" : "s"} filled in from Sleeper, priced with last year's auction.</p>}
         <p className="small">
           One row per manager{perManager > 1 ? ` (${perManager} each, the league's keeper limit)` : ""}. Find the player, type <strong>last year's price</strong>; this year's price follows the league rule ({ruleText}) and can be overridden. Rows without a player are ignored.
         </p>

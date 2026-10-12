@@ -154,7 +154,7 @@ export default function SettingsPage({ leagueId }) {
 
       <div className="panel">
         <h3>Ranking</h3>
-        <div className="small muted">Value = weight avg × FP/G + weight ceiling × ceiling, × games confidence × injury × age × availability. All in fantasy points under the scoring above.</div>
+        <div className="small muted">Value = weight avg × FP/G + weight ceiling × ceiling, × games confidence × injury × age × availability. FP/G blends Sleeper's season projection with last season (projection weight). All in fantasy points under the scoring above.</div>
         <div className="row">
           <label className="inline">weight avg (FP/G) <Num value={s.ranking.weight_avg} onChange={(v) => setDeep("ranking", { weight_avg: v })} /></label>
           <label className="inline">weight ceiling <Num value={s.ranking.weight_ceiling} onChange={(v) => setDeep("ranking", { weight_ceiling: v })} /></label>
@@ -167,6 +167,8 @@ export default function SettingsPage({ leagueId }) {
           </label>
         </div>
         <div className="row">
+          <label className="inline" title="share of FP/G from Sleeper's season projection (role, minutes, new team); the rest is last season">projection weight (0–1) <Num value={s.ranking.projection_weight ?? 1} onChange={(v) => setDeep("ranking", { projection_weight: v ?? 0 })} data-testid="projection-weight" /></label>
+          <label className="inline" title="bench spots per team that get real auction money; the rest are $1 fills">priced bench spots <Num value={s.ranking.priced_bench_slots ?? 2} onChange={(v) => setDeep("ranking", { priced_bench_slots: v ?? 0 })} step="1" data-testid="priced-bench" /></label>
           <label className="inline">min games for full confidence <Num value={s.ranking.min_games_full_confidence} onChange={(v) => setDeep("ranking", { min_games_full_confidence: v })} step="1" /></label>
           <label className="inline">availability weight (0 = ignore missed weeks, 1 = scale fully) <Num value={s.ranking.availability_weight ?? 0} onChange={(v) => setDeep("ranking", { availability_weight: v ?? 0 })} data-testid="availability-weight" /></label>
           <label className="inline"><input type="checkbox" checked={s.ranking.hide_unrosterable} onChange={(e) => setDeep("ranking", { hide_unrosterable: e.target.checked })} /> hide players I cannot roster</label>
@@ -193,6 +195,18 @@ export default function SettingsPage({ leagueId }) {
         <div className="row">
           <input type="text" placeholder="sleeper league id" value={sleeperId} onChange={(e) => setSleeperId(e.target.value)} data-testid="sleeper-league-id" />
           <button onClick={doPreview} disabled={!sleeperId.trim()} data-testid="sleeper-preview">Preview</button>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <label className="inline small" title="used by the data pull for managers, keepers, last year's auction, and by live draft sync">linked league
+            <input type="text" value={s.sleeper_league_id || ""} placeholder="none" onChange={(e) => set({ sleeper_league_id: e.target.value.trim() || null })} data-testid="linked-sleeper-league" />
+          </label>
+          <label className="inline small" title="leave empty to sync the league's own draft; paste a Sleeper mock draft id (from sleeper.com/draft/nba/<id>) to test sync">sync draft id
+            <input type="text" value={s.sleeper_draft_id || ""} placeholder="league's draft" onChange={(e) => set({ sleeper_draft_id: e.target.value.trim() || null })} data-testid="sleeper-draft-id" />
+          </label>
+          <label className="inline small" title="other Sleeper leagues with the same people (dynasty, old seasons, any format): used only to learn favourite teams, young/veteran lean and who drafted whom">history leagues
+            <input type="text" key={(s.sleeper_history_league_ids || []).join(",")} defaultValue={(s.sleeper_history_league_ids || []).join(", ")} placeholder="ids, comma-separated" onBlur={(e) => set({ sleeper_history_league_ids: e.target.value.split(/[\s,]+/).filter(Boolean) })} data-testid="sleeper-history-ids" style={{ minWidth: 260 }} />
+          </label>
+          <span className="small muted">Save, then pull data (Data tab) to fetch managers, keepers and past drafts.</span>
         </div>
         {preview && (
           <div>

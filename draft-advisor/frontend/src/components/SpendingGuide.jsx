@@ -3,7 +3,7 @@ import { api } from "../api.js";
 
 const VERDICTS = {
   go: ["good", "GO"], "fair-only": ["good", "BID FAIR"], fits: ["good", "FITS"],
-  stretch: ["even", "STRETCH"], pass: ["bad", "PASS"], cannot: ["bad", "CAN'T"],
+  stretch: ["even", "STRETCH"], pass: ["bad", "WALK-AWAY"], cannot: ["bad", "CAN'T"],
 };
 
 export function VerdictBadge({ verdict }) {
@@ -41,7 +41,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect }) 
       <div className="row">
         <h3 style={{ margin: 0 }}>Spending guide <span className="badge info">for {g.name}</span></h3>
         {!open && <span className="small muted">${me.remaining} · {me.open_mandatory} slots · {ordinal(g.money_rank)} of {g.num_managers} in money · prices {g.inflation.toFixed(2)}×</span>}
-        <button className="small" onClick={toggle} data-testid="toggle-spending" style={{ marginLeft: "auto" }}>{open ? "▾ hide" : "▸ show"}</button>
+        <button className="small ghost" onClick={toggle} data-testid="toggle-spending" style={{ marginLeft: "auto" }}>{open ? "▾ hide" : "▸ show"}</button>
       </div>
       {open && (
         <>
@@ -63,6 +63,18 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect }) 
             </div>
           </div>
           <ul className="small guide-lines">{g.advice.slice(1).map((line, i) => <li key={i}>{line}</li>)}</ul>
+          {g.nominations?.length > 0 && (
+            <div className="nom-ideas" data-testid="nominations">
+              <div className="bid-label" style={{ marginBottom: 4 }}>When it's your turn to nominate</div>
+              {g.nominations.map((n) => (
+                <div key={`${n.kind}-${n.player_id}`} className="nom-row clickable" onClick={() => onSelect?.(n.player_id)} title={n.reason}>
+                  <span className={`verdict ${n.kind === "drain" ? "even" : "good"}`}>{n.kind === "drain" ? "DRAIN" : "SNEAK"}</span>
+                  <strong>{n.name}</strong> <span className="muted">~${n.price}</span>
+                  <span className="small muted nom-why">{n.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {g.targets.length > 0 && (
             <>
               <div className="small muted" style={{ marginTop: 4 }}>Targets you can afford (click to open; rivals = managers who can reach the market max; room pays ${g.targets[0].room_per_starter}/starter from here):</div>

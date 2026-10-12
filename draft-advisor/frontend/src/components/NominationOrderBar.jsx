@@ -25,7 +25,7 @@ export default function NominationOrderBar({ managers, order, nextNominator, liv
 
   return (
     <div className="order-bar" data-testid="order-bar">
-      <span className="small muted" style={{ marginRight: 6 }}>Nomination order (drag to reorder{live ? ", click a name to make them next" : ""}):</span>
+      <span className="small muted" style={{ marginRight: 6 }} title={`drag to reorder${live ? ", click a name to make them next" : ""}`}>Nomination order</span>
       {items.map((id, i) => {
         const m = byId[id];
         const full = m && (m.budget.open_mandatory === 0 || m.budget.max_bid < 1);

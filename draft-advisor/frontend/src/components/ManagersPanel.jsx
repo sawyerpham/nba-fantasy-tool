@@ -10,7 +10,8 @@ export default function ManagersPanel({ managers, onEditPick, onMovePick }) {
 
   return (
     <div className="panel scroll" data-testid="managers-panel">
-      <h3>Managers {editable && <span className="small muted">(drag a pick to another manager to move it, click it to edit)</span>}</h3>
+      <h3>Managers</h3>
+      {editable && <div className="small muted" style={{ marginTop: -4, marginBottom: 10 }}>Drag a pick to another manager to move it · click to edit</div>}
       {managers.map((m) => {
         const b = m.budget;
         const openSlots = Object.entries(m.open_slots).filter(([, n]) => n > 0).map(([s, n]) => `${s}${n > 1 ? "×" + n : ""}`).join(" ");
@@ -26,17 +27,28 @@ export default function ManagersPanel({ managers, onEditPick, onMovePick }) {
             onDrop={(e) => { e.preventDefault(); if (canDrop) onMovePick?.(dragging, m.manager_id); setDragging(null); setOver(null); }}
           >
             <div className="row">
-              <strong>{m.name}</strong> <span className="muted small">{m.manager_id}</span>
+              <strong>{m.name}</strong>
               {m.is_user && <span className="badge info">YOU</span>}
-              {m.is_next_nominator && <span className="badge">nominates next</span>}
+              {m.is_next_nominator && <span className="badge">up next</span>}
+              <span className="spacer" />
               <span className="small muted">{m.behavior.spend_pace}{m.behavior.aggression !== 1 ? ` ×${m.behavior.aggression}` : ""}</span>
             </div>
-            <div className="small">
-              <span data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span> left · max bid <strong data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong> · {b.open_mandatory} mandatory slot{b.open_mandatory === 1 ? "" : "s"} open (${b.reserved} reserved)
+            <div className="manager-money">
+              <span><span className="big" data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span> <span className="small muted">left</span></span>
+              <span className="small muted">max bid <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
+              <span className="small muted">{b.open_mandatory} slot{b.open_mandatory === 1 ? "" : "s"} open (${b.reserved} reserved)</span>
             </div>
-            <div className="small">Open: {openSlots || "none"}</div>
+            <div className="small muted">Needs: {openSlots || "none"}</div>
+            {m.tendency && (
+              <div className="small muted" data-testid={`tendency-${m.manager_id}`} title="how they spent in last season's auction">
+                Last year: <span className={`badge ${m.tendency.style === "star chaser" ? "warn" : m.tendency.style === "new" ? "info" : ""}`} style={{ marginLeft: 0 }}>{m.tendency.style === "new" ? "new, no history" : m.tendency.style}</span>
+                {m.tendency.top_buys.length > 0 && " " + m.tendency.top_buys.map((t) => `${t.name.split(" ").slice(-1)[0]} $${t.price}`).join(", ")}
+                {m.tendency.favorite_teams?.length > 0 && <span className="badge info" title="drafted 5+ players from this team across your linked leagues">{m.tendency.favorite_teams.join("/")} fan</span>}
+                {m.tendency.lean && <span className="badge" title="average experience of their earliest picks">likes {m.tendency.lean}</span>}
+              </div>
+            )}
             {stacks.length > 0 && (
-              <div className="small">Stacks: {stacks.map(([t, n]) => <span key={t} className={`badge ${n >= 3 ? "warn" : ""}`}>{t} ×{n}</span>)}</div>
+              <div className="small muted">Stacks: {stacks.map(([t, n]) => <span key={t} className={`badge ${n >= 3 ? "warn" : ""}`}>{t} ×{n}</span>)}</div>
             )}
             {m.picks.length > 0 && (
               <div className="small">
@@ -51,7 +63,7 @@ export default function ManagersPanel({ managers, onEditPick, onMovePick }) {
                     onClick={() => editable && onEditPick(p)}
                     data-testid={`pick-chip-${p.pick_number}`}
                   >
-                    <span className="muted">{p.slot}</span> {p.player_name} <span className="muted">{p.team_abbr}</span> ${p.price}{p.is_keeper ? " (K)" : ""}
+                    <span className="muted">{p.slot}</span> {p.player_name} <span className="muted">{p.team_abbr}</span> <strong>${p.price}</strong>{p.is_keeper ? " (K)" : ""}
                   </span>
                 ))}
               </div>
