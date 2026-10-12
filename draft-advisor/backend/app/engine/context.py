@@ -156,5 +156,4 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
     w("\n## How to read this")
     w("- FP/G = expected fantasy points per game (Sleeper projection). wk-best = expected best game of a week (what Lock-In scores). "
       "avail = share of fantasy weeks he played last season. value = my tool's ranking score in FP. $ = my tool's 'pay up to' for me now.")
-    w("- Please answer briefly: what to bid (or whether to pass) on the player in question, and which players or positions to target next given my roster, my money and the other managers' money and habits.")
     return "\n".join(out)
