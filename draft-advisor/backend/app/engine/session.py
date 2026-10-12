@@ -35,6 +35,7 @@ class ManagerSummary:
     stack: dict[str, int]
     is_next_nominator: bool
     behavior: dict
+    tendency: dict | None = None   # how they spent in last season's Sleeper auction
 
 
 @dataclass
@@ -47,6 +48,8 @@ class DraftSession:
     overrides: dict[int, PlayerOverrides]
     valuations: dict[int, PlayerValuation]
     now: Callable[[], datetime] = utcnow
+    sleeper_details: dict | None = None   # cached Sleeper league details (see services/sleeper_league.py)
+    sleeper_history: list[dict] = field(default_factory=list)   # extra leagues, for draft habits only
     _pool_values: dict[int, float] | None = field(default=None, init=False, repr=False)
     _opening_rate: float | None = field(default=None, init=False, repr=False)
 
@@ -84,7 +87,7 @@ class DraftSession:
 
     def pool_values(self) -> dict[int, float]:
         if self._pool_values is None:
-            self._pool_values = pool_values(self.players, self.overrides, self.valuations, self.league.ranking)
+            self._pool_values = pool_values(self.players, self.overrides, self.valuations, self.league.ranking, self.league.scoring)
         return self._pool_values
 
     def available_ids(self) -> list[int]:
@@ -136,7 +139,23 @@ class DraftSession:
         )
 
     def manager_summaries(self) -> list[ManagerSummary]:
+        from ..services.sleeper_league import draft_habits, tendencies
+
         nominator = self.engine.next_nominator()
+        habits = tendencies(self.sleeper_details)
+        drafts = draft_habits([self.sleeper_details, *self.sleeper_history]) if self.sleeper_details else {}
+        by_sleeper = {r.sleeper_id: pid for pid, r in self.players.items() if r.sleeper_id}
+
+        def tendency(m) -> dict | None:
+            if not habits and not drafts:
+                return None
+            t = dict(habits.get(m.sleeper_user_id) or {"style": "new", "top_buys": []})
+            d = drafts.get(m.sleeper_user_id) or {}
+            t["favorite_teams"] = d.get("favorite_teams", [])
+            t["lean"] = d.get("lean")
+            # our player id -> where they drafted him before ("2025 tobedecided.: $51")
+            t["drafted_before"] = {str(by_sleeper[s]): how for s, how in d.get("drafted", {}).items() if s in by_sleeper}
+            return t
         out = []
         for m in self.managers:
             picks = self.engine.picks_for(m.manager_id)
@@ -156,6 +175,7 @@ class DraftSession:
                     stack=dict(roster.team_stack(self.players, picks)),
                     is_next_nominator=(m.manager_id == nominator),
                     behavior=m.behavior.model_dump(),
+                    tendency=tendency(m),
                 )
             )
         return out
