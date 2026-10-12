@@ -12,7 +12,7 @@ const COLS = [
   ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
   ["fit", "Fit", "fit for your team, 0-100: how good he is vs the best left, × 0.6 if he'd only reach your bench, × less if his price is past your stretch / walk-away", "num"],
   ["price", "$", "pay up to: the record bar's recommended max for you right now", "num"],
-  [null, "Slot", "slot this player would fill for you"], [null, "", ""],
+  [null, "", ""],
 ];
 
 // ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
@@ -112,7 +112,6 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 <strong className={`fit-num ${!r.fit ? "" : r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit ? r.fit.score : "—"}</strong>
               </td>
               <td className="num">{r.price != null ? <strong className="price">${r.price}</strong> : <span className="muted">—</span>}</td>
-              <td>{r.assignable_slot ? <span className="badge" style={{ margin: 0 }}>{r.assignable_slot}</span> : <span className="muted">—</span>}</td>
               <td onClick={(e) => e.stopPropagation()}>
                 {live && (
                   <div className="row-actions">
