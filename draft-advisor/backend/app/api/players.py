@@ -20,6 +20,7 @@ def _brief(state: AppState, player_id: int, drafted_by: str | None = None) -> di
     return {
         "player_id": player_id,
         "full_name": rec.full_name,
+        "sleeper_id": rec.sleeper_id,
         "team_abbr": rec.team_abbr,
         "eligibility": list(ov.eligibility) if ov else [],
         "eligibility_source": ov.eligibility_source if ov else "none",

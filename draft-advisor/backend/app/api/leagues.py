@@ -101,6 +101,23 @@ def put_managers(league_id: str, body: list[Manager], state: AppState = Depends(
     return session.managers
 
 
+@router.post("/{league_id}/sleeper/managers")
+def load_managers_from_sleeper(league_id: str, state: AppState = Depends(get_state)) -> list[Manager]:
+    """Replace the managers with this season's Sleeper rosters (setup only; needs a data pull for the league)."""
+    from ..services.sleeper_league import managers_from_sleeper
+
+    session = _session(state, league_id)
+    if session.draft.status != "setup":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "managers can only be replaced while the draft is in setup")
+    if not session.sleeper_details:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no Sleeper league data: set the Sleeper league id in Settings, then pull data")
+    session.managers = managers_from_sleeper(session.sleeper_details, session.managers)
+    session.draft.nomination_order = [m.manager_id for m in session.managers]
+    session.invalidate()
+    state.save_session(league_id)
+    return session.managers
+
+
 @router.patch("/{league_id}/managers/{manager_id}")
 def patch_manager(league_id: str, manager_id: str, body: ManagerPatch, state: AppState = Depends(get_state)) -> Manager:
     session = _session(state, league_id)
@@ -165,6 +182,14 @@ def _sleeper_league(state: AppState, sleeper_league_id: str):
     return league
 
 
+def _sleeper_positions(league) -> list[str]:
+    """roster_positions plus IR: Sleeper keeps IR slots in settings.reserve_slots, not in roster_positions."""
+    positions = list(league.roster_positions)
+    if "IR" not in positions:
+        positions += ["IR"] * int(league.settings.get("reserve_slots") or 0)
+    return positions
+
+
 def _roster_specs(positions: list[str]) -> tuple[list[RosterSlotSpec], list[str]]:
     counts = Counter(positions)
     specs, unknown = [], []
@@ -192,7 +217,7 @@ def _diffs(session, league, mapping) -> list[dict]:
         if (c.bonus if c else None) != (n.bonus if n else None) or (c.threshold if c else None) != (n.threshold if n else None):
             diffs.append({"field": f"scoring.bonus.{rule_id}", "current": c.model_dump() if c else None,
                           "sleeper": n.model_dump() if n else None})
-    specs, unknown = _roster_specs(league.roster_positions)
+    specs, unknown = _roster_specs(_sleeper_positions(league))
     if {s.slot: s.count for s in specs} != roster.slot_capacity(current):
         diffs.append({"field": "roster_slots", "current": roster.slot_capacity(current),
                       "sleeper": {s.slot: s.count for s in specs}, "unknown_positions": unknown})
@@ -220,16 +245,26 @@ def sleeper_preview(league_id: str, body: SleeperPreviewIn, state: AppState = De
 def sleeper_apply(league_id: str, body: SleeperApplyIn, state: AppState = Depends(get_state)) -> LeagueSettings:
     session = _session(state, league_id)
     league = _sleeper_league(state, body.sleeper_league_id)
+    new = _applied(session, league, body.sleeper_league_id, body.apply)
+    try:
+        state.replace_league_settings(league_id, new)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return session.league
+
+
+def _applied(session, league, sleeper_league_id: str, fields: list[str]) -> LeagueSettings:
+    """A copy of the league settings with the chosen Sleeper fields applied (managers changed in place)."""
     mapping = map_sleeper_scoring(league.scoring_settings)
     new = session.league.model_copy(deep=True)
-    new.sleeper_league_id = body.sleeper_league_id
-    for field in body.apply:
+    new.sleeper_league_id = sleeper_league_id
+    for field in fields:
         if field == "name" and league.name:
             new.name = league.name
         elif field == "scoring":
             new.scoring = mapping.settings
         elif field == "roster_slots":
-            specs, unknown = _roster_specs(league.roster_positions)
+            specs, unknown = _roster_specs(_sleeper_positions(league))
             if unknown:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown roster positions from Sleeper: {unknown}")
             new.roster_slots = specs
@@ -252,11 +287,92 @@ def sleeper_apply(league_id: str, body: SleeperApplyIn, state: AppState = Depend
             if max_keepers is not None:
                 new.keeper.max_per_manager = int(max_keepers)
                 new.keeper.enabled = int(max_keepers) > 0
+    return new
+
+
+@router.post("/{league_id}/sleeper/sync")
+def sleeper_sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """The one-click pre-draft sync: download the linked Sleeper league (and history leagues), refresh projections,
+    then (before the draft) take over its managers and rules. Returns what changed in plain words."""
+    from datetime import datetime, timezone
+
+    from nba_fantasy_shared.providers.base import CallFailed
+
+    from .. import config
+    from ..services.sleeper_changelog import load_changelog
+    from ..services.sleeper_league import current_keepers, load_details, managers_from_sleeper, pull_details, write_profiles
+
+    session = _session(state, league_id)
+    sid = session.league.sleeper_league_id
+    if state.platform is None or not hasattr(state.platform, "get_json"):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sleeper provider not configured")
+    if not sid:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "link a Sleeper league first (Settings → Sleeper league → linked league)")
+    changes: list[str] = []
+    log_before = {e["id"] for e in load_changelog(state.store, sid)}
     try:
-        state.replace_league_settings(league_id, new)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    return session.league
+        details = pull_details(state.platform, state.store, sid)
+        for hid in session.league.sleeper_history_league_ids:
+            if load_details(state.store, hid) is None:   # past leagues don't change; Pull now refreshes them anyway
+                pull_details(state.platform, state.store, hid)
+    except CallFailed as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Sleeper unavailable: {exc}") from exc
+    write_profiles(state.store)
+    try:
+        proj = state.platform.fetch_projections(session.league.roster_season)
+        state.store.write_json(config.projections_rel(session.league.roster_season),
+                               {"pulled_at": datetime.now(timezone.utc).isoformat(), "projections": proj}, indent=None)
+        state.load_pool()   # re-reads projections and every session's Sleeper details
+    except (CallFailed, ValueError, AttributeError) as exc:
+        changes.append(f"projections not refreshed ({exc})")
+    session = _session(state, league_id)
+
+    if session.draft.status == "setup":
+        before = {m.manager_id: m.name for m in session.managers}
+        session.managers = managers_from_sleeper(details, session.managers)
+        session.draft.nomination_order = [m.manager_id for m in session.managers]
+        for m in session.managers:
+            if before.get(m.manager_id) != m.name:
+                changes.append(f"{m.name} replaced {before[m.manager_id]}" if m.manager_id in before else f"{m.name} added")
+        league = _sleeper_league(state, sid)
+        rule_diffs = [d for d in _diffs(session, league, map_sleeper_scoring(league.scoring_settings)) if d["field"] != "name"]
+        for d in rule_diffs:
+            changes.append(_describe(d))
+        try:
+            state.replace_league_settings(league_id, _applied(session, league, sid, ["scoring", "roster_slots", "keepers"]))
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        session.invalidate()
+        state.save_session(league_id)
+    else:
+        changes.append("draft already started: managers and rules were left as they are")
+
+    keepers = current_keepers(session.sleeper_details, session.managers, session.players, session.league.keeper.escalation)
+    new_log = [e for e in load_changelog(state.store, sid) if e["id"] not in log_before]
+    return {"changes": changes or ["managers and rules already match Sleeper"], "keepers_set": len(keepers),
+            "changelog_new": new_log, "synced_at": details.get("pulled_at")}
+
+
+def _describe(d: dict) -> str:
+    field, cur, new = d["field"], d["current"], d["sleeper"]
+    if field == "roster_slots":
+        fmt = lambda c: " ".join(f"{k}×{v}" for k, v in (c or {}).items() if v)
+        return f"roster: {fmt(cur)} → {fmt(new)}"
+    if field.startswith("scoring.bonus."):
+        bonus = lambda r: f"+{r['bonus']:g}" if r else "none"
+        return f"bonus {field.rsplit('.', 1)[1]}: {bonus(cur)} → {bonus(new)}"
+    if field.startswith("scoring.base."):
+        return f"scoring {field.rsplit('.', 1)[1]}: {cur:g} → {new:g}"
+    if field == "keepers.max_per_manager":
+        return f"keeper limit: {cur} → {new}"
+    return f"{field}: {cur} → {new}"
+
+
+@router.get("/{league_id}/sleeper/changelog")
+def sleeper_changelog(league_id: str, state: AppState = Depends(get_state)) -> list[dict]:
+    from ..services.sleeper_changelog import load_changelog
+
+    return load_changelog(state.store, _session(state, league_id).league.sleeper_league_id)
 
 
 # ------------------------------------------------------------------ export

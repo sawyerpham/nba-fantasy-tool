@@ -18,7 +18,8 @@ from nba_fantasy_shared.storage import JsonStore
 from .. import config
 from ..engine.session import DraftSession
 from .league_repository import LeagueRepository, new_document
-from .pull_service import PlayerDetailCache, PullService, PullStatus, load_overrides, load_records, save_overrides
+from .pull_service import PlayerDetailCache, PullService, PullStatus, load_overrides, load_projections, load_records, save_overrides
+from .sleeper_league import load_details
 from .valuation_service import ValuationService
 
 log = logging.getLogger(__name__)
@@ -57,13 +58,22 @@ class AppState:
 
     def load_pool(self) -> None:
         with self._lock:
-            self.players = {r.player_id: r for r in load_records(self.store, self.roster_season)}
+            projections = load_projections(self.store, self.roster_season)
+            self.players = {
+                r.player_id: r.model_copy(update={"projection": projections.get(r.sleeper_id or "")})
+                for r in load_records(self.store, self.roster_season)
+            }
             self.overrides = load_overrides(self.store)
             for session in self.sessions.values():
                 session.players = dict(self.players)
                 session.overrides = self.overrides
                 session.set_valuations(self.valuations_for(session.league.scoring, session.league.stats_season))
+                session.sleeper_details = load_details(self.store, session.league.sleeper_league_id)
+                session.sleeper_history = self._history(session.league)
         log.info("pool loaded: %d players, %d overrides", len(self.players), len(self.overrides))
+
+    def _history(self, league: LeagueSettings) -> list[dict]:
+        return [d for d in (load_details(self.store, i) for i in league.sleeper_history_league_ids) if d]
 
     def valuations_for(self, scoring: ScoringSettings, stats_season: str | None = None) -> dict[int, PlayerValuation]:
         service = ValuationService(self.store, stats_season or self.stats_season)
@@ -90,6 +100,7 @@ class AppState:
                 "game_logs_hours": age(config.game_logs_rel(self.stats_season)),
                 "sleeper_players_hours": age(PLAYERS_CACHE_REL),
                 "reconcile_hours": age(rel),
+                "sleeper_projections_hours": age(config.projections_rel(self.roster_season)),
             },
             "reconcile": reconcile,
             "pull": self.pull_status(),
@@ -230,6 +241,8 @@ class AppState:
                     doc, self.players, self.overrides, self.valuations_for(doc.league.scoring, doc.league.stats_season)
                 )
                 session.overrides = self.overrides  # shared, so edits propagate to every league
+                session.sleeper_details = load_details(self.store, doc.league.sleeper_league_id)
+                session.sleeper_history = self._history(doc.league)
                 self.sessions[league_id] = session
             return session
 
@@ -251,6 +264,8 @@ class AppState:
             session.set_league(league)
             if scoring_changed or season_changed:
                 session.set_valuations(self.valuations_for(league.scoring, league.stats_season))
+            session.sleeper_details = load_details(self.store, league.sleeper_league_id)
+            session.sleeper_history = self._history(league)
             self.save_session(league_id)
             return session
 

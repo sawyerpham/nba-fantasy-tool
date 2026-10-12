@@ -52,6 +52,32 @@ def _mutate(state: AppState, league_id: str, action) -> dict:
     return _draft_view(session)
 
 
+@router.get("/sleeper/keepers")
+def sleeper_keepers(league_id: str, state: AppState = Depends(get_state)) -> list[dict]:
+    """This season's keepers as set in Sleeper, priced with the league's escalation rule (needs a data pull)."""
+    from ..services.sleeper_league import current_keepers
+
+    s = _session(state, league_id)
+    return current_keepers(s.sleeper_details, s.managers, s.players, s.league.keeper.escalation)
+
+
+@router.post("/draft/sync")
+def sync_from_sleeper(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Record every pick made in the Sleeper draft that is not recorded here yet. Safe to call repeatedly."""
+    from ..services.sleeper_league import draft_id, sync_picks
+
+    session = _session(state, league_id)
+    did = draft_id(session.sleeper_details, session.league.sleeper_draft_id)
+    if state.platform is None or not hasattr(state.platform, "get_json"):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sleeper provider not configured")
+    if not did:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no Sleeper draft: link the league (Settings) and pull data, or set a draft id")
+    result = sync_picks(state.platform, session, did)
+    if result["added"]:
+        state.save_session(league_id)
+    return {**result, "view": _draft_view(session)}
+
+
 @router.post("/draft/start")
 def start_draft(league_id: str, body: StartDraft, state: AppState = Depends(get_state)) -> dict:
     keepers = [KeeperAssignment(k.manager_id, k.player_id, k.cost) for k in body.keepers]
@@ -131,7 +157,35 @@ def rankings(
             rows = session.rankings(manager_id, limit)
     except DraftError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    return [asdict(r) for r in rows]
+    from collections import Counter
+
+    from ..engine.ranking import tiers
+
+    tier = tiers(session.pool_values())
+    left = Counter(tier.get(pid) for pid in session.available_ids())
+    size = Counter(tier.values())
+    prices = _prices(session, rows, manager_id) if session.draft.status == "live" else {}
+    return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
+             "price": prices.get(r.player_id)}
+            for r in rows]
+
+
+def _prices(session, rows, manager_id: str | None) -> dict[int, int]:
+    """'Pay up to' for each listed player (the record bar's number), sharing one market rate across rows."""
+    from ..engine.bidding import market_rate, recommend_bid
+    from ..engine.ranking import rank_players
+
+    manager = manager_id or session.user_manager_id()
+    available = rank_players(session.league, session.players, session.overrides, session.valuations,
+                             session.engine.picks_for(manager), session.available_ids())
+    pool = session.pool_values()
+    rate = market_rate(session.league, session.managers, session.draft.picks, (p.value for p in available), pool)
+    progress = session.engine.progress()
+    out = {}
+    for r in rows:
+        rec = recommend_bid(session.league, session.managers, session.draft.picks, manager, r, available, pool, progress, rate=rate)
+        out[r.player_id] = rec.recommended_max if rec.can_bid else round(rec.fair_value)
+    return out
 
 
 @router.get("/spending")

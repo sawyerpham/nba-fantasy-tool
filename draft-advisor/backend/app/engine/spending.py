@@ -35,6 +35,7 @@ from .ranking import RankedPlayer
 STARTER_ORDER: tuple[str, ...] = roster.POSITION_SLOTS + roster.FLEX_SLOTS + ("UTIL",)
 FIT_SCAN_LIMIT = 200  # candidates examined per slot when looking for one that fits the allowance
 DEFAULT_TARGETS = 5
+NOMINATION_SCAN = 40  # available players considered for nomination ideas
 
 
 @dataclass
@@ -114,6 +115,7 @@ class SpendingGuide:
     focus: TargetAdvice | None
     targets: list[TargetAdvice]
     advice: list[str] = field(default_factory=list)
+    nominations: list[dict] = field(default_factory=list)
 
 
 def ordinal(n: int) -> str:
@@ -336,6 +338,34 @@ def spending_guide(
                 continue
             targets.append(advise(p))
 
+    # ---- nomination ideas
+    # drain: players the room will pay a lot for that you won't buy (no fitting slot, or priced past your stretch);
+    # sneak: players you want that few rivals can afford right now, so they may go near fair value.
+    # ponytail: scans the top NOMINATION_SCAN available; widen if late-draft suggestions run dry.
+    nominations: list[dict] = []
+    if me.open_mandatory > 0:
+        drain, sneak = [], []
+        for p in sorted(available, key=lambda x: -x.value)[:NOMINATION_SCAN]:
+            r = rec_for(p)
+            market = price(p)
+            rivals = sum(1 for x in others if x.open_mandatory > 0 and x.max_bid >= market)
+            if not p.rosterable or market > me.max_bid:
+                if rivals >= 2:
+                    drain.append((market * rivals, p, market, rivals, "you have no slot for him" if not p.rosterable else "above your max bid"))
+                continue
+            a = advise(p)
+            if a.verdict == "pass":   # past your walk-away; a mere stretch may still be your star
+                if rivals >= 2:
+                    drain.append((market * rivals, p, market, rivals, "too pricey for your build"))
+            elif a.verdict in ("go", "fits", "fair-only") and r.can_bid and rivals <= few_rivals:
+                sneak.append((-p.value, p, a.suggested, rivals, ""))
+        for _, p, market, rivals, why in sorted(drain, key=lambda t: -t[0])[:3]:
+            nominations.append({"kind": "drain", "player_id": p.player_id, "name": p.full_name, "price": market, "rivals": rivals,
+                                "reason": f"{rivals} rivals can pay ~${market} and {why}: their money leaves the room"})
+        for _, p, suggested, rivals, _ in sorted(sneak, key=lambda t: t[0])[:3]:
+            nominations.append({"kind": "sneak", "player_id": p.player_id, "name": p.full_name, "price": suggested, "rivals": rivals,
+                                "reason": f"only {rivals} rival{'s' if rivals != 1 else ''} can reach ${suggested} right now"})
+
     # ---- headline advice
     advice: list[str] = []
     if me.open_mandatory == 0:
@@ -396,4 +426,5 @@ def spending_guide(
         focus=focus,
         targets=targets,
         advice=advice,
+        nominations=nominations,
     )
