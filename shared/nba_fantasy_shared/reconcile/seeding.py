@@ -31,12 +31,18 @@ def map_injury(raw: str | None, injury_map: Mapping[str, InjuryStatus]) -> Injur
     return injury_map.get(raw, "day_to_day")
 
 
+SHORT_TERM_TAGS = ("DTD", "GTD", "Questionable", "Doubtful")
+
+
 def seed_overrides(
     records: list[PlayerRecord],
     existing: Mapping[int, PlayerOverrides] | None = None,
     injury_map: Mapping[str, InjuryStatus] | None = None,
     now: datetime | None = None,
+    ignore_short_term: bool = False,
 ) -> dict[int, PlayerOverrides]:
+    """ignore_short_term: before the regular season, DTD/GTD tags (preseason rest days, minor knocks) seed as
+    healthy; Out/IR still count. A 'Rest' tag is never an injury. Sleeper's raw tag and note are kept either way."""
     existing = dict(existing or {})
     injury_map = injury_map or DEFAULT_SLEEPER_INJURY_MAP
     now = now or utcnow()
@@ -55,9 +61,12 @@ def seed_overrides(
                 current.eligibility = list(fantasy.fantasy_positions)
                 current.eligibility_source = "sleeper" if fantasy.fantasy_positions else "none"
             if current.injury_source != "manual":
-                current.injury_status = map_injury(fantasy.injury_status_raw, injury_map)
+                raw = fantasy.injury_status_raw
+                minor = (raw in SHORT_TERM_TAGS and ignore_short_term) or (fantasy.injury_body_part or "").lower() == "rest"
+                current.injury_status = "healthy" if minor else map_injury(raw, injury_map)
                 current.injury_source = "sleeper"
-                current.injury_note = injury_note_from(fantasy.injury_body_part, fantasy.injury_notes)
+                note = injury_note_from(fantasy.injury_body_part, fantasy.injury_notes)
+                current.injury_note = f"ignored: {raw} {note}".strip() if minor and raw else note
             current.injury_sleeper_raw = fantasy.injury_status_raw
             current.seeded_at = now
             current.updated_at = now

@@ -116,6 +116,11 @@ def load_records(store: JsonStore, roster_season: str) -> list[PlayerRecord]:
     return [PlayerRecord.model_validate(r) for r in store.read_json(rel)["records"]]
 
 
+def load_projections(store: JsonStore, roster_season: str) -> dict[str, dict[str, float]]:
+    rel = config.projections_rel(roster_season)
+    return store.read_json(rel)["projections"] if store.exists(rel) else {}
+
+
 def load_game_logs(store: JsonStore, stats_season: str) -> dict[int, list[GameLine]]:
     rel = config.game_logs_rel(stats_season)
     if not store.exists(rel):
@@ -170,6 +175,8 @@ class PullService:
             assert self.roster_season and self.stats_season
             nba_bios = self._pull_nba_pool()
             sleeper_all, fantasy = self._pull_sleeper(sources, force_sleeper)
+            self._pull_projections(sources)
+            self._pull_sleeper_leagues(sources)
             records, report = self._reconcile(nba_bios, sleeper_all, fantasy)
             if not skip_game_logs:
                 self._pull_game_logs(records)
@@ -224,6 +231,45 @@ class PullService:
         self.status.reports.append(report2)
         return bios, attrs
 
+    def _pull_projections(self, sources: set[str]) -> None:
+        if self.platform is None or "sleeper" not in sources or not hasattr(self.platform, "fetch_projections"):
+            return
+        self._phase("sleeper_projections")
+        try:
+            projections = self.platform.fetch_projections(self.roster_season)
+        except (CallFailed, ValueError) as exc:  # projections are an upgrade, not a requirement
+            log.warning("Sleeper projections unavailable (%s); keeping the previous cache", exc)
+            return
+        self.store.write_json(
+            config.projections_rel(self.roster_season),
+            {"pulled_at": utcnow().isoformat(), "projections": projections},
+            indent=None,
+        )
+
+    def _pull_sleeper_leagues(self, sources: set[str]) -> None:
+        """Managers, keepers and past auctions for every saved league linked to a Sleeper league."""
+        if self.platform is None or "sleeper" not in sources or not hasattr(self.platform, "get_json"):
+            return
+        from .league_repository import LeagueRepository
+        from .sleeper_league import pull_details
+
+        repo = LeagueRepository(self.store)
+        ids: set[str] = set()
+        for lid in repo.list_ids():
+            league = repo.load(lid).league
+            ids |= {league.sleeper_league_id, *league.sleeper_history_league_ids} - {None, ""}
+        ids = sorted(ids)
+        for sleeper_id in ids:
+            self._phase(f"sleeper_league {sleeper_id}")
+            try:
+                pull_details(self.platform, self.store, sleeper_id)
+            except (CallFailed, ValueError) as exc:  # league details are an upgrade, not a requirement
+                log.warning("Sleeper league %s unavailable (%s)", sleeper_id, exc)
+        if ids:
+            from .sleeper_league import write_profiles
+
+            write_profiles(self.store)
+
     def _reconcile(
         self, nba_bios: list[PlayerBio], sleeper_all: list[PlayerBio], fantasy: dict[str, FantasyAttributes]
     ) -> tuple[list[PlayerRecord], ReconcileReport]:
@@ -263,6 +309,8 @@ class PullService:
     def _seed(self, records: list[PlayerRecord]) -> None:
         self._phase("seed_overrides")
         existing = load_overrides(self.store)
-        seeded = seed_overrides(records, existing, self.injury_map)
+        state = self.status.platform_state
+        preseason = state is not None and state.season_type in ("pre", "off")
+        seeded = seed_overrides(records, existing, self.injury_map, ignore_short_term=preseason)
         save_overrides(self.store, seeded)
         self.status.seeded_overrides = sum(1 for o in seeded.values() if o.seeded_at is not None)

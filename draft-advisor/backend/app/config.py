@@ -24,6 +24,10 @@ def game_logs_rel(stats_season: str) -> str:
     return f"cache/game_logs_{stats_season}.json"
 
 
+def projections_rel(roster_season: str) -> str:
+    return f"cache/sleeper_projections_{roster_season}.json"
+
+
 def reconcile_rel(roster_season: str) -> str:
     return f"cache/reconcile_{roster_season}.json"
 

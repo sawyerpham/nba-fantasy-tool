@@ -183,7 +183,7 @@ class SleeperProvider:
     # ---- HTTP -----------------------------------------------------------------------------
 
     def _get_json(self, path: str, label: str) -> Any:
-        url = f"{self.base_url}/{path.lstrip('/')}"
+        url = path if path.startswith("http") else f"{self.base_url}/{path.lstrip('/')}"
 
         def do() -> Any:
             resp = self.session.get(url, timeout=self.runner.policy.timeout_s)
@@ -290,6 +290,25 @@ class SleeperProvider:
         state = platform_state_from_json(data)
         self.store.write_json(STATE_CACHE_REL, {"pulled_at": self._now().isoformat(), "state": state.model_dump(mode="json")})
         return state
+
+    def get_json(self, path: str) -> Any:
+        """Any read-only Sleeper endpoint (league users/rosters, drafts, picks); None on 404."""
+        return self._get_json(path, f"Sleeper GET /{path.lstrip('/')}")
+
+    def fetch_projections(self, roster_season: str) -> dict[str, dict[str, float]]:
+        """Season projections (per-game stats, incl. 'sp' = projected seconds) keyed by Sleeper player id.
+
+        Sleeper's undocumented projections endpoint lives beside /v1, not under it. Entries without
+        projected points are placeholders (retired players etc.) and are dropped.
+        """
+        year = roster_season.split("-")[0]
+        host = self.base_url.rsplit("/v1", 1)[0]
+        data = self._get_json(f"{host}/projections/nba/{year}?season_type=regular", f"Sleeper GET /projections/nba/{year}")
+        return {
+            str(e["player_id"]): {k: float(v) for k, v in e["stats"].items() if isinstance(v, (int, float))}
+            for e in data or []
+            if e.get("player_id") and (e.get("stats") or {}).get("pts")
+        }
 
     def fetch_league(self, sleeper_league_id: str) -> PlatformLeague | None:
         data = self._get_json(f"league/{sleeper_league_id}", f"Sleeper GET /league/{sleeper_league_id}")

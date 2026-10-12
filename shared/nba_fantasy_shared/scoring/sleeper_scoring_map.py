@@ -40,7 +40,8 @@ UNSUPPORTED_KEYS: frozenset[str] = frozenset(
 TRIPLE_DOUBLE_KEY = "td"
 
 # bonus_pt_40 / bonus_ast_15 / bonus_reb_20 / bonus_stl_5 ... -> stat_threshold rules
-_BONUS_PATTERN = re.compile(r"^bonus_(pt|pts|reb|ast|stl|blk)_(\d+)$")
+# A real NBA league (2026-10-11) names them with a "p" suffix: bonus_pt_40p, bonus_ast_15p, bonus_reb_20p.
+_BONUS_PATTERN = re.compile(r"^bonus_(pt|pts|reb|ast|stl|blk)_(\d+)p?$")
 _BONUS_STAT = {"pt": "pts", "pts": "pts", "reb": "reb", "ast": "ast", "stl": "stl", "blk": "blk"}
 
 EXPECTED_KEYS: tuple[str, ...] = tuple(BASE_KEYS) + (

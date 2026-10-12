@@ -109,6 +109,7 @@ class PlayerRecord(BaseModel):
     fantasy: FantasyAttributes | None = None
     match_method: MatchMethod
     has_stats: bool = True
+    projection: dict[str, float] | None = None  # Sleeper season projection, per-game stats (attached at load)
 
 
 class PlayerOverrides(BaseModel):

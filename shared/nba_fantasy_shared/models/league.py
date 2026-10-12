@@ -96,6 +96,12 @@ class RankingSettings(BaseModel):
     age_penalty_max: float = 0.25
     min_games_full_confidence: int = 20
     hide_unrosterable: bool = True
+    # Share of FP/G taken from Sleeper's season projection (role, minutes, new team); the rest is last season.
+    # 1 = projection only (user's call, 2026-10-11); players Sleeper does not project still use last season.
+    projection_weight: float = 1.0
+    # Bench spots per team that get real auction money; the rest are treated as $1 fills. Calibrated to
+    # the league's 2025 auction (stars $90–105, #84 ≈ $6, 55 picks at $1).
+    priced_bench_slots: int = 2
 
 
 class ManagerBehavior(BaseModel):
@@ -118,6 +124,9 @@ class LeagueSettings(BaseModel):
     name: str
     platform: Literal["sleeper"] = "sleeper"
     sleeper_league_id: str | None = None
+    sleeper_draft_id: str | None = None   # live-sync override (e.g. a Sleeper mock draft); default: the league's draft
+    # Other Sleeper leagues with the same people (any format), pulled only to learn how each manager drafts.
+    sleeper_history_league_ids: list[str] = Field(default_factory=list)
     roster_season: str = "2026-27"
     stats_season: str = "2025-26"
     game_mode: GameMode = "lock_in"
