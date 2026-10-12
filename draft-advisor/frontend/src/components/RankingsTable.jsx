@@ -19,6 +19,9 @@ const COLS = [
 // ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
 const trend = (r) => (r.proj_fpts == null || !r.last_fpts ? "" : r.proj_fpts - r.last_fpts >= 0.5 ? "up" : r.last_fpts - r.proj_fpts >= 0.5 ? "down" : "");
 
+// Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
+export const tierHue = (tier) => ({ "--h": Math.round(Math.min(tier - 1, 14) / 14 * 130) });
+
 export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort, ceilingMetric = "weekly_best" }) {
   // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
@@ -64,7 +67,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               data-testid={`rank-row-${r.player_id}`}
             >
               <td className="num muted">{mode === "tier" && r.tier != null
-                ? <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} title={`rank #${r.rank} · tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>
+                ? <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} title={`rank #${r.rank} · tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>
                 : r.rank}</td>
               <td>
                 <div className="player-cell">
