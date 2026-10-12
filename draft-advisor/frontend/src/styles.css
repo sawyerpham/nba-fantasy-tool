@@ -117,7 +117,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 /* Draft page: [spending guide / team] | [on the block + rankings] | [player / managers], full width. Every pane
    scrolls on its own and the columns end at the bottom of the window (--cols-top is measured by the draft page). */
-.draft-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 420px; grid-template-areas: "left rank side"; gap: 16px;
+.draft-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 500px; grid-template-areas: "left rank side"; gap: 16px;
   height: calc(100vh - var(--cols-top, 160px) - 16px); min-height: 420px; }
 .dg-left { grid-area: left; } .dg-side { grid-area: side; }
 .dg-left, .dg-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -136,7 +136,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 > label, .grid2 > label { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: var(--muted); }
 .spacer { flex: 1; }
-@media (max-width: 1500px) { .draft-grid { grid-template-columns: 320px minmax(0, 1fr) 380px; } }
+@media (max-width: 1500px) { .draft-grid { grid-template-columns: 300px minmax(0, 1fr) 420px; } }
 @media (max-width: 1200px) {
   .draft-grid { grid-template-columns: 1fr; grid-template-areas: "rank" "left" "side"; height: auto; }
   .dg-pane { flex: none; max-height: 60vh; } .dg-rank > .panel.scroll { max-height: 72vh; }
@@ -268,10 +268,12 @@ tr.tier-start td { border-top: 2px solid var(--primary-soft); }
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--text); }
 th.sorted { color: var(--primary); }
-.rank-head { display: inline-flex; align-items: center; gap: 2px; }
-.rank-toggle { width: 22px; height: 20px; padding: 0; font-size: 12.5px; font-weight: 700; line-height: 18px; border-radius: 5px; text-transform: none; color: var(--primary); }
 .sort-arrow { display: inline-block; width: 1em; text-align: center; }
-[data-testid="rankings-table"] th:first-child, [data-testid="rankings-table"] td:first-child { width: 60px; min-width: 60px; max-width: 60px; }
+[data-testid="rankings-table"] th:first-child, [data-testid="rankings-table"] td:first-child { width: 84px; min-width: 84px; max-width: 84px; }
+.rank-cell { white-space: nowrap; }
+.rank-num { display: inline-block; min-width: 2.2em; text-align: right; font-size: 13.5px; }
+/* rankings: tight columns so the side columns get the width */
+[data-testid="rankings-table"] th, [data-testid="rankings-table"] td { padding: 7px 6px; }
 .tier-cell { font-size: 13px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
 /* --h is set per tier (red = best, green = worst); "last" = tier nearly gone, ringed. */
 .tier-cell, .tier-tag { color: hsl(var(--h, 230) 85% 72%); background: hsl(var(--h, 230) 70% 50% / 0.2); }
@@ -332,4 +334,4 @@ th.sorted { color: var(--primary); }
 /* panes that should show everything: size to their content; the neighbour pane takes the rest and scrolls */
 .dg-pane.fit-content { flex: 0 1 auto; }
 .managers-table td, .managers-table th { padding: 3px 6px; font-size: 13.5px; }
-.managers-table td:last-child { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.managers-table td:last-child { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }

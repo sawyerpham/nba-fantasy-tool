@@ -132,7 +132,7 @@ try {
 
   // ---------------------------------------------------------------- 5. nominate -> on the block -> record bid
   const first = (await apiGet(`/leagues/${LEAGUE}/rankings?limit=1`))[0];
-  await page.getByTestId(`btn-block-${first.player_id}`).click();
+  await page.getByTestId(`rank-row-${first.player_id}`).dblclick();   // double-click a row = on the block
   await page.getByTestId("on-the-block").waitFor();
   await page.getByTestId("pick-dialog").waitFor();          // nominating opens the inline record bar by itself
   await page.getByTestId("pick-recommended").waitFor();
@@ -183,11 +183,8 @@ try {
   assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Prices"), "spending guide shows you vs the room");
   assert((await page.locator('[data-testid^="spend-target-"]').count()) >= 1, "spending guide lists affordable targets");
   log("spending guide:", spending.replace(/\s+/g, " ").slice(0, 160));
-  await page.getByTestId("rank-sort").click();             // first column shows tiers by default (T2 once Jokić is gone), numbers when toggled
-  await page.waitForFunction(() => /^T\d+$/.test(document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent || ""));
-  await page.getByTestId("rank-mode-toggle").click();
-  await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
-  await page.getByTestId("rank-mode-toggle").click();
+  await page.getByTestId("rank-sort").click();             // first column: tier and overall rank side by side ("T2 1")
+  await page.waitForFunction(() => /^T\d+ 1$/.test((document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent || "").trim()));
   log("rankings: position chip filter and column sort work");
   // adjust who drafted whom: Jokić is pick #3 (after two keepers); move it to m2 through the edit dialog, then back
   await page.getByTestId("pick-chip-3").click();
@@ -225,9 +222,9 @@ try {
 
     // open the pick dialog: from the table when the row is visible for the user, else via the search box
     let path = "table";
-    const rowBtn = page.getByTestId(`btn-block-${cand.player_id}`);
-    if (await rowBtn.count()) {
-      await rowBtn.first().click();
+    const row = page.getByTestId(`rank-row-${cand.player_id}`);
+    if (await row.count()) {
+      await row.first().dblclick();
     } else {
       path = "search";
       await page.getByTestId("search-input").fill(cand.full_name.split(" ").slice(-1)[0]);
