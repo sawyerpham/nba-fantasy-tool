@@ -184,6 +184,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 /* ---------- rankings ---------- */
 .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .toolbar h3 { margin: 0 8px 0 0; font-size: 19.5px; }
+.toolbar input[type="text"] { flex: 1 1 120px; min-width: 100px; max-width: 240px; }
 .chips { display: inline-flex; gap: 2px; padding: 3px; background: var(--panel-2); border-radius: 10px; }
 .chips .chip { border: 0; background: transparent; color: var(--muted); border-radius: 7px; margin: 0; }
 .chips .chip.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }

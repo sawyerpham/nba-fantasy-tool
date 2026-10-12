@@ -12,6 +12,10 @@ import EditPickDialog from "../components/EditPickDialog.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
+// A bench spot rarely scores under Lock-In, so in "My team" order a bench-only fit counts for 60 % of its value.
+const BENCH_FIT = 0.6;
+const teamScore = (r) => r.value * (r.assignable_slot === "BN" ? BENCH_FIT : 1);
+
 export default function DraftPage({ leagueId }) {
   const [view, setView] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -30,6 +34,12 @@ export default function DraftPage({ leagueId }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  // "My team" ranks players who would only reach your bench lower; "Overall" is the league-wide order.
+  const [forTeam, setForTeam] = useState(() => { try { return localStorage.getItem("da.rankFor") === "team"; } catch { return false; } });
+  const pickRankFor = (team) => {
+    setForTeam(team);
+    try { localStorage.setItem("da.rankFor", team ? "team" : "overall"); } catch { /* ignore */ }
+  };
   const [sync, setSync] = useState(() => { try { return localStorage.getItem(`da.sync.${leagueId}`) === "1"; } catch { return false; } });
   const [syncInfo, setSyncInfo] = useState(null);
   const syncBusy = useRef(false);
@@ -88,20 +98,25 @@ export default function DraftPage({ leagueId }) {
 
   const visible = useMemo(() => {
     let rows = rankings;
+    if (forTeam) {
+      const order = rankings.slice().sort((a, b) => teamScore(b) - teamScore(a) || a.rank - b.rank);
+      const teamRank = new Map(order.map((r, i) => [r.player_id, i + 1]));
+      rows = rows.map((r) => ({ ...r, team_rank: teamRank.get(r.player_id) }));
+    }
     if (filter) rows = rows.filter((r) => r.full_name.toLowerCase().includes(filter.toLowerCase()));
     if (posFilter) rows = rows.filter((r) => r.eligibility.includes(posFilter));
     const { key, dir } = sort;
     const sign = dir === "asc" ? 1 : -1;
     return rows.slice().sort((a, b) => {
       const val = (r) => (key === "pos" ? (r.eligibility.length ? Math.min(...r.eligibility.map((p) => POSITIONS.indexOf(p))) : 99)
-        : key === "min" ? (r.proj_min ?? r.last_min) : r[key]);
+        : key === "min" ? (r.proj_min ?? r.last_min) : key === "rank" && forTeam ? r.team_rank : r[key]);
       const x = val(a), y = val(b);
       if (x === y) return a.rank - b.rank;
       if (x === null || x === undefined) return 1;
       if (y === null || y === undefined) return -1;
       return (x < y ? -1 : 1) * sign;
     });
-  }, [rankings, filter, posFilter, sort]);
+  }, [rankings, filter, posFilter, sort, forTeam]);
 
   if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
   if (!view) return <p>{error || "Loading…"}</p>;
@@ -234,7 +249,11 @@ export default function DraftPage({ leagueId }) {
       <div className="cols">
         <div>
           <div className="toolbar">
-            <h3>Rankings <span className="small muted" style={{ fontWeight: 400 }}>for {userName}</span></h3>
+            <h3>Rankings</h3>
+            <span className="chips" title="My team: players who would only reach your bench rank lower, so open starting spots come first">
+              <button className={`small chip ${!forTeam ? "on" : ""}`} onClick={() => pickRankFor(false)} data-testid="rank-for-overall">Overall</button>
+              <button className={`small chip ${forTeam ? "on" : ""}`} onClick={() => pickRankFor(true)} data-testid="rank-for-team">My team</button>
+            </span>
             <input type="text" placeholder="Search players…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
             <span className="chips">
               <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>All</button>
