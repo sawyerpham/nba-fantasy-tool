@@ -10,7 +10,7 @@ function SourceBadge({ source }) {
   return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
 }
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName, onBlock, row }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, userName, onBlock, row }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -85,14 +85,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <div className="small muted">
         {bio.position_raw ? `${bio.position_raw} · ` : ""}age {bio.age ?? "?"} · {bio.height_in ? `${Math.floor(bio.height_in / 12)}'${bio.height_in % 12}"` : "?"} · {bio.weight_lbs ?? "?"} lb
         {bio.years_exp != null ? ` · ${bio.years_exp} yrs exp` : ""}{bio.draft_year ? ` · drafted ${bio.draft_year} R${bio.draft_round} #${bio.draft_number}` : ""}
-        {" · "}matched via {rec_.match_method}
       </div>
       {error && <div className="error">{error}</div>}
 
       {fit && fit.player_id === playerId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
           <div className="fit-head"><span className="bid-label">For your team</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
-          <ul className="small guide-lines">{fit.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          {/* Price and projection lines are left out here: the bid guide and Fantasy points sections below show them. */}
+          <ul className="small guide-lines">{fit.reasons.filter((r) => !/^(Price works|Stretch|Too pricey|You can't|Projected)/.test(r)).map((r, i) => <li key={i}>{r}</li>)}</ul>
         </div>
       )}
 
@@ -123,19 +123,11 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict">
               <VerdictBadge verdict={spend.verdict} /> {spend.text}
               {spend.verdict !== "cannot" && (
-                <div className="muted">after ${spend.suggested}: ${spend.left_after} left · ${spend.per_starter_after}/starter vs room ${spend.room_per_starter} · stretch ${spend.stretch} · walk-away ${spend.walk_away} · {spend.rivals_above_market} rival{spend.rivals_above_market === 1 ? "" : "s"} can reach the market max</div>
+                <div className="muted">stretch ${spend.stretch} · walk-away ${spend.walk_away}</div>
               )}
             </div>
           )}
           {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
-          <div className="small muted">
-            ${rec.my_budget_remaining} left · {rec.my_open_mandatory} slot{rec.my_open_mandatory === 1 ? "" : "s"} to fill ·{" "}
-            {rec.competitors.length
-              ? `${rec.competitors.length} rival${rec.competitors.length === 1 ? "" : "s"} can afford it: ` +
-                rec.competitors.slice().sort((a, b) => b.max_bid - a.max_bid).slice(0, 3).map((c) => `${c.name} $${c.max_bid}`).join(", ") +
-                (rec.competitors.length > 3 ? ` +${rec.competitors.length - 3} more` : "")
-              : "no rival can afford it"}
-          </div>
           <details className="small" style={{ marginTop: 4 }}>
             <summary>show the math</summary>
             <ul>{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
@@ -162,11 +154,11 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       </div>
       <div><textarea rows="2" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
-      <h3>Fantasy points <span className="muted small">(scoring {data.scoring_hash})</span></h3>
+      <h3>Fantasy points</h3>
       {row && (
         <div className="small" data-testid="fp-this-season">
           This season: <strong>{row.avg_fpts.toFixed(1)} FP/G</strong>{" "}
-          {row.proj_fpts != null ? "(Sleeper's projection, the number the rankings use)" : "(no Sleeper projection, so last season's number)"}
+          {row.proj_fpts != null ? "(Sleeper projection, used by the rankings)" : "(no Sleeper projection, so last season's number)"}
           {row.proj_fpts != null && row.last_fpts ? <span className={row.proj_fpts >= row.last_fpts ? "ok" : "warn-text"}> · {(row.proj_fpts - row.last_fpts) >= 0 ? "+" : ""}{(row.proj_fpts - row.last_fpts).toFixed(1)} vs last season</span> : null}
           {row.fpg_reason && row.fpg_reason.reason !== "steady" && (
             <div data-testid="fpg-reason">
@@ -183,22 +175,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
           </div>
           <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
-          {scoring && (
-            <details style={{ marginTop: 4 }}>
-              <summary>How the {val.avg_fpts} FP/G is made</summary>
-              <table className="small">
-                <thead><tr><th>stat</th><th>avg / game</th><th>× points</th><th>= FP</th></tr></thead>
-                <tbody>
-                  {Object.entries(scoring.base).map(([k, w]) => {
-                    const avg = val.stat_averages?.[k] ?? 0;
-                    return <tr key={k}><td>{k}</td><td>{avg.toFixed(1)}</td><td>{w}</td><td>{(avg * w).toFixed(2)}</td></tr>;
-                  })}
-                  <tr><td>bonuses</td><td colSpan="2">{Object.entries(val.bonus_counts).filter(([, n]) => n).map(([k, n]) => `${k}×${n}`).join(", ") || "none"}</td><td>{val.bonus_fpts_per_game.toFixed(2)}</td></tr>
-                  <tr><th colSpan="3">FP per game</th><th>{val.avg_fpts}</th></tr>
-                </tbody>
-              </table>
-            </details>
-          )}
           <div className="muted">Per game: {val.per_game_fpts.slice(-15).join(", ")}{val.per_game_fpts.length > 15 ? " (last 15)" : ""}</div>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}

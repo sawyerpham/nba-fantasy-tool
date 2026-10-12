@@ -324,7 +324,7 @@ export default function DraftPage({ leagueId }) {
           </div>
         </section>
         <section className="dg-side">
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} scoring={settings?.scoring} userName={userName}
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} userName={userName}
             onBlock={nominated?.player_id === selected} row={rankings.find((r) => r.player_id === selected)} />
           <div className="row" style={{ margin: "4px 0 10px" }}>
             <button className="small ghost" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ Hide managers" : "▸ Show managers"}</button>
