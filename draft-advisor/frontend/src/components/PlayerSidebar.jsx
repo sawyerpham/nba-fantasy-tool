@@ -162,7 +162,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           {row.proj_fpts != null && row.last_fpts ? <span className={row.proj_fpts >= row.last_fpts ? "ok" : "warn-text"}> · {(row.proj_fpts - row.last_fpts) >= 0 ? "+" : ""}{(row.proj_fpts - row.last_fpts).toFixed(1)} vs last season</span> : null}
           {row.fpg_reason && row.fpg_reason.reason !== "steady" && (
             <div data-testid="fpg-reason">
-              Why: {row.fpg_reason.reason} <span className="muted">({row.fpg_reason.confidence} confidence)</span>
+              Why: {row.fpg_reason.detail || row.fpg_reason.reason} <span className="muted">({row.fpg_reason.confidence} confidence)</span>
               {row.fpg_reason.sources?.map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="muted"> [{i + 1}]</a>)}
             </div>
           )}
