@@ -68,9 +68,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       {fit && fit.player_id === playerId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
-          <div className="fit-head"><span className="bid-label">For your team</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
-          {/* Price and projection lines are left out here: the bid guide and Fantasy points sections below show them. */}
-          <ul className="small guide-lines">{fit.reasons.filter((r) => !/^(Price works|Stretch|Too pricey|You can't|Projected)/.test(r)).map((r, i) => <li key={i}>{r}</li>)}</ul>
+          <div className="fit-head"><span className="bid-label">Fit for your team (same as the Fit column)</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
+          <ul className="small guide-lines">{fit.score_lines.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          {fit.notes.length > 0 && (
+            <>
+              <div className="bid-label" style={{ marginTop: 6 }}>Worth knowing (not in the score)</div>
+              <ul className="small guide-lines">{fit.notes.map((r, i) => <li key={i}>{r}</li>)}</ul>
+            </>
+          )}
         </div>
       )}
 

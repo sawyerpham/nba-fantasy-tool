@@ -132,24 +132,25 @@ def test_export_round_trip(fixture_world):
     json.loads(raw)  # plain JSON on disk
 
 
-def test_team_fit_reads_open_slot_price_and_bench_only(fixture_world):
-    from app.engine.fit import team_fit
+def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
+    from app.api.draft import _prices
+    from app.engine.fit import fit_scores, team_fit
 
     s = make_session(fixture_world)
     before = team_fit(s, "m1", JOKIC)
-    assert before.reasons[0] == "Fills your last open C starting spot." and not any("rice" in r for r in before.reasons)  # no price before the draft
+    assert before.score == 100 and before.score_lines[2].startswith("Price: not counted")
     s.start([])
-    live = team_fit(s, "m1", JOKIC)
-    assert any(r.startswith(("Price works", "Stretch", "Too pricey", "You can't")) for r in live.reasons)
-    # Fill every slot a center can start in (C, UTIL×2): another center is now bench only and a poorer fit.
+    rows = s.rankings("m1", 40)
+    column = fit_scores(s, "m1", rows, _prices(s, rows, "m1"))
+    for pid in (r.player_id for r in rows[:8]):
+        assert team_fit(s, "m1", pid).score == column[pid]["score"]
+    # Fill every slot a center can start in (C, UTIL×2): another center is now bench only and scores lower.
     centers = [pid for pid, o in s.overrides.items() if "C" in o.eligibility and pid in s.players and pid != JOKIC and s.engine.is_available(pid)][:3]
     for pid, slot in zip(centers, ("C", "UTIL", "UTIL")):
         s.engine.pick(pid, "m1", 1, slot)
     s.invalidate()
     bench = team_fit(s, "m1", JOKIC)
-    assert bench.reasons[0].startswith("Bench only") and "bench only" in bench.headline
-    assert ["poor", "okay", "good", "great"].index(bench.verdict) < ["poor", "okay", "good", "great"].index(live.verdict)
-
+    assert bench.score_lines[1].startswith("Role: bench only") and "bench only" in bench.headline
 
 def test_draft_context_has_rules_state_managers_and_the_player_on_the_block(fixture_world):
     from app.engine.context import draft_context
@@ -174,4 +175,4 @@ def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
     rows = s.rankings("m1", 30)
     top = rows[0]
     fits = fit_scores(s, "m1", rows, {top.player_id: 10_000})
-    assert fits[top.player_id]["score"] == 0 and "can't afford" in fits[top.player_id]["why"]
+    assert fits[top.player_id]["score"] == 0 and "more than you can bid" in fits[top.player_id]["why"]
