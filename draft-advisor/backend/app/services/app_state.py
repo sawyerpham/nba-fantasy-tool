@@ -118,21 +118,12 @@ class AppState:
                 session.invalidate()
 
     def update_override(self, player_id: int, changes: dict) -> PlayerOverrides:
-        """Manual edit: every touched field becomes source='manual'."""
+        """The user's notes (eligibility and injury always come from Sleeper)."""
         if player_id not in self.players:
             raise KeyError(player_id)
         now = datetime.now(timezone.utc)
         current = self.overrides.get(player_id) or PlayerOverrides(player_id=player_id, updated_at=now)
         data = current.model_dump()
-        if "eligibility" in changes:
-            data["eligibility"] = list(changes["eligibility"])
-            data["eligibility_source"] = "manual"
-        if "injury_status" in changes:
-            data["injury_status"] = changes["injury_status"]
-            data["injury_source"] = "manual"
-        if "injury_note" in changes:
-            data["injury_note"] = changes["injury_note"]
-            data["injury_source"] = "manual"
         if "notes" in changes:
             data["notes"] = changes["notes"]
         data["updated_at"] = now
@@ -141,33 +132,6 @@ class AppState:
         self.save_overrides()
         return updated
 
-    def reset_override(self, player_id: int, fields: Iterable[str]) -> PlayerOverrides:
-        """Put selected fields back under Sleeper seeding (or 'none' when Sleeper knows nothing)."""
-        from nba_fantasy_shared.reconcile.seeding import injury_note_from, map_injury
-
-        record = self.players.get(player_id)
-        if record is None:
-            raise KeyError(player_id)
-        now = datetime.now(timezone.utc)
-        current = self.overrides.get(player_id) or PlayerOverrides(player_id=player_id, updated_at=now)
-        data = current.model_dump()
-        fantasy = record.fantasy
-        injury_map = self._injury_map()
-        for field in fields:
-            if field == "eligibility":
-                data["eligibility"] = list(fantasy.fantasy_positions) if fantasy else []
-                data["eligibility_source"] = "sleeper" if fantasy and fantasy.fantasy_positions else "none"
-            elif field == "injury":
-                data["injury_status"] = map_injury(fantasy.injury_status_raw, injury_map) if fantasy else "healthy"
-                data["injury_source"] = "sleeper" if fantasy else "none"
-                data["injury_note"] = injury_note_from(fantasy.injury_body_part, fantasy.injury_notes) if fantasy else ""
-            else:
-                raise ValueError(f"unknown override field {field!r}; use 'eligibility' or 'injury'")
-        data["updated_at"] = now
-        updated = PlayerOverrides.model_validate(data)
-        self.overrides[player_id] = updated
-        self.save_overrides()
-        return updated
 
     def _injury_map(self) -> dict:
         for session in self.sessions.values():

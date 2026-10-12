@@ -1,4 +1,4 @@
-"""Player search (autocomplete), detail (sidebar), and user-editable overrides."""
+"""Player search (autocomplete), detail (sidebar), and the user's per-player notes."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from nba_fantasy_shared.reconcile.names import normalize_name
 
 from ..services.app_state import AppState
 from .deps import get_state
-from .schemas import OverridePatch, OverrideReset
+from .schemas import OverridePatch
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -92,15 +92,6 @@ def patch_overrides(player_id: int, body: OverridePatch, state: AppState = Depen
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "nothing to change")
     try:
         updated = state.update_override(player_id, changes)
-    except KeyError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown player {player_id}") from exc
-    return updated.model_dump(mode="json")
-
-
-@router.post("/{player_id}/overrides/reset")
-def reset_overrides(player_id: int, body: OverrideReset, state: AppState = Depends(get_state)) -> dict:
-    try:
-        updated = state.reset_override(player_id, body.fields)
     except KeyError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown player {player_id}") from exc
     return updated.model_dump(mode="json")

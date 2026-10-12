@@ -99,11 +99,8 @@ try {
   const jokic = top[0].player_id;
   await page.getByTestId(`rank-row-${jokic}`).click();
   await page.getByTestId("player-sidebar").waitFor();
-  await page.getByTestId("injury-select").selectOption("day_to_day");
-  await page.getByTestId("source-manual").first().waitFor();
-  await page.getByTestId("reset-injury").click();
-  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="source-sleeper"]')].length >= 2);
-  summary.steps.push("override edit + reset via sidebar (source badges)");
+  assert((await page.getByTestId("sleeper-info").textContent()).includes("C"), "sidebar shows Sleeper positions");
+  summary.steps.push("sidebar shows Sleeper positions and injury (read-only)");
 
   await page.getByTestId("btn-start").click();
   await page.getByTestId("start-dialog").waitFor();

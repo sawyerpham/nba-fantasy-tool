@@ -57,7 +57,7 @@ def test_seed_maps_dtd_ir_and_none():
         assert seed_overrides([record(1, fa)], {}, now=NOW)[1].injury_status == expected
 
 
-def test_seed_never_overwrites_manual_fields_but_refreshes_sleeper_fields():
+def test_seed_always_takes_sleeper_and_keeps_the_users_notes():
     existing = {
         1: PlayerOverrides(player_id=1, eligibility=["C"], eligibility_source="manual",
                            injury_status="healthy", injury_source="sleeper", updated_at=NOW, notes="keep me"),
@@ -67,12 +67,11 @@ def test_seed_never_overwrites_manual_fields_but_refreshes_sleeper_fields():
     fa1 = FantasyAttributes(sleeper_id="1", fantasy_positions=["PF", "SF"], injury_status_raw="DTD", injury_body_part="Ankle")
     fa2 = FantasyAttributes(sleeper_id="2", fantasy_positions=["PG", "SG"], injury_status_raw=None)
     out = seed_overrides([record(1, fa1), record(2, fa2)], existing, now=LATER)
-    # player 1: manual eligibility kept, sleeper injury refreshed
-    assert out[1].eligibility == ["C"] and out[1].eligibility_source == "manual"
+    # old manual values (from before manual editing was removed) are replaced by Sleeper's
+    assert out[1].eligibility == ["PF", "SF"] and out[1].eligibility_source == "sleeper"
     assert out[1].injury_status == "day_to_day" and out[1].injury_note == "Ankle" and out[1].notes == "keep me"
-    # player 2: sleeper eligibility refreshed, manual injury kept
     assert out[2].eligibility == ["PG", "SG"] and out[2].eligibility_source == "sleeper"
-    assert out[2].injury_status == "out_season" and out[2].injury_source == "manual" and out[2].injury_note == "ACL"
+    assert out[2].injury_status == "healthy" and out[2].injury_source == "sleeper" and out[2].injury_note == ""
     assert out[2].injury_sleeper_raw is None  # raw value still recorded for display
 
 

@@ -3,12 +3,6 @@ import { api, qs } from "../api.js";
 import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
 
-const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
-const INJURY_STATUSES = ["healthy", "day_to_day", "out_short_term", "out_long_term", "out_season"];
-
-function SourceBadge({ source }) {
-  return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
-}
 
 export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, userName, onBlock, row }) {
   const [data, setData] = useState(null);
@@ -16,14 +10,12 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const [spend, setSpend] = useState(null);
   const [fit, setFit] = useState(null);
   const [error, setError] = useState("");
-  const [note, setNote] = useState("");
   const [notes, setNotes] = useState("");
 
   const load = useCallback(() => {
     if (!playerId) return;
     api.get(`/players/${playerId}` + qs({ league_id: leagueId })).then((d) => {
       setData(d);
-      setNote(d.overrides?.injury_note || "");
       setNotes(d.overrides?.notes || "");
     }).catch((e) => setError(e.message));
     api.get(`/leagues/${leagueId}/fit/${playerId}`).then(setFit).catch(() => setFit(null));   // drafted players get no fit read
@@ -56,20 +48,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     } catch (e) {
       setError(e.message);
     }
-  };
-  const reset = async (field) => {
-    setError("");
-    try {
-      await api.post(`/players/${playerId}/overrides/reset`, { fields: [field] });
-      onOverridesChanged?.();
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-  const toggleElig = (pos) => {
-    const next = ov.eligibility.includes(pos) ? ov.eligibility.filter((p) => p !== pos) : [...POSITIONS.filter((p) => ov.eligibility.includes(p) || p === pos)];
-    patch({ eligibility: next });
   };
 
   return (
@@ -136,21 +114,11 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </div>
       )}
 
-      <h3>Eligibility <SourceBadge source={ov.eligibility_source} /> <button className="small" onClick={() => reset("eligibility")} data-testid="reset-eligibility">reset to Sleeper</button></h3>
-      <div className="row">
-        {POSITIONS.map((p) => (
-          <label key={p} className="inline"><input type="checkbox" checked={ov.eligibility.includes(p)} onChange={() => toggleElig(p)} data-testid={`elig-${p}`} /> {p}</label>
-        ))}
-        {fantasy?.fantasy_positions_alt && <span className="small muted">Sleeper alt: {fantasy.fantasy_positions_alt.join("/")}</span>}
-      </div>
-
-      <h3>Injury <SourceBadge source={ov.injury_source} /> <button className="small" onClick={() => reset("injury")} data-testid="reset-injury">reset to Sleeper</button></h3>
-      <div className="row">
-        <select value={ov.injury_status} onChange={(e) => patch({ injury_status: e.target.value })} data-testid="injury-select">
-          {INJURY_STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <input type="text" value={note} placeholder="note" onChange={(e) => setNote(e.target.value)} onBlur={() => note !== (ov.injury_note || "") && patch({ injury_note: note })} data-testid="injury-note" />
-        {ov.injury_sleeper_raw && <span className="small muted">Sleeper: {ov.injury_sleeper_raw}{fantasy?.injury_body_part ? ` (${fantasy.injury_body_part})` : ""}</span>}
+      <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
+        <span className="muted">Positions (Sleeper):</span> <strong>{ov.eligibility.join(" / ") || "none listed"}</strong>
+        {" · "}<span className="muted">Injury:</span>{" "}
+        <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
+        {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
       </div>
       <div><textarea rows="2" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 

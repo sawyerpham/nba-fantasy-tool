@@ -1,8 +1,8 @@
 """Seed PlayerOverrides from Sleeper attributes with source tracking.
 
-Rules (DESIGN.md 1.4): a field whose source is "manual" is never touched; fields sourced
-"sleeper" or "none" are re-seeded on every pull; records without Sleeper data keep whatever
-they had (or get an empty "none" override).
+Eligibility and injury come straight from Sleeper and are re-seeded on every pull (there is no manual
+editing); records without Sleeper data keep whatever they had (or get an empty "none" override). The
+user's free-text notes are never touched.
 """
 
 from __future__ import annotations
@@ -57,16 +57,14 @@ def seed_overrides(
 
         fantasy = record.fantasy
         if fantasy is not None:
-            if current.eligibility_source != "manual":
-                current.eligibility = list(fantasy.fantasy_positions)
-                current.eligibility_source = "sleeper" if fantasy.fantasy_positions else "none"
-            if current.injury_source != "manual":
-                raw = fantasy.injury_status_raw
-                minor = (raw in SHORT_TERM_TAGS and ignore_short_term) or (fantasy.injury_body_part or "").lower() == "rest"
-                current.injury_status = "healthy" if minor else map_injury(raw, injury_map)
-                current.injury_source = "sleeper"
-                note = injury_note_from(fantasy.injury_body_part, fantasy.injury_notes)
-                current.injury_note = f"ignored: {raw} {note}".strip() if minor and raw else note
+            current.eligibility = list(fantasy.fantasy_positions)
+            current.eligibility_source = "sleeper" if fantasy.fantasy_positions else "none"
+            raw = fantasy.injury_status_raw
+            minor = (raw in SHORT_TERM_TAGS and ignore_short_term) or (fantasy.injury_body_part or "").lower() == "rest"
+            current.injury_status = "healthy" if minor else map_injury(raw, injury_map)
+            current.injury_source = "sleeper"
+            note = injury_note_from(fantasy.injury_body_part, fantasy.injury_notes)
+            current.injury_note = f"ignored: {raw} {note}".strip() if minor and raw else note
             current.injury_sleeper_raw = fantasy.injury_status_raw
             current.seeded_at = now
             current.updated_at = now
