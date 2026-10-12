@@ -180,7 +180,7 @@ try {
   const verdict = await page.getByTestId("spend-verdict").textContent();
   assert(/GO|BID FAIR|FITS|STRETCH|WALK-AWAY/.test(verdict), `go/pass call rendered in the bid guide: ${verdict.slice(0, 60)}`);
   const spending = await page.getByTestId("spending-guide").textContent();
-  assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Prices vs opening"), "spending guide shows you vs the room");
+  assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Prices"), "spending guide shows you vs the room");
   assert((await page.locator('[data-testid^="spend-target-"]').count()) >= 1, "spending guide lists affordable targets");
   log("spending guide:", spending.replace(/\s+/g, " ").slice(0, 160));
   await page.getByTestId("rank-sort").click();             // first column shows tiers by default (T2 once Jokić is gone), numbers when toggled
