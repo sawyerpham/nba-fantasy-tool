@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
-import ManagersPanel from "../components/ManagersPanel.jsx";
-import TeamPreview from "../components/TeamPreview.jsx";
+import RoomBoard from "../components/RoomBoard.jsx";
 import PickBar from "../components/PickBar.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
@@ -27,8 +26,6 @@ export default function DraftPage({ leagueId }) {
   const [dismissed, setDismissed] = useState(null); // nominated player whose bar was closed
   const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
-  const [teamManager, setTeamManager] = useState(null);   // whose roster the Team preview shows (null = mine)
-  const [draggingPick, setDraggingPick] = useState(null);
   const [orderOpen, setOrderOpen] = useState(null);   // null = open in setup, closed once live
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -214,6 +211,8 @@ export default function DraftPage({ leagueId }) {
               {upcoming.length > 0 && <> · then {upcoming.join(", ")}</>}
             </span>
           )}
+          <button className="small ghost" onClick={() => document.getElementById("room")?.scrollIntoView({ behavior: "smooth" })} data-testid="btn-room"
+            title="every manager's money, roster and who to nominate to make them spend">Room ↓</button>
           <button className={`small ${showOrder ? "" : "ghost"}`} onClick={() => setOrderOpen(!showOrder)} data-testid="btn-order"
             title="change the nomination order or who nominates next">{showOrder ? "▾ Order" : "▸ Order"}</button>
           <span className="spacer" />
@@ -255,13 +254,9 @@ export default function DraftPage({ leagueId }) {
 
       <div className="draft-grid" ref={colsRef}>
         <section className="dg-left">
-          <div className="dg-pane fit-content">
+          <div className="dg-pane">
             {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
               : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
-          </div>
-          <div className="dg-pane">
-            <TeamPreview managers={view.managers} rosterSlots={settings?.roster_slots} managerId={teamManager} onPick={setTeamManager}
-              onEditPick={view.status !== "setup" ? setEditPick : undefined} onDragPick={setDraggingPick} />
           </div>
         </section>
         <section className="dg-rank">
@@ -313,21 +308,25 @@ export default function DraftPage({ leagueId }) {
           </div>
         </section>
         <section className="dg-side">
-          <div className="dg-pane dg-profile">
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} userName={userName}
+          <div className="dg-pane">
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} userName={userName}
             onBlock={nominated?.player_id === selected} row={rankings.find((r) => r.player_id === selected)} />
-          </div>
-          <div className="dg-pane fit-content">
-            <ManagersPanel
-              managers={view.managers}
-              selectedId={teamManager || view.managers.find((m) => m.is_user)?.manager_id}
-              onSelect={setTeamManager}
-              dragging={draggingPick}
-              onMovePick={(p, managerId) => { setDraggingPick(null); act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch"); }}
-            />
           </div>
         </section>
       </div>
+
+      <section className="room" id="room">
+        <div className="room-title">
+          <h2 style={{ margin: 0 }}>The room</h2>
+          <span className="small muted">every manager's money and roster · <strong>bait</strong> = available players they need and are likely to overpay for: nominate them to drain that manager's budget</span>
+          <span className="spacer" />
+          <button className="small ghost" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑ Draft</button>
+        </div>
+        <RoomBoard leagueId={leagueId} rosterSlots={settings?.roster_slots} refreshKey={`${refreshKey}-${view.picks.length}`}
+          onEditPick={view.status !== "setup" ? setEditPick : undefined}
+          onMovePick={(p, managerId) => act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch")}
+          onSelectPlayer={(pid) => { setSelected(pid); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+      </section>
 
       {editPick && (
         <EditPickDialog leagueId={leagueId} view={view} pick={editPick} minBid={settings?.min_bid ?? 1} onClose={() => setEditPick(null)}

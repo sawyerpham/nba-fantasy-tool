@@ -176,3 +176,14 @@ def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
     top = rows[0]
     fits = fit_scores(s, "m1", rows, {top.player_id: 10_000})
     assert fits[top.player_id]["score"] == 0 and "more than you can bid" in fits[top.player_id]["why"]
+
+
+def test_room_board_baits_each_rival_with_affordable_players_for_an_open_starting_spot(fixture_world):
+    from app.engine.room import room_board
+
+    s = make_session(fixture_world)
+    s.start([])
+    board = room_board(s, "m1")
+    assert len(board) == 12 and board[0]["is_user"] and board[0]["bait"] == []
+    rival = next(m for m in board if m["manager_id"] == "m2")
+    assert rival["bait"] and all(b["slot"] not in (None, "BN") and b["price"] <= rival["budget"]["max_bid"] for b in rival["bait"])

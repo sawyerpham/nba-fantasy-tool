@@ -4,7 +4,7 @@ import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
 
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, userName, onBlock, row }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, row }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -103,11 +103,9 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             </div>
           </div>
           {spend && rec.can_bid && (
-            <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict">
-              <VerdictBadge verdict={spend.verdict} /> {spend.text}
-              {spend.verdict !== "cannot" && (
-                <div className="muted">stretch ${spend.stretch} · walk-away ${spend.walk_away}</div>
-              )}
+            <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict" title={spend.text}>
+              <VerdictBadge verdict={spend.verdict} />
+              {spend.verdict !== "cannot" && <span className="muted"> stretch ${spend.stretch} · walk-away ${spend.walk_away} · hover for why</span>}
             </div>
           )}
           {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
@@ -115,7 +113,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <summary>show the math</summary>
             <ul>{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
           </details>
-          {live && <button className="primary" style={{ marginTop: 6 }} onClick={() => onDraft({ player_id: rec_.player_id, full_name: rec_.full_name, team_abbr: rec_.team_abbr, sleeper_id: rec_.sleeper_id })} data-testid="sidebar-draft">On the block</button>}
         </div>
       )}
 
@@ -125,7 +122,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
         {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
       </div>
-      <div><textarea rows="2" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
+      <div><textarea rows="1" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
       <h3>Fantasy points</h3>
       {row && (
@@ -148,13 +145,13 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
           </div>
           <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
-          <div className="muted">Per game: {val.per_game_fpts.slice(-15).join(", ")}{val.per_game_fpts.length > 15 ? " (last 15)" : ""}</div>
+          <details><summary className="small">Per-game FP (last 15)</summary><div className="muted">{val.per_game_fpts.slice(-15).join(", ")}</div></details>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}
 
       {data.detail?.season_totals?.length > 0 && (
         <>
-          <h3>Season history</h3>
+          <details><summary className="small">Season history</summary>
           <table className="small">
             <thead><tr><th>season</th><th>team</th><th>age</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th></tr></thead>
             <tbody>
@@ -165,6 +162,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
               ))}
             </tbody>
           </table>
+          </details>
         </>
       )}
     </div>

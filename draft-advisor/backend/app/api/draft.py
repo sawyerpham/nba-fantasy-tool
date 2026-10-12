@@ -239,3 +239,15 @@ def context(league_id: str, manager_id: str | None = Query(None), player_id: int
         return draft_context(session, manager_id or session.user_manager_id(), player_id, top)
     except DraftError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.get("/room")
+def room(league_id: str, manager_id: str | None = Query(None), state: AppState = Depends(get_state)) -> list[dict]:
+    """Every manager's money, roster and habits, plus the players to nominate to make each rival spend."""
+    from ..engine.room import room_board
+
+    session = _session(state, league_id)
+    try:
+        return room_board(session, manager_id or session.user_manager_id())
+    except DraftError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
