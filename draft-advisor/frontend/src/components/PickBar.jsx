@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import Headshot from "./Headshot.jsx";
+import { tierHue } from "./RankingsTable.jsx";
 
 // Inline "who won it?" bar: price is prefilled with the recommendation, one click on a manager records the pick.
 // The slot is assigned automatically (most specific open slot); fix it afterwards from the pick chip if needed.
@@ -58,7 +59,7 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
           <span className="label">{nominatedBy ? "On the block" : "Mark drafted"}</span>
           <span className="on-block" data-testid={nominatedBy ? "on-the-block" : undefined}>{player.full_name}</span>
           {nominatedBy && <span className="small muted">by {nominatedBy}</span>}
-          {tier && tier.tier_size > 1 && <span className={`tier-tag ${tier.tier_left <= 2 ? "last" : ""}`} title="players of similar value still available">T{tier.tier} · {tier.tier_left - 1 === 0 ? "last one in his tier" : `${tier.tier_left - 1} more like him left`}</span>}
+          {tier && tier.tier_size > 1 && <span className={`tier-tag ${tier.tier_left <= 2 ? "last" : ""}`} style={tierHue(tier.tier)} title="players of similar value still available">T{tier.tier} · {tier.tier_left - 1 === 0 ? "last one in his tier" : `${tier.tier_left - 1} more like him left`}</span>}
           {rec && <span className="small muted">pay up to <strong data-testid="pick-recommended">${rec.recommended_max}</strong> · fair ${Math.round(rec.fair_value)}</span>}
           <span className="spacer" />
           {search}

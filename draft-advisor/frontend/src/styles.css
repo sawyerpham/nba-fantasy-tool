@@ -246,8 +246,7 @@ tr:hover .row-actions, tr.selected .row-actions, .row-actions:focus-within { opa
 .nom-row:hover strong { color: var(--primary); }
 .nom-why { flex-basis: 100%; padding-left: 4px; }
 tr.tier-start td { border-top: 2px solid var(--primary-soft); }
-.tier-tag { white-space: nowrap; font-size: 10.5px; font-weight: 700; color: var(--info-t); background: var(--info); border-radius: 6px; padding: 0 6px; margin-left: 6px; }
-.tier-tag.last { color: var(--warn-t); background: var(--warn); }
+.tier-tag { white-space: nowrap; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 0 6px; margin-left: 6px; }
 .mark-drafted { display: inline-flex; align-items: center; gap: 8px; }
 .pick-bar-head .mark-drafted input { min-width: 180px; }
 th.sortable { cursor: pointer; user-select: none; }
@@ -257,8 +256,11 @@ th.sorted { color: var(--primary); }
 .rank-toggle { width: 22px; height: 20px; padding: 0; font-size: 11px; font-weight: 700; line-height: 18px; border-radius: 5px; text-transform: none; color: var(--primary); }
 .sort-arrow { display: inline-block; width: 1em; text-align: center; }
 [data-testid="rankings-table"] th:first-child, [data-testid="rankings-table"] td:first-child { width: 60px; min-width: 60px; max-width: 60px; }
-.tier-cell { font-size: 11.5px; font-weight: 700; color: var(--info-t); background: var(--info); border-radius: 6px; padding: 1px 7px; }
-.tier-cell.last { color: var(--warn-t); background: var(--warn); }
+.tier-cell { font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
+/* --h is set per tier (red = best, green = worst); "last" = tier nearly gone, ringed. */
+.tier-cell, .tier-tag { color: hsl(var(--h, 230) 85% 72%); background: hsl(var(--h, 230) 70% 50% / 0.2); }
+[data-theme="light"] .tier-cell, [data-theme="light"] .tier-tag { color: hsl(var(--h, 230) 80% 30%); background: hsl(var(--h, 230) 75% 50% / 0.16); }
+.tier-cell.last, .tier-tag.last { box-shadow: 0 0 0 1.5px currentColor; }
 .headshot { flex: none; display: inline-grid; place-items: center; border-radius: 50%; object-fit: cover; object-position: top; background: var(--panel-2); border: 1px solid var(--border); font-weight: 700; color: var(--muted); }
 .player-cell { display: flex; align-items: center; gap: 10px; }
 .trend { display: inline-block; width: 1.1em; margin-left: 2px; font-size: 9px; text-align: center; vertical-align: 1px; }
