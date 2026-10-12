@@ -50,6 +50,7 @@ header.top .meta .dot.down { background: var(--danger); box-shadow: 0 0 0 3px va
 header.top .meta button { border-radius: 999px; padding: 5px 12px; }
 
 main { padding: 24px 28px 48px; max-width: 1720px; margin: 0 auto; }
+main:has(.cols) { padding-bottom: 16px; }   /* draft page: the columns already end 16px above the bottom */
 
 /* ---------- type ---------- */
 h2 { font-size: 23px; font-weight: 700; letter-spacing: -0.02em; margin: 28px 0 12px; }
@@ -114,11 +115,14 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 
 /* ---------- layout ---------- */
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.cols { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; align-items: start; }
-.cols > div:last-child { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+/* Both columns end at the bottom of the window and scroll on their own; --cols-top is measured by the draft page. */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; height: calc(100vh - var(--cols-top, 160px) - 16px); min-height: 420px; }
+.cols > div:first-child { display: flex; flex-direction: column; min-height: 0; }
+.cols > div:first-child > .panel.scroll { flex: 1; min-height: 0; max-height: none; margin-bottom: 0; }
+.cols > div:last-child { min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .cols > div:last-child .panel { padding: 16px; overflow-x: auto; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.panel.scroll { max-height: calc(100vh - 125px); overflow: auto; scrollbar-width: thin; }
+.panel.scroll { max-height: 72vh; overflow: auto; scrollbar-width: thin; }
 .cols > div:last-child .panel.scroll { max-height: none; overflow: visible; }
 .panel.flush { padding: 0; overflow: hidden; }
 .sticky-bar { position: sticky; top: 58px; z-index: 4; background: var(--panel); padding: 10px 0; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
@@ -126,7 +130,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 > label, .grid2 > label { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: var(--muted); }
 .spacer { flex: 1; }
-@media (max-width: 1200px) { .cols { grid-template-columns: 1fr; } .cols > div:last-child { position: static; max-height: none; } }
+@media (max-width: 1200px) { .cols { grid-template-columns: 1fr; height: auto; } .cols > div:first-child > .panel.scroll { max-height: 72vh; } }
 
 /* ---------- badges & pills ---------- */
 .badge {

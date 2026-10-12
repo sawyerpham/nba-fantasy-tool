@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
@@ -95,6 +95,22 @@ export default function DraftPage({ leagueId }) {
     const t = setInterval(tick, SYNC_MS);
     return () => clearInterval(t);
   }, [sync, view?.status, leagueId, loadRankings]);
+
+  // Where the two columns start, so they can end at the bottom of the window (see .cols in styles.css).
+  const colsRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = colsRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const top = `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`;
+      if (el.style.getPropertyValue("--cols-top") !== top) el.style.setProperty("--cols-top", top);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el.parentElement);
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+  });
 
   const visible = useMemo(() => {
     let rows = rankings;
@@ -246,7 +262,7 @@ export default function DraftPage({ leagueId }) {
         </div>
       )}
 
-      <div className="cols">
+      <div className="cols" ref={colsRef}>
         <div>
           <div className="toolbar">
             <h3>Rankings</h3>
