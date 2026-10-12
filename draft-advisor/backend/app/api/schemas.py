@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from nba_fantasy_shared.models.draft import KeeperRecord
 from nba_fantasy_shared.models.league import LeagueSettings, Manager, ManagerBehavior
-from nba_fantasy_shared.models.players import InjuryStatus, Position, SlotType
+from nba_fantasy_shared.models.players import SlotType
 
 
 class PullRequest(BaseModel):
@@ -18,14 +18,7 @@ class PullRequest(BaseModel):
 
 
 class OverridePatch(BaseModel):
-    eligibility: list[Position] | None = None
-    injury_status: InjuryStatus | None = None
-    injury_note: str | None = None
     notes: str | None = None
-
-
-class OverrideReset(BaseModel):
-    fields: list[Literal["eligibility", "injury"]]
 
 
 class CreateLeague(BaseModel):

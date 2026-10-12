@@ -100,22 +100,16 @@ def test_player_detail_with_valuation_and_history(pulled):
     assert client.get("/api/players/1").status_code == 404
 
 
-def test_override_patch_and_reset_track_sources(pulled):
+def test_only_notes_are_editable_eligibility_and_injury_come_from_sleeper(pulled):
     client, state, *_ = pulled
-    r = client.patch(f"/api/players/{BUTLER}/overrides", json={"injury_status": "out_long_term", "injury_note": "Knee, out until Jan"})
-    assert r.status_code == 200
-    assert r.json()["injury_status"] == "out_long_term" and r.json()["injury_source"] == "manual"
-    assert r.json()["eligibility_source"] == "sleeper"  # untouched field keeps its source
-    r = client.patch(f"/api/players/{BUTLER}/overrides", json={"eligibility": ["SF", "PF", "SG"]})
-    assert r.json()["eligibility"] == ["SF", "PF", "SG"] and r.json()["eligibility_source"] == "manual"
-    assert state.overrides[BUTLER].injury_status == "out_long_term"  # persisted in memory
-    assert json.loads(state.store.path("player_overrides.json").read_text(encoding="utf-8"))[str(BUTLER)]["injury_source"] == "manual"
-    r = client.post(f"/api/players/{BUTLER}/overrides/reset", json={"fields": ["injury", "eligibility"]})
-    assert r.json()["injury_status"] == "out_short_term" and r.json()["injury_source"] == "sleeper"
-    assert r.json()["injury_note"] == "Knee — Surgery" and r.json()["eligibility_source"] == "sleeper"
-    assert client.patch(f"/api/players/{BUTLER}/overrides", json={}).status_code == 400
+    r = client.patch(f"/api/players/{BUTLER}/overrides", json={"notes": "watch his knee"})
+    assert r.status_code == 200 and r.json()["notes"] == "watch his knee"
+    assert r.json()["injury_source"] == "sleeper" and r.json()["eligibility_source"] == "sleeper"
+    assert json.loads(state.store.path("player_overrides.json").read_text(encoding="utf-8"))[str(BUTLER)]["notes"] == "watch his knee"
+    # eligibility / injury fields are ignored: nothing left to change
+    assert client.patch(f"/api/players/{BUTLER}/overrides", json={"injury_status": "out_long_term"}).status_code == 400
+    assert client.post(f"/api/players/{BUTLER}/overrides/reset", json={"fields": ["injury"]}).status_code in (404, 405)
     assert client.patch("/api/players/1/overrides", json={"notes": "x"}).status_code == 404
-    assert client.patch(f"/api/players/{BUTLER}/overrides", json={"injury_status": "bogus"}).status_code == 422
 
 
 # ------------------------------------------------------------------ leagues
@@ -368,7 +362,7 @@ def _comparable(doc: DraftExport) -> dict:
 def test_gate_export_round_trips_with_no_data_loss(pulled):
     client, state, store, _ = pulled
     league(client, "lg-export", "Export League")
-    client.patch(f"/api/players/{S_CURRY}/overrides", json={"injury_status": "day_to_day", "notes": "watch minutes"})
+    client.patch(f"/api/players/{S_CURRY}/overrides", json={"notes": "watch minutes"})
     r = client.post("/api/leagues/lg-export/draft/start", json={"keepers": [{"manager_id": "m3", "player_id": DONCIC, "cost": 50}]})
     assert r.status_code == 200
     for pid, mgr, price in [(JOKIC, "m1", 70), (BUTLER, "m2", 12), (S_CURRY, "m1", 25), (WALKER, "m4", 1)]:
@@ -389,7 +383,7 @@ def test_gate_export_round_trips_with_no_data_loss(pulled):
     # every drafted player carries record + overrides + valuation; keepers and history are present
     assert set(exported.players) == {str(p) for p in (DONCIC, JOKIC, BUTLER, S_CURRY, WALKER)}
     curry = exported.players[str(S_CURRY)]
-    assert curry.overrides.injury_status == "day_to_day" and curry.overrides.notes == "watch minutes" and curry.overrides.injury_source == "manual"
+    assert curry.overrides.notes == "watch minutes" and curry.overrides.injury_source == "sleeper"
     assert exported.players[str(JOKIC)].valuation.bonus_counts["triple_double"] == 34
     assert exported.players[str(WALKER)].valuation.games_played == 0 and exported.players[str(WALKER)].record.match_method == "static_list"
     assert [k.player_id for k in exported.keepers.current] == [DONCIC]

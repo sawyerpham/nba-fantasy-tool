@@ -71,25 +71,19 @@ def test_full_pull_from_fixtures(service):
         assert service.store.exists(rel), rel
 
 
-def test_second_pull_preserves_manual_edits_and_reseeds_the_rest(service):
+def test_second_pull_reseeds_from_sleeper_and_keeps_notes(service):
     assert service.run().state == "done"
     overrides = load_overrides(service.store)
     jokic = overrides[JOKIC]
-    jokic.eligibility, jokic.eligibility_source = ["C", "PF"], "manual"
-    butler = overrides[BUTLER]
-    butler.injury_status, butler.injury_source, butler.injury_note = "out_long_term", "manual", "Knee — out until January"
+    jokic.eligibility, jokic.eligibility_source, jokic.notes = ["C", "PF"], "manual", "my note"
     adams = overrides[ADAMS]
-    adams.injury_status, adams.injury_source = "healthy", "sleeper"  # a stale sleeper-sourced value
+    adams.injury_status, adams.injury_source = "out_season", "sleeper"  # a stale sleeper-sourced value
     save_overrides(service.store, overrides)
 
     assert service.run(skip_game_logs=True).state == "done"
     after = load_overrides(service.store)
-    assert after[JOKIC].eligibility == ["C", "PF"] and after[JOKIC].eligibility_source == "manual"
-    assert after[JOKIC].injury_source == "sleeper"  # the other field still re-seeds
-    assert after[BUTLER].injury_status == "out_long_term" and after[BUTLER].injury_note == "Knee — out until January"
-    assert after[BUTLER].eligibility_source == "sleeper"
+    assert after[JOKIC].eligibility == ["C"] and after[JOKIC].eligibility_source == "sleeper" and after[JOKIC].notes == "my note"
     assert after[ADAMS].injury_status == "healthy" and after[ADAMS].injury_source == "sleeper"  # refreshed (off-season DTD)
-
 
 def test_pull_without_sleeper_source_yields_nba_only_records(service):
     status = service.run(sources=["nba_api"], skip_game_logs=True)

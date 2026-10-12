@@ -113,7 +113,7 @@ class PlayerRecord(BaseModel):
 
 
 class PlayerOverrides(BaseModel):
-    """User-editable attributes; survive re-pulls. Seeding never touches 'manual' fields."""
+    """Per-player draft attributes: eligibility and injury seeded from Sleeper on every pull, plus the user's notes."""
 
     player_id: int
     eligibility: list[Position] = Field(default_factory=list)
