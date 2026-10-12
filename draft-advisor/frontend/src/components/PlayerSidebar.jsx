@@ -10,7 +10,7 @@ function SourceBadge({ source }) {
   return <span className={`badge ${source}`} data-testid={`source-${source}`}>{source}</span>;
 }
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName, onBlock }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, onDraft, scoring, userName, onBlock, row }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -163,6 +163,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <div><textarea rows="2" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
       <h3>Fantasy points <span className="muted small">(scoring {data.scoring_hash})</span></h3>
+      {row && (
+        <div className="small" data-testid="fp-this-season">
+          This season: <strong>{row.avg_fpts.toFixed(1)} FP/G</strong>{" "}
+          {row.proj_fpts != null ? "(Sleeper's projection, the number the rankings use)" : "(no Sleeper projection, so last season's number)"}
+          {row.proj_fpts != null && row.last_fpts ? <span className={row.proj_fpts >= row.last_fpts ? "ok" : "warn-text"}> · {(row.proj_fpts - row.last_fpts) >= 0 ? "+" : ""}{(row.proj_fpts - row.last_fpts).toFixed(1)} vs last season</span> : null}
+        </div>
+      )}
+      {val && <div className="bid-label" style={{ marginTop: 8 }}>Last season (actual games)</div>}
       {val ? (
         <div className="small">
           <div>
