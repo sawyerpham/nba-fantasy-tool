@@ -299,16 +299,25 @@ class SleeperProvider:
         """Season projections (per-game stats, incl. 'sp' = projected seconds) keyed by Sleeper player id.
 
         Sleeper's undocumented projections endpoint lives beside /v1, not under it. Entries without
-        projected points are placeholders (retired players etc.) and are dropped.
+        projected points are placeholders (retired players etc.) and are dropped. Each entry also gets
+        'owned': the % of Sleeper leagues where the player is on a roster (undocumented research endpoint).
         """
         year = roster_season.split("-")[0]
         host = self.base_url.rsplit("/v1", 1)[0]
         data = self._get_json(f"{host}/projections/nba/{year}?season_type=regular", f"Sleeper GET /projections/nba/{year}")
-        return {
+        out = {
             str(e["player_id"]): {k: float(v) for k, v in e["stats"].items() if isinstance(v, (int, float))}
             for e in data or []
             if e.get("player_id") and (e.get("stats") or {}).get("pts")
         }
+        try:
+            research = self._get_json(f"{host}/players/nba/research/regular/{year}", f"Sleeper GET /players/nba/research/regular/{year}") or {}
+        except CallFailed:
+            research = {}   # ownership is nice to have; projections still count
+        if research:   # players it leaves out are on (almost) no rosters
+            for sid, proj in out.items():
+                proj["owned"] = float((research.get(sid) or {}).get("owned") or 0.0)
+        return out
 
     def fetch_league(self, sleeper_league_id: str) -> PlatformLeague | None:
         data = self._get_json(f"league/{sleeper_league_id}", f"Sleeper GET /league/{sleeper_league_id}")
