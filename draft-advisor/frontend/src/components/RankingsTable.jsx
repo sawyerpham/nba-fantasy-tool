@@ -26,7 +26,12 @@ const valueWhy = (r) => [
   r.scarcity && `${r.scarcity > 0 ? "+" : ""}${r.scarcity.toFixed(2)} position scarcity`,
 ].filter(Boolean).join(" · ");
 
-const trend = (r) => (r.proj_fpts == null || !r.last_fpts ? "" : r.proj_fpts - r.last_fpts >= 0.5 ? "up" : r.last_fpts - r.proj_fpts >= 0.5 ? "down" : "");
+// Projection vs last season: one arrow per step (0.5 / 1.5 / 3 FP/G), green up, red down.
+const trend = (r) => {
+  if (r.proj_fpts == null || !r.last_fpts) return { dir: "", n: 0, diff: 0 };
+  const diff = r.proj_fpts - r.last_fpts, a = Math.abs(diff);
+  return { dir: diff > 0 ? "up" : "down", n: a >= 3 ? 3 : a >= 1.5 ? 2 : a >= 0.5 ? 1 : 0, diff };
+};
 
 // Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
 export const tierHue = (tier) => ({ "--h": Math.round(Math.min(tier - 1, 14) / 14 * 130) });
@@ -98,7 +103,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               <td>{r.eligibility.join("/")}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
-                <span className={`trend ${trend(r)}`}>{{ up: "▲", down: "▼" }[trend(r)] || ""}</span>
+                {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
               </td>
               <td className="num">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>

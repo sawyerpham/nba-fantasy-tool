@@ -280,7 +280,7 @@ th.sorted { color: var(--primary); }
 .tier-cell.last, .tier-tag.last { box-shadow: 0 0 0 1.5px currentColor; }
 .headshot { flex: none; display: inline-grid; place-items: center; border-radius: 50%; object-fit: cover; object-position: top; background: var(--panel-2); border: 1px solid var(--border); font-weight: 700; color: var(--muted); }
 .player-cell { display: flex; align-items: center; gap: 10px; }
-.trend { display: inline-block; width: 1.1em; margin-left: 2px; font-size: 10.5px; text-align: center; vertical-align: 1px; }
+.trend { display: inline-block; width: 3em; margin-left: 2px; font-size: 10.5px; letter-spacing: -1px; text-align: left; vertical-align: 1px; }
 .trend.up { color: var(--ok); }
 .trend.down { color: var(--danger); }
 .price { color: var(--info-t); }
