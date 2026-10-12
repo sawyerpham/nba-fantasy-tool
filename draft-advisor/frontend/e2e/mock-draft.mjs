@@ -151,6 +151,7 @@ try {
   const nextId = () => page.getByTestId("next-nominator").getAttribute("data-manager-id");
   assert((await nextId()) === "m2", "m2 nominates after m1");
   assert((await page.getByTestId("next-nominator").textContent()) === "Early Eddie", "next nominator shown by name, not id");
+  if (!(await page.getByTestId("order-bar").isVisible())) await page.getByTestId("btn-order").click();   // order editor is folded away once live
   for (let k = 0; k < 11; k++) await page.getByTestId("order-left-m12").click();  // each click waits for the previous save (arrows disable while busy)
   // wait for the last save to land: the chip shows "1." and the arrows are enabled again (not busy)
   await page.waitForFunction(() => document.querySelector('[data-testid="order-next-m12"]')?.textContent.startsWith("1.")

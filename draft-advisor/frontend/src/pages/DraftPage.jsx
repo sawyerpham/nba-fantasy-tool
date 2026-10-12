@@ -31,6 +31,7 @@ export default function DraftPage({ leagueId }) {
   const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
   const [showManagers, setShowManagers] = useState(true);
+  const [orderOpen, setOrderOpen] = useState(null);   // null = open in setup, closed once live
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -96,7 +97,7 @@ export default function DraftPage({ leagueId }) {
     return () => clearInterval(t);
   }, [sync, view?.status, leagueId, loadRankings]);
 
-  // Where the two columns start, so they can end at the bottom of the window (see .cols in styles.css).
+  // Where the columns start, so they can end at the bottom of the window (see .draft-grid in styles.css).
   const colsRef = useRef(null);
   useLayoutEffect(() => {
     const el = colsRef.current;
@@ -194,16 +195,28 @@ export default function DraftPage({ leagueId }) {
   const recordTarget = pick || (nominated && dismissed !== nominated.player_id ? { player_id: nominated.player_id, full_name: nominatedName } : null);
   const userName = view.managers.find((m) => m.is_user)?.name || "you";
   const nameOf = (id) => (id ? view.managers.find((m) => m.manager_id === id)?.name || id : null);
+  const showOrder = orderOpen ?? !live;
+  // The next few nominators in rotation, skipping full rosters.
+  const order = view.nomination_order;
+  const start = Math.max(0, order.indexOf(view.next_nominator));
+  const canNominate = (id) => { const m = view.managers.find((x) => x.manager_id === id); return m && m.budget.open_mandatory > 0; };
+  const upcoming = [...order.slice(start), ...order.slice(0, start)].filter(canNominate).slice(1, 3).map(nameOf);
 
   return (
     <div>
-      <div className="panel">
+      <div className="panel draft-top">
         <div className="draft-head">
-          <span className="title">Draft</span>
           <span className={`status-pill ${view.status}`} data-testid="draft-status">{view.status}</span>
           <div className="progress" title={`${(view.progress * 100).toFixed(1)}%`}><div style={{ width: `${view.progress * 100}%` }} /></div>
-          <span className="small muted">{view.picks.length} picks · {view.available_count} available</span>
-          {live && <span className="small muted">Up next: <strong style={{ color: "var(--text)" }} data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong></span>}
+          <span className="small muted">{view.picks.length} picks · {view.available_count} left</span>
+          {live && (
+            <span className="small muted upcoming">
+              Nominating: <strong style={{ color: "var(--text)" }} data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong>
+              {upcoming.length > 0 && <> · then {upcoming.join(", ")}</>}
+            </span>
+          )}
+          <button className={`small ${showOrder ? "" : "ghost"}`} onClick={() => setOrderOpen(!showOrder)} data-testid="btn-order"
+            title="change the nomination order or who nominates next">{showOrder ? "▾ Order" : "▸ Order"}</button>
           <span className="spacer" />
           {live && (
             <span className="sync-box" data-testid="sync-box">
@@ -227,14 +240,14 @@ export default function DraftPage({ leagueId }) {
           <button className="ghost" onClick={exportLeague} data-testid="btn-export">Export</button>
           {view.status !== "setup" && <button className="danger" onClick={() => window.confirm("Reset the draft? All picks are removed.") && act("reset")} data-testid="btn-reset">Reset</button>}
         </div>
-        <NominationOrderBar
+        {showOrder && <NominationOrderBar
           managers={view.managers}
           order={view.nomination_order}
           nextNominator={view.next_nominator}
           live={live}
           onReorder={(order) => act("nomination-order", { order }, "put")}
           onMakeNext={(manager_id) => act("next-nominator", { manager_id }, "put")}
-        />
+        />}
         {error && <div className="error" data-testid="draft-error">{error}</div>}
         {notice && <div className="ok" data-testid="draft-notice">{notice}</div>}
       </div>
@@ -262,8 +275,12 @@ export default function DraftPage({ leagueId }) {
         </div>
       )}
 
-      <div className="cols" ref={colsRef}>
-        <div>
+      <div className="draft-grid" ref={colsRef}>
+        <section className="dg-guide">
+          {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
+            : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
+        </section>
+        <section className="dg-rank">
           <div className="toolbar">
             <h3>Rankings</h3>
             <span className="chips" title="My team: players who would only reach your bench rank lower, so open starting spots come first">
@@ -291,9 +308,8 @@ export default function DraftPage({ leagueId }) {
               onSort={onSort}
             />
           </div>
-        </div>
-        <div>
-          <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
+        </section>
+        <section className="dg-side">
           <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} scoring={settings?.scoring} userName={userName}
             onBlock={nominated?.player_id === selected} />
           <div className="row" style={{ margin: "4px 0 10px" }}>
@@ -306,7 +322,7 @@ export default function DraftPage({ leagueId }) {
               onMovePick={(p, managerId) => act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch")}
             />
           )}
-        </div>
+        </section>
       </div>
 
       {editPick && (
