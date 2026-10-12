@@ -149,3 +149,15 @@ def test_team_fit_reads_open_slot_price_and_bench_only(fixture_world):
     bench = team_fit(s, "m1", JOKIC)
     assert bench.reasons[0].startswith("Bench only") and "bench only" in bench.headline
     assert ["poor", "okay", "good", "great"].index(bench.verdict) < ["poor", "okay", "good", "great"].index(live.verdict)
+
+
+def test_draft_context_has_rules_state_managers_and_the_player_on_the_block(fixture_world):
+    from app.engine.context import draft_context
+
+    s = make_session(fixture_world)
+    s.start([])
+    s.engine.nominate(JOKIC)
+    text = draft_context(s, "m1", top=10)
+    for heading in ("## League rules", "## Draft so far", "## Managers", "## My money vs the room", "## Best available", "## Player in question"):
+        assert heading in text
+    assert "I am **Team 1**" in text and "On the block now: Nikola Joki" in text and "### Team 12" in text
