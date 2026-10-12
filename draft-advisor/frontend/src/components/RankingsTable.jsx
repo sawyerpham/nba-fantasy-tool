@@ -39,7 +39,7 @@ export const tierHue = (tier) => ({ "--h": Math.round(Math.min(tier - 1, 14) / 1
 export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort }) {
   // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
-  const byRank = (!sort || sort.key === "rank") && rows[0]?.team_rank == null;   // tier lines only in the overall order
+  const byRank = !sort || sort.key === "rank";
   // The first column shows value tiers (T1, T2 …) or plain rank numbers; remembered per browser.
   const [mode, setMode] = useState(() => { try { return localStorage.getItem("da.rankMode") || "tier"; } catch { return "tier"; } });
   const toggleMode = (e) => {
@@ -79,7 +79,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
             >
               <td className="num muted">{mode === "tier" && r.tier != null
                 ? <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} title={`rank #${r.rank} · tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>
-                : r.team_rank ?? r.rank}</td>
+                : r.rank}</td>
               <td>
                 <div className="player-cell">
                 <Headshot sleeperId={r.sleeper_id} name={r.full_name} size={34} />
