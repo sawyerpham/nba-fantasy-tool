@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
+import SleeperSync from "../components/SleeperSync.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import useSaveShortcut from "../useSaveShortcut.js";
 
@@ -265,6 +266,7 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
       {doc && (
         <>
           <h2>{doc.league.name} <span className="muted small">({doc.league.league_id}, draft {doc.draft.status})</span></h2>
+          <SleeperSync leagueId={leagueId} sleeperLeagueId={doc.league.sleeper_league_id} onSynced={loadDoc} />
           <ManagersEditor leagueId={leagueId} managers={doc.managers} draftStatus={doc.draft.status} reload={loadDoc} />
           <KeeperHistoryEditor leagueId={leagueId} history={doc.keepers.history} managers={doc.managers} reload={loadDoc} />
         </>

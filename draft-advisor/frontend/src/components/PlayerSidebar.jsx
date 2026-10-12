@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, qs } from "../api.js";
 import { VerdictBadge } from "./SpendingGuide.jsx";
+import Headshot from "./Headshot.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const INJURY_STATUSES = ["healthy", "day_to_day", "out_short_term", "out_long_term", "out_season"];
@@ -72,6 +73,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   return (
     <div className="panel scroll" data-testid="player-sidebar">
       <h3>
+        <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
         {rec_.sleeper_status && rec_.sleeper_status !== "ACT" && <span className="badge">{rec_.sleeper_status}</span>}
         {rec_.unsigned_per_sleeper && <span className="badge warn">unsigned per Sleeper</span>}
@@ -129,7 +131,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <summary>show the math</summary>
             <ul>{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
           </details>
-          {live && <button className="primary" style={{ marginTop: 6 }} onClick={() => onDraft({ player_id: rec_.player_id, full_name: rec_.full_name, team_abbr: rec_.team_abbr })} data-testid="sidebar-draft">Drafted…</button>}
+          {live && <button className="primary" style={{ marginTop: 6 }} onClick={() => onDraft({ player_id: rec_.player_id, full_name: rec_.full_name, team_abbr: rec_.team_abbr, sleeper_id: rec_.sleeper_id })} data-testid="sidebar-draft">On the block</button>}
         </div>
       )}
 

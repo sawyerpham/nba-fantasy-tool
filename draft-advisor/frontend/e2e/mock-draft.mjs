@@ -135,16 +135,14 @@ try {
 
   // ---------------------------------------------------------------- 5. nominate -> on the block -> record bid
   const first = (await apiGet(`/leagues/${LEAGUE}/rankings?limit=1`))[0];
-  await page.getByTestId(`btn-nominate-${first.player_id}`).click();
+  await page.getByTestId(`btn-block-${first.player_id}`).click();
   await page.getByTestId("on-the-block").waitFor();
-  await page.getByTestId("btn-record-bid").click();
-  await page.getByTestId("pick-dialog").waitFor();
+  await page.getByTestId("pick-dialog").waitFor();          // nominating opens the inline record bar by itself
   await page.getByTestId("pick-recommended").waitFor();
   const recText = await page.getByTestId("pick-recommended").textContent();
   const recMax = Number(recText.replace(/[^0-9]/g, ""));
-  await page.getByTestId("pick-manager").selectOption("m1");
-  await page.getByTestId("pick-price").fill(String(recMax));
-  await page.getByTestId("pick-submit").click();
+  assert(Number(await page.getByTestId("pick-price").inputValue()) === recMax, "price prefilled with the recommendation");
+  await page.getByTestId("pick-mgr-m1").click();               // one click records
   await page.getByTestId("pick-dialog").waitFor({ state: "detached" });
   log(`user (m1) won ${first.full_name} for the recommended $${recMax}`);
   summary.picks.push({ n: 1, player: first.full_name, winner: "m1", price: recMax, rec: recMax, path: "nominate+record" });
@@ -171,7 +169,7 @@ try {
   await page.locator('[data-testid="rankings-table"] th', { hasText: "Wk-best" }).click();
   await page.waitForFunction(() => {
     const rows = [...document.querySelectorAll('[data-testid^="rank-row-"]')];
-    return rows.length > 2 && Number(rows[0].children[8].textContent) >= Number(rows[1].children[8].textContent);
+    return rows.length > 2 && Number(rows[0].children[5].textContent) >= Number(rows[1].children[5].textContent);
   });
   assert((await page.locator('[data-testid="value-legend"]').count()) === 0, "formula legend removed from the draft page");
   await page.locator('[data-testid^="rank-row-"]').first().click();
@@ -180,13 +178,16 @@ try {
   assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value (league)"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
   await page.getByTestId("spend-verdict").waitFor();
   const verdict = await page.getByTestId("spend-verdict").textContent();
-  assert(/GO|BID FAIR|FITS|STRETCH|PASS/.test(verdict), `go/pass call rendered in the bid guide: ${verdict.slice(0, 60)}`);
+  assert(/GO|BID FAIR|FITS|STRETCH|WALK-AWAY/.test(verdict), `go/pass call rendered in the bid guide: ${verdict.slice(0, 60)}`);
   const spending = await page.getByTestId("spending-guide").textContent();
   assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Prices vs opening"), "spending guide shows you vs the room");
   assert((await page.locator('[data-testid^="spend-target-"]').count()) >= 1, "spending guide lists affordable targets");
   log("spending guide:", spending.replace(/\s+/g, " ").slice(0, 160));
-  await page.locator('[data-testid="rankings-table"] th', { hasText: "#" }).click();
+  await page.getByTestId("rank-sort").click();             // first column shows tiers by default (T2 once Jokić is gone), numbers when toggled
+  await page.waitForFunction(() => /^T\d+$/.test(document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent || ""));
+  await page.getByTestId("rank-mode-toggle").click();
   await page.waitForFunction(() => document.querySelector('[data-testid^="rank-row-"]')?.children[0].textContent === "1");
+  await page.getByTestId("rank-mode-toggle").click();
   log("rankings: position chip filter and column sort work");
   // adjust who drafted whom: Jokić is pick #3 (after two keepers); move it to m2 through the edit dialog, then back
   await page.getByTestId("pick-chip-3").click();
@@ -222,7 +223,7 @@ try {
 
     // open the pick dialog: from the table when the row is visible for the user, else via the search box
     let path = "table";
-    const rowBtn = page.getByTestId(`btn-draft-${cand.player_id}`);
+    const rowBtn = page.getByTestId(`btn-block-${cand.player_id}`);
     if (await rowBtn.count()) {
       await rowBtn.first().click();
     } else {
@@ -231,26 +232,24 @@ try {
       await page.getByTestId(`search-result-${cand.player_id}`).click();
     }
     await page.getByTestId("pick-dialog").waitFor();
-    await page.getByTestId("pick-manager").selectOption(winner);
     let rec = 1;
     try {
       await page.getByTestId("pick-recommended").waitFor({ timeout: 4000 });
       rec = Number((await page.getByTestId("pick-recommended").textContent()).replace(/[^0-9]/g, "")) || 1;
     } catch { /* recommendation unavailable: bid the minimum */ }
-    const maxBid = Number((await page.getByTestId("pick-max-bid").textContent()).replace(/[^0-9]/g, ""));
+    const maxBid = Number((await page.getByTestId(`pick-max-${winner}`).textContent()).replace(/[^0-9]/g, ""));
     assert(maxBid === winnerBudget.max_bid, `dialog max bid ${maxBid} == API max bid ${winnerBudget.max_bid}`);
     // late in the draft managers fill bench at $1; otherwise pay up to the recommendation, capped by the reservation rule
     const price = Math.max(1, Math.min(winnerBudget.open_mandatory <= 3 ? 1 : rec, maxBid));
     await page.getByTestId("pick-price").fill(String(price));
-    await page.getByTestId("pick-submit").click();
+    await page.getByTestId(`pick-mgr-${winner}`).click();
     try {
       await page.getByTestId("pick-dialog").waitFor({ state: "detached", timeout: 8000 });
     } catch {
       const err = (await page.getByTestId("pick-error").textContent().catch(() => "unknown")) || "unknown";
       failures++;
       log(`pick rejected (${winner} / ${cand.full_name} / $${price}): ${err}`);
-      await page.keyboard.press("Escape");
-      await page.locator(".modal-backdrop").click({ position: { x: 5, y: 5 } }).catch(() => {});
+      await page.getByTestId("pick-cancel").click().catch(() => {});
       await page.getByTestId("pick-dialog").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
       assert(failures < 10, "too many rejected picks");
       continue;
@@ -283,15 +282,14 @@ try {
   // ---------------------------------------------------------------- 8. undo + redo, complete, export
   const lastBefore = final.picks[final.picks.length - 1];
   await page.getByTestId("btn-undo").click();
-  await page.waitForFunction((n0) => document.querySelector('[data-testid="managers-panel"]') && true, final.picks.length);
-  const afterUndo = await apiGet(`/leagues/${LEAGUE}/draft`);
+  let afterUndo;
+  for (let i = 0; i < 50 && (afterUndo = await apiGet(`/leagues/${LEAGUE}/draft`)).picks.length !== 179; i++) await page.waitForTimeout(100);
   assert(afterUndo.picks.length === 179, "undo removed the last pick");
   await page.getByTestId("search-input").fill(lastBefore.player_id ? (await apiGet(`/players/${lastBefore.player_id}?include_history=false`)).record.last_name : "");
   await page.getByTestId(`search-result-${lastBefore.player_id}`).click();
   await page.getByTestId("pick-dialog").waitFor();
-  await page.getByTestId("pick-manager").selectOption(lastBefore.manager_id);
   await page.getByTestId("pick-price").fill(String(lastBefore.price));
-  await page.getByTestId("pick-submit").click();
+  await page.getByTestId(`pick-mgr-${lastBefore.manager_id}`).click();
   await page.getByTestId("pick-dialog").waitFor({ state: "detached" });
   assert((await apiGet(`/leagues/${LEAGUE}/draft`)).picks.length === 180, "re-pick restored 180");
   summary.steps.push("undo + re-pick via search");

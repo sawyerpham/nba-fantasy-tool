@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import ManagersPanel from "../components/ManagersPanel.jsx";
-import PickDialog from "../components/PickDialog.jsx";
+import PickBar from "../components/PickBar.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import NominationOrderBar from "../components/NominationOrderBar.jsx";
@@ -23,12 +23,17 @@ export default function DraftPage({ leagueId }) {
   const [sort, setSort] = useState({ key: "rank", dir: "asc" });
   const [selected, setSelected] = useState(null);
   const [pick, setPick] = useState(null);
+  const [dismissed, setDismissed] = useState(null); // nominated player whose bar was closed
   const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
   const [showManagers, setShowManagers] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sync, setSync] = useState(() => { try { return localStorage.getItem(`da.sync.${leagueId}`) === "1"; } catch { return false; } });
+  const [syncInfo, setSyncInfo] = useState(null);
+  const syncBusy = useRef(false);
+  const SYNC_MS = 3000;
 
   const loadView = useCallback(() => api.get(`/leagues/${leagueId}/draft`).then(setView), [leagueId]);
   const loadRankings = useCallback(
@@ -54,6 +59,33 @@ export default function DraftPage({ leagueId }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Live Sleeper sync: every SYNC_MS, record any pick made in the Sleeper draft that isn't here yet.
+  useEffect(() => {
+    try { localStorage.setItem(`da.sync.${leagueId}`, sync ? "1" : "0"); } catch { /* ignore */ }
+    if (!sync || view?.status !== "live") return undefined;
+    const tick = async () => {
+      if (syncBusy.current) return;
+      syncBusy.current = true;
+      try {
+        const r = await api.post(`/leagues/${leagueId}/draft/sync`);
+        setSyncInfo((old) => ({ ...r, total: r.added.length, lag: r.added.length && r.seconds_since_last_sleeper_pick < 600 ? r.seconds_since_last_sleeper_pick : old?.lag }));
+        if (r.added.length) {
+          setView(r.view);
+          setPick((p) => (p && r.view.picks.some((x) => x.player_id === p.player_id) ? null : p));
+          await loadRankings();
+          setRefreshKey((k) => k + 1);
+        }
+      } catch (e) {
+        setSyncInfo({ fatal: e.message });
+      } finally {
+        syncBusy.current = false;
+      }
+    };
+    tick();
+    const t = setInterval(tick, SYNC_MS);
+    return () => clearInterval(t);
+  }, [sync, view?.status, leagueId, loadRankings]);
+
   const visible = useMemo(() => {
     let rows = rankings;
     if (filter) rows = rows.filter((r) => r.full_name.toLowerCase().includes(filter.toLowerCase()));
@@ -61,7 +93,9 @@ export default function DraftPage({ leagueId }) {
     const { key, dir } = sort;
     const sign = dir === "asc" ? 1 : -1;
     return rows.slice().sort((a, b) => {
-      const x = a[key], y = b[key];
+      const val = (r) => (key === "pos" ? (r.eligibility.length ? Math.min(...r.eligibility.map((p) => POSITIONS.indexOf(p))) : 99)
+        : key === "min" ? (r.proj_min ?? r.last_min) : r[key]);
+      const x = val(a), y = val(b);
       if (x === y) return a.rank - b.rank;
       if (x === null || x === undefined) return 1;
       if (y === null || y === undefined) return -1;
@@ -89,6 +123,15 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
+  // One action for "this player is up": nominate him (opens the record bar); if nominating isn't possible,
+  // just open the record bar for him.
+  const putOnBlock = async (r) => {
+    setPick(null);
+    setDismissed(null);
+    const v = await act("nominate", { player_id: r.player_id });
+    if (!v) { setError(""); setPick(r); }
+  };
+
   const onPicked = async (v) => {
     setPick(null);
     setView(v);
@@ -107,25 +150,51 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
-  const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : (["rank", "full_name", "team_abbr", "injury_status"].includes(key) ? "asc" : "desc") }));
+  const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : (["rank", "full_name", "team_abbr", "injury_status", "pos"].includes(key) ? "asc" : "desc") }));
   const onOverridesChanged = () => { loadRankings(); loadView(); };
   const nominated = view.current_nomination;
   const nominatedName = nominated ? (rankings.find((r) => r.player_id === nominated.player_id)?.full_name || `#${nominated.player_id}`) : null;
+  const markDrafted = (
+    <span className="mark-drafted">
+      <span className="small muted">Mark drafted <kbd>/</kbd></span>
+      <PlayerSearch leagueId={leagueId} onSelect={(p) => (p.drafted_by ? setError(`${p.full_name} is already drafted by ${p.drafted_by}`) : setPick(p))} placeholder="type a name…" />
+    </span>
+  );
+  const recordTarget = pick || (nominated && dismissed !== nominated.player_id ? { player_id: nominated.player_id, full_name: nominatedName } : null);
   const userName = view.managers.find((m) => m.is_user)?.name || "you";
   const nameOf = (id) => (id ? view.managers.find((m) => m.manager_id === id)?.name || id : null);
 
   return (
     <div>
       <div className="panel">
-        <div className="row">
-          <strong>Draft: <span data-testid="draft-status">{view.status}</span></strong>
-          <span className="small">progress {(view.progress * 100).toFixed(1)}% · {view.picks.length} picks · {view.available_count} available</span>
-          {live && <span>Nominates next: <strong data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong></span>}
+        <div className="draft-head">
+          <span className="title">Draft</span>
+          <span className={`status-pill ${view.status}`} data-testid="draft-status">{view.status}</span>
+          <div className="progress" title={`${(view.progress * 100).toFixed(1)}%`}><div style={{ width: `${view.progress * 100}%` }} /></div>
+          <span className="small muted">{view.picks.length} picks · {view.available_count} available</span>
+          {live && <span className="small muted">Up next: <strong style={{ color: "var(--text)" }} data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong></span>}
+          <span className="spacer" />
+          {live && (
+            <span className="sync-box" data-testid="sync-box">
+              <label className="inline small" title="check the Sleeper draft every 3 s and record new picks automatically">
+                <input type="checkbox" checked={sync} onChange={(e) => setSync(e.target.checked)} data-testid="sync-toggle" /> Sleeper sync
+              </label>
+              {sync && syncInfo && (
+                syncInfo.fatal ? <span className="small warn-text" title={syncInfo.fatal}>sync off: {syncInfo.fatal.slice(0, 60)}</span> : (
+                  <span className="small muted" title={syncInfo.errors?.join(" · ") || ""}>
+                    {syncInfo.total ? `+${syncInfo.total} pick${syncInfo.total === 1 ? "" : "s"}` : "up to date"}
+                    {syncInfo.lag != null ? ` · last pick landed ${syncInfo.lag}s after Sleeper` : ""}
+                    {syncInfo.errors?.length ? <span className="warn-text"> · {syncInfo.errors.length} need a hand entry</span> : ""}
+                  </span>
+                )
+              )}
+            </span>
+          )}
           {view.status === "setup" && <button className="primary" onClick={() => setStartOpen(true)} data-testid="btn-start">Start draft…</button>}
-          {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo">Undo last pick</button>}
-          {live && <button onClick={() => window.confirm("Complete the draft?") && act("complete")} data-testid="btn-complete">Complete draft</button>}
+          {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo">↶ Undo</button>}
+          {live && <button onClick={() => window.confirm("Complete the draft?") && act("complete")} data-testid="btn-complete">Complete</button>}
+          <button className="ghost" onClick={exportLeague} data-testid="btn-export">Export</button>
           {view.status !== "setup" && <button className="danger" onClick={() => window.confirm("Reset the draft? All picks are removed.") && act("reset")} data-testid="btn-reset">Reset</button>}
-          <button onClick={exportLeague} data-testid="btn-export">Export JSON</button>
         </div>
         <NominationOrderBar
           managers={view.managers}
@@ -135,44 +204,53 @@ export default function DraftPage({ leagueId }) {
           onReorder={(order) => act("nomination-order", { order }, "put")}
           onMakeNext={(manager_id) => act("next-nominator", { manager_id }, "put")}
         />
-        {live && (
-          <div className="row" style={{ marginTop: 6 }}>
-            <span>On the block:</span>
-            {nominated ? (
-              <>
-                <strong data-testid="on-the-block">{nominatedName}</strong>
-                <span className="small muted">nominated by {nameOf(nominated.nominated_by)}</span>
-                <button className="primary" onClick={() => setPick({ player_id: nominated.player_id, full_name: nominatedName })} data-testid="btn-record-bid">Record winning bid…</button>
-              </>
-            ) : <span className="muted">nobody — nominate from the table, or mark a drafted player via search</span>}
-            <span style={{ marginLeft: 12 }}>Mark drafted (press <kbd>/</kbd>):</span>
-            <PlayerSearch leagueId={leagueId} onSelect={(p) => (p.drafted_by ? setError(`${p.full_name} is already drafted by ${p.drafted_by}`) : setPick(p))} placeholder="type a name…" />
-          </div>
-        )}
         {error && <div className="error" data-testid="draft-error">{error}</div>}
         {notice && <div className="ok" data-testid="draft-notice">{notice}</div>}
       </div>
 
+      {live && (
+        <div className="block-bar sticky-block">
+          {recordTarget ? (
+            <PickBar key={recordTarget.player_id} leagueId={leagueId} view={view} player={recordTarget} onPicked={onPicked}
+              nominatedBy={!pick && nominated ? nameOf(nominated.nominated_by) : null}
+              tier={rankings.find((r) => r.player_id === recordTarget.player_id)} search={markDrafted}
+              onCancel={() => { if (pick) setPick(null); else setDismissed(nominated?.player_id); }} />
+          ) : (
+            <>
+              <span className="label">On the block</span>
+              {nominated ? (
+                <>
+                  <span className="on-block" data-testid="on-the-block">{nominatedName}</span>
+                  <span className="small muted">by {nameOf(nominated.nominated_by)}</span>
+                  <button className="primary" onClick={() => setDismissed(null)} data-testid="btn-record-bid">Record winner</button>
+                </>
+              ) : <span className="muted">Nobody yet — click On the block on a player, or turn on Sleeper sync</span>}
+            </>
+          )}
+          {!recordTarget && <><span className="spacer" />{markDrafted}</>}
+        </div>
+      )}
+
       <div className="cols">
         <div>
-          <div className="row" style={{ marginBottom: 6 }}>
-            <h3 style={{ margin: 0 }}>Rankings (for {userName})</h3>
-            <input type="text" placeholder="filter…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
+          <div className="toolbar">
+            <h3>Rankings <span className="small muted" style={{ fontWeight: 400 }}>for {userName}</span></h3>
+            <input type="text" placeholder="Search players…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
             <span className="chips">
-              <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>all</button>
+              <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>All</button>
               {POSITIONS.map((p) => <button key={p} className={`small chip ${posFilter === p ? "on" : ""}`} onClick={() => setPosFilter(posFilter === p ? "" : p)} data-testid={`pos-${p}`}>{p}</button>)}
             </span>
-            <label className="inline"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> include players I cannot roster</label>
-            <label className="inline">show <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
-            <button onClick={() => { loadRankings(); loadView(); }}>Refresh</button>
+            <span className="spacer" />
+            <label className="inline small muted"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> show unrosterable</label>
+            <label className="inline small muted">top <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
+            <button className="ghost" onClick={() => { loadRankings(); loadView(); }} title="Refresh">↻</button>
           </div>
-          <div className="panel scroll" style={{ padding: 0 }}>
+          <div className="panel scroll" style={{ padding: "0 4px" }}>
             <RankingsTable
               rows={visible}
               selectedId={selected}
               onSelect={setSelected}
-              onNominate={(r) => act("nominate", { player_id: r.player_id })}
-              onDraft={(r) => setPick(r)}
+              onBlock={putOnBlock}
               live={live}
               sort={sort}
               onSort={onSort}
@@ -182,10 +260,10 @@ export default function DraftPage({ leagueId }) {
         </div>
         <div>
           <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={(p) => setPick(p)} scoring={settings?.scoring} userName={userName}
+          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} scoring={settings?.scoring} userName={userName}
             onBlock={nominated?.player_id === selected} />
-          <div className="row" style={{ marginBottom: 4 }}>
-            <button className="small" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ hide managers" : "▸ show managers"}</button>
+          <div className="row" style={{ margin: "4px 0 10px" }}>
+            <button className="small ghost" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ Hide managers" : "▸ Show managers"}</button>
           </div>
           {showManagers && (
             <ManagersPanel
@@ -197,7 +275,6 @@ export default function DraftPage({ leagueId }) {
         </div>
       </div>
 
-      {pick && <PickDialog leagueId={leagueId} view={view} player={pick} onClose={() => setPick(null)} onPicked={onPicked} />}
       {editPick && (
         <EditPickDialog leagueId={leagueId} view={view} pick={editPick} minBid={settings?.min_bid ?? 1} onClose={() => setEditPick(null)}
           onSaved={async (v) => { setEditPick(null); setView(v); await loadRankings(); bump(); }} />
