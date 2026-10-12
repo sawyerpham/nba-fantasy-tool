@@ -161,3 +161,17 @@ def test_draft_context_has_rules_state_managers_and_the_player_on_the_block(fixt
     for heading in ("## League rules", "## Draft so far", "## Managers", "## My money vs the room", "## Best available", "## Player in question"):
         assert heading in text
     assert "I am **Team 1**" in text and "On the block now: Nikola Joki" in text and "### Team 12" in text
+
+
+def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
+    from app.engine.fit import fit_scores
+
+    s = make_session(fixture_world)
+    rows = s.rankings("m1", 30)
+    fits = fit_scores(s, "m1", rows, {})
+    assert fits[rows[0].player_id]["score"] == 100   # best player left, starting slot, no prices before the draft
+    s.start([])
+    rows = s.rankings("m1", 30)
+    top = rows[0]
+    fits = fit_scores(s, "m1", rows, {top.player_id: 10_000})
+    assert fits[top.player_id]["score"] == 0 and "can't afford" in fits[top.player_id]["why"]

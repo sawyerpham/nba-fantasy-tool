@@ -121,3 +121,37 @@ def team_fit(session, manager_id: str, player_id: int) -> TeamFit:
     tags = [tag for pts, tag, _ in sorted(notes, key=lambda n: (-abs(n[0]), n[0])) if tag][:2]
     return TeamFit(player_id, verdict, f"{LABEL[verdict]}: {', '.join(tags)}" if tags else LABEL[verdict],
                    [why for _, _, why in notes])
+
+
+# Fit column: quality × where he'd play for me × whether the price works for me.
+BENCH_FIT = 0.6          # a bench player rarely scores under Lock-In
+PRICE_FIT = {"ok": 1.0, "stretch": 0.85, "past walk-away": 0.4, "can't afford": 0.0}
+
+
+def fit_scores(session, manager_id: str, rows, prices: dict[int, int]) -> dict[int, dict]:
+    """0-100 per listed player: 100 × value ÷ best value left, × slot factor, × price factor (live draft only).
+
+    ponytail: price bands use one stretch / walk-away pair (from a starter target) for every player; per-slot
+    bands if bench prices ever matter.
+    """
+    best = max((r.value for r in rows), default=0.0) or 1.0
+    bands = None
+    if session.draft.status == "live" and prices:
+        starter = next((r for r in rows if r.assignable_slot not in (None, "BN")), None)
+        focus = session.spending_guide(manager_id, starter.player_id).focus if starter else None
+        if focus is not None:
+            bands = (focus.stretch, focus.walk_away, session.engine.budget(manager_id).max_bid)
+    out = {}
+    for r in rows:
+        slot = 0.0 if r.assignable_slot is None else BENCH_FIT if r.assignable_slot == "BN" else 1.0
+        why = [f"value {r.value:.1f} = {round(100 * r.value / best)}% of the best left",
+               "no open spot" if slot == 0 else "bench only ×0.6" if slot < 1 else f"starts at {r.assignable_slot}"]
+        price_band = "ok"
+        if bands and r.player_id in prices:
+            stretch, walk, cap = bands
+            p = prices[r.player_id]
+            price_band = "can't afford" if p > cap else "past walk-away" if p > walk else "stretch" if p > stretch else "ok"
+            why.append(f"${p} {'fits your budget' if price_band == 'ok' else price_band} (stretch ${stretch}, walk-away ${walk})")
+        score = round(100 * r.value / best * slot * PRICE_FIT[price_band])
+        out[r.player_id] = {"score": score, "why": " · ".join(why)}
+    return out

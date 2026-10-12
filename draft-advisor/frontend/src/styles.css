@@ -311,3 +311,6 @@ th.sorted { color: var(--primary); }
 .fit-card.poor { border-left-color: var(--danger); }
 .fit-card .fit-head { display: flex; flex-direction: column; gap: 2px; }
 .fit-card ul { margin: 6px 0 0 18px; }
+
+/* Fit column */
+.fit-num.hi { color: var(--ok); } .fit-num.mid { color: var(--even-t); } .fit-num.lo { color: var(--danger); }
