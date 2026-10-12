@@ -178,6 +178,8 @@ try {
   const guide = await page.getByTestId("recommendation").textContent();
   assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value (league)"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
   await page.getByTestId("spend-verdict").waitFor();
+  await page.getByTestId("team-fit").waitFor();
+  log("team fit:", (await page.getByTestId("team-fit-headline").textContent()));
   const verdict = await page.getByTestId("spend-verdict").textContent();
   assert(/GO|BID FAIR|FITS|STRETCH|WALK-AWAY/.test(verdict), `go/pass call rendered in the bid guide: ${verdict.slice(0, 60)}`);
   const spending = await page.getByTestId("spending-guide").textContent();

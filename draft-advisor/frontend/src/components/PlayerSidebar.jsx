@@ -14,6 +14,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
+  const [fit, setFit] = useState(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState("");
@@ -25,6 +26,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       setNote(d.overrides?.injury_note || "");
       setNotes(d.overrides?.notes || "");
     }).catch((e) => setError(e.message));
+    api.get(`/leagues/${leagueId}/fit/${playerId}`).then(setFit).catch(() => setFit(null));   // drafted players get no fit read
     if (live) {
       api.get(`/leagues/${leagueId}/recommend/${playerId}`).then(setRec).catch(() => setRec(null));
       api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => setSpend(g.focus)).catch(() => setSpend(null));
@@ -86,6 +88,13 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         {" · "}matched via {rec_.match_method}
       </div>
       {error && <div className="error">{error}</div>}
+
+      {fit && fit.player_id === playerId && (
+        <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
+          <div className="fit-head"><span className="bid-label">For your team</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
+          <ul className="small guide-lines">{fit.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+        </div>
+      )}
 
       {rec && (
         <div data-testid="recommendation">

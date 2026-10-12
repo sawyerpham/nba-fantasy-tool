@@ -208,3 +208,15 @@ def recommend(league_id: str, player_id: int, manager_id: str | None = Query(Non
     except StopIteration as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown player {player_id}") from exc
     return asdict(rec)
+
+
+@router.get("/fit/{player_id}")
+def fit(league_id: str, player_id: int, manager_id: str | None = Query(None), state: AppState = Depends(get_state)) -> dict:
+    """Is this available player good for the manager's team? Verdict, one-line headline, reasons."""
+    from ..engine.fit import team_fit
+
+    session = _session(state, league_id)
+    try:
+        return asdict(team_fit(session, manager_id or session.user_manager_id(), player_id))
+    except (DraftError, ValueError) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
