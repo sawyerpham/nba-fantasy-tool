@@ -118,7 +118,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .cols > div:last-child { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .cols > div:last-child .panel { padding: 16px; overflow-x: auto; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.panel.scroll { max-height: 72vh; overflow: auto; scrollbar-width: thin; }
+.panel.scroll { max-height: calc(100vh - 125px); overflow: auto; scrollbar-width: thin; }
 .cols > div:last-child .panel.scroll { max-height: none; overflow: visible; }
 .panel.flush { padding: 0; overflow: hidden; }
 .sticky-bar { position: sticky; top: 58px; z-index: 4; background: var(--panel); padding: 10px 0; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
