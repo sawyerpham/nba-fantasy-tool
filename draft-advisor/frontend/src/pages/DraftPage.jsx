@@ -12,9 +12,8 @@ import EditPickDialog from "../components/EditPickDialog.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
-// A bench spot rarely scores under Lock-In, so in "My team" order a bench-only fit counts for 60 % of its value.
-const BENCH_FIT = 0.6;
-const teamScore = (r) => r.value * (r.assignable_slot === "BN" ? BENCH_FIT : 1);
+// "My team" order = the Fit column (value, bench-only fits ×0.6, price vs your stretch / walk-away).
+const teamScore = (r) => r.fit?.score ?? 0;
 
 export default function DraftPage({ leagueId }) {
   const [view, setView] = useState(null);
@@ -126,7 +125,7 @@ export default function DraftPage({ leagueId }) {
     const sign = dir === "asc" ? 1 : -1;
     return rows.slice().sort((a, b) => {
       const val = (r) => (key === "pos" ? (r.eligibility.length ? Math.min(...r.eligibility.map((p) => POSITIONS.indexOf(p))) : 99)
-        : key === "min" ? (r.proj_min ?? r.last_min) : key === "rank" && forTeam ? r.team_rank : r[key]);
+        : key === "min" ? (r.proj_min ?? r.last_min) : key === "fit" ? r.fit?.score : key === "rank" && forTeam ? r.team_rank : r[key]);
       const x = val(a), y = val(b);
       if (x === y) return a.rank - b.rank;
       if (x === null || x === undefined) return 1;

@@ -165,8 +165,11 @@ def rankings(
     prices = _prices(session, rows, manager_id) if session.draft.status == "live" else {}
     # Why FP/G moved vs last season: data/fpg_reasons.json, written by hand / an LLM pass (optional).
     reasons = state.store.read_json("fpg_reasons.json").get("players", {}) if state.store.exists("fpg_reasons.json") else {}
+    from ..engine.fit import fit_scores
+
+    fits = fit_scores(session, manager_id or session.user_manager_id(), rows, prices)
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
-             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id))}
+             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id)}
             for r in rows]
 
 
