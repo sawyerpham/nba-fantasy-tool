@@ -103,7 +103,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               <td>{r.eligibility.join("/")}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
-                {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
+                {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
               </td>
               <td className="num">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>

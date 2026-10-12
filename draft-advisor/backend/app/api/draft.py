@@ -163,8 +163,10 @@ def rankings(
     left = Counter(tier.get(pid) for pid in session.available_ids())
     size = Counter(tier.values())
     prices = _prices(session, rows, manager_id) if session.draft.status == "live" else {}
+    # Why FP/G moved vs last season: data/fpg_reasons.json, written by hand / an LLM pass (optional).
+    reasons = state.store.read_json("fpg_reasons.json").get("players", {}) if state.store.exists("fpg_reasons.json") else {}
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
-             "price": prices.get(r.player_id)}
+             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id))}
             for r in rows]
 
 
