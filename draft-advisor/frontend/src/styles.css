@@ -115,32 +115,31 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 
 /* ---------- layout ---------- */
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-/* Draft page: spending guide | rankings | player + managers, full width, each column scrolls on its own and
-   ends at the bottom of the window (--cols-top is measured by the draft page). */
-.draft-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 400px; grid-template-areas: "guide rank side"; gap: 16px;
+/* Draft page: [spending guide / team] | [on the block + rankings] | [player / managers], full width. Every pane
+   scrolls on its own and the columns end at the bottom of the window (--cols-top is measured by the draft page). */
+.draft-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr) 420px; grid-template-areas: "left rank side"; gap: 16px;
   height: calc(100vh - var(--cols-top, 160px) - 16px); min-height: 420px; }
-.dg-guide { grid-area: guide; } .dg-side { grid-area: side; }
-.dg-guide, .dg-side { min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-.dg-guide .panel, .dg-side .panel { padding: 16px; overflow-x: auto; }
-.dg-guide .panel:last-child, .dg-side .panel:last-child { margin-bottom: 0; }
+.dg-left { grid-area: left; } .dg-side { grid-area: side; }
+.dg-left, .dg-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.dg-pane { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.dg-profile { flex-grow: 1.4; }
+.dg-pane > .panel { padding: 14px 16px; margin-bottom: 0; overflow-x: auto; }
 .dg-rank { grid-area: rank; display: flex; flex-direction: column; min-height: 0; }
+.dg-rank > .block-bar { margin: 0 0 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
 .dg-rank > .panel.scroll { flex: 1; min-height: 0; max-height: none; margin-bottom: 0; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
 .panel.scroll { max-height: 72vh; overflow: auto; scrollbar-width: thin; }
-.dg-side .panel.scroll { max-height: none; overflow: visible; }
+.dg-pane .panel.scroll { max-height: none; overflow: visible; }
 .panel.flush { padding: 0; overflow: hidden; }
 .sticky-bar { position: sticky; top: 58px; z-index: 4; background: var(--panel); padding: 10px 0; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 > label, .grid2 > label { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: var(--muted); }
 .spacer { flex: 1; }
-@media (max-width: 1500px) {
-  .draft-grid { grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "rank guide" "rank side"; }
-  .dg-guide { max-height: 45vh; }
-}
+@media (max-width: 1500px) { .draft-grid { grid-template-columns: 320px minmax(0, 1fr) 380px; } }
 @media (max-width: 1200px) {
-  .draft-grid { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: "guide" "rank" "side"; height: auto; }
-  .dg-guide { max-height: none; } .dg-rank > .panel.scroll { max-height: 72vh; }
+  .draft-grid { grid-template-columns: 1fr; grid-template-areas: "rank" "left" "side"; height: auto; }
+  .dg-pane { flex: none; max-height: 60vh; } .dg-rank > .panel.scroll { max-height: 72vh; }
 }
 
 /* ---------- badges & pills ---------- */
@@ -291,11 +290,11 @@ th.sorted { color: var(--primary); }
 .activity-time { color: var(--muted); font-size: 14px; white-space: nowrap; }
 
 /* spending guide in its own narrow column */
-.dg-guide .bid-cell { padding: 8px 10px; }
-.dg-guide .bid-num { font-size: 22px; white-space: nowrap; }
-.dg-guide .nom-row { flex-wrap: nowrap; align-items: center; }
-.dg-guide .nom-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.dg-guide .nom-row .muted { white-space: nowrap; margin-left: auto; }
+.dg-left .bid-cell { padding: 8px 10px; }
+.dg-left .bid-num { font-size: 22px; white-space: nowrap; }
+.dg-left .nom-row { flex-wrap: nowrap; align-items: center; }
+.dg-left .nom-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dg-left .nom-row .muted { white-space: nowrap; margin-left: auto; }
 /* draft header and rankings toolbar stay on one line; long text shrinks instead of wrapping */
 .draft-top .draft-head { flex-wrap: nowrap; }
 .draft-top .draft-head > * { flex-shrink: 0; }
@@ -314,3 +313,23 @@ th.sorted { color: var(--primary); }
 
 /* Fit column */
 .fit-num.hi { color: var(--ok); } .fit-num.mid { color: var(--even-t); } .fit-num.lo { color: var(--danger); }
+
+/* team preview: one line per roster spot */
+.team-slots { display: grid; gap: 2px; }
+.team-slot { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 7px; font-size: 14px; }
+.team-slot.filled { background: var(--panel-2); }
+.team-slot.bench .team-slot-pos { color: var(--muted); }
+.team-slot-pos { font-size: 12px; font-weight: 700; color: var(--info-t); }
+.team-slot-player { display: flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; }
+.team-slot-player.editable { cursor: pointer; } .team-slot-player.editable:hover { color: var(--primary); }
+.team-slot-player.dragging { opacity: 0.4; }
+/* managers: one row each */
+.managers-table td, .managers-table th { padding: 5px 6px; white-space: nowrap; }
+.managers-table tr.user-row td { background: var(--user-card); }
+.managers-table tr.drop-over td { outline: 2px dashed var(--primary); outline-offset: -2px; }
+.managers-table .badge { margin-left: 6px; }
+.nom-dot { color: var(--primary); margin-right: 4px; font-size: 10px; }
+/* panes that should show everything: size to their content; the neighbour pane takes the rest and scrolls */
+.dg-pane.fit-content { flex: 0 1 auto; }
+.managers-table td, .managers-table th { padding: 3px 6px; font-size: 13.5px; }
+.managers-table td:last-child { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }

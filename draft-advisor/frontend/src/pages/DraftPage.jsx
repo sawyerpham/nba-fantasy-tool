@@ -3,6 +3,7 @@ import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import ManagersPanel from "../components/ManagersPanel.jsx";
+import TeamPreview from "../components/TeamPreview.jsx";
 import PickBar from "../components/PickBar.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
@@ -26,7 +27,8 @@ export default function DraftPage({ leagueId }) {
   const [dismissed, setDismissed] = useState(null); // nominated player whose bar was closed
   const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
-  const [showManagers, setShowManagers] = useState(true);
+  const [teamManager, setTeamManager] = useState(null);   // whose roster the Team preview shows (null = mine)
+  const [draggingPick, setDraggingPick] = useState(null);
   const [orderOpen, setOrderOpen] = useState(null);   // null = open in setup, closed once live
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -251,35 +253,41 @@ export default function DraftPage({ leagueId }) {
         {notice && <div className="ok" data-testid="draft-notice">{notice}</div>}
       </div>
 
-      {live && (
-        <div className="block-bar sticky-block">
-          {recordTarget ? (
-            <PickBar key={recordTarget.player_id} leagueId={leagueId} view={view} player={recordTarget} onPicked={onPicked}
-              nominatedBy={!pick && nominated ? nameOf(nominated.nominated_by) : null}
-              tier={rankings.find((r) => r.player_id === recordTarget.player_id)} search={markDrafted}
-              onCancel={() => { if (pick) setPick(null); else setDismissed(nominated?.player_id); }} />
-          ) : (
-            <>
-              <span className="label">On the block</span>
-              {nominated ? (
-                <>
-                  <span className="on-block" data-testid="on-the-block">{nominatedName}</span>
-                  <span className="small muted">by {nameOf(nominated.nominated_by)}</span>
-                  <button className="primary" onClick={() => setDismissed(null)} data-testid="btn-record-bid">Record winner</button>
-                </>
-              ) : <span className="muted">Nobody yet — click On the block on a player, or turn on Sleeper sync</span>}
-            </>
-          )}
-          {!recordTarget && <><span className="spacer" />{markDrafted}</>}
-        </div>
-      )}
-
       <div className="draft-grid" ref={colsRef}>
-        <section className="dg-guide">
-          {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
-            : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
+        <section className="dg-left">
+          <div className="dg-pane fit-content">
+            {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
+              : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
+          </div>
+          <div className="dg-pane">
+            <TeamPreview managers={view.managers} rosterSlots={settings?.roster_slots} managerId={teamManager} onPick={setTeamManager}
+              onEditPick={view.status !== "setup" ? setEditPick : undefined} onDragPick={setDraggingPick} />
+          </div>
         </section>
         <section className="dg-rank">
+          {live && (
+            <div className="block-bar">
+              {recordTarget ? (
+                <PickBar key={recordTarget.player_id} leagueId={leagueId} view={view} player={recordTarget} onPicked={onPicked}
+                  nominatedBy={!pick && nominated ? nameOf(nominated.nominated_by) : null}
+                  tier={rankings.find((r) => r.player_id === recordTarget.player_id)} search={markDrafted}
+                  onCancel={() => { if (pick) setPick(null); else setDismissed(nominated?.player_id); }} />
+              ) : (
+                <>
+                  <span className="label">On the block</span>
+                  {nominated ? (
+                    <>
+                      <span className="on-block" data-testid="on-the-block">{nominatedName}</span>
+                      <span className="small muted">by {nameOf(nominated.nominated_by)}</span>
+                      <button className="primary" onClick={() => setDismissed(null)} data-testid="btn-record-bid">Record winner</button>
+                    </>
+                  ) : <span className="muted">Nobody yet — click On the block on a player, or turn on Sleeper sync</span>}
+                </>
+              )}
+              {!recordTarget && <><span className="spacer" />{markDrafted}</>}
+            </div>
+          )}
+
           <div className="toolbar">
             <h3>Rankings</h3>
             <input type="text" placeholder="Search players…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
@@ -305,18 +313,19 @@ export default function DraftPage({ leagueId }) {
           </div>
         </section>
         <section className="dg-side">
+          <div className="dg-pane dg-profile">
           <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} onDraft={putOnBlock} userName={userName}
             onBlock={nominated?.player_id === selected} row={rankings.find((r) => r.player_id === selected)} />
-          <div className="row" style={{ margin: "4px 0 10px" }}>
-            <button className="small ghost" onClick={() => setShowManagers(!showManagers)} data-testid="toggle-managers">{showManagers ? "▾ Hide managers" : "▸ Show managers"}</button>
           </div>
-          {showManagers && (
+          <div className="dg-pane fit-content">
             <ManagersPanel
               managers={view.managers}
-              onEditPick={view.status !== "setup" ? setEditPick : undefined}
-              onMovePick={(p, managerId) => act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch")}
+              selectedId={teamManager || view.managers.find((m) => m.is_user)?.manager_id}
+              onSelect={setTeamManager}
+              dragging={draggingPick}
+              onMovePick={(p, managerId) => { setDraggingPick(null); act(`picks/${p.pick_number}`, { manager_id: managerId }, "patch"); }}
             />
-          )}
+          </div>
         </section>
       </div>
 
