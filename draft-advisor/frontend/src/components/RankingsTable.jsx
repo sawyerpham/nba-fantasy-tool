@@ -1,18 +1,17 @@
-import React, { useState } from "react";
+import React from "react";
 import Headshot from "./Headshot.jsx";
 
 const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_term: "OUT-LT", out_season: "SEASON" };
 
 // Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
 const COLS = [
-  ["rank", "#", "rank by value", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
+  ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
   ["pos", "Pos", "fantasy positions (Sleeper, editable)"],
   ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num"],
   ["availability", "Avail", "weeks with a game / season weeks", "num"],
   ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
   ["fit", "Fit", "fit for your team, 0-100: how good he is vs the best left, × 0.6 if he'd only reach your bench, × less if his price is past your stretch / walk-away", "num"],
   ["price", "$", "pay up to: the record bar's recommended max for you right now", "num"],
-  [null, "", ""],
 ];
 
 // ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
@@ -40,14 +39,6 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
   // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
   const byRank = !sort || sort.key === "rank";
-  // The first column shows value tiers (T1, T2 …) or plain rank numbers; remembered per browser.
-  const [mode, setMode] = useState(() => { try { return localStorage.getItem("da.rankMode") || "tier"; } catch { return "tier"; } });
-  const toggleMode = (e) => {
-    e.stopPropagation();
-    const next = mode === "tier" ? "num" : "tier";
-    setMode(next);
-    try { localStorage.setItem("da.rankMode", next); } catch { /* ignore */ }
-  };
   return (
     <table data-testid="rankings-table">
       <thead>
@@ -55,12 +46,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
           {COLS.map(([key, label, title, cls]) => {
             return (
               <th key={label || "actions"} className={`${cls || ""} ${key && onSort ? "sortable" : ""} ${sort?.key === key ? "sorted" : ""}`} onClick={() => key && onSort && onSort(key)} title={title ? `${title}${key ? " · click to sort" : ""}` : (key ? "click to sort" : "")}>
-                {key === "rank" ? (
-                  <span className="rank-head">
-                    <button type="button" className="rank-toggle" onClick={toggleMode} title={mode === "tier" ? "showing tiers · click for rank numbers" : "showing rank numbers · click for tiers"} data-testid="rank-mode-toggle">{mode === "tier" ? "T" : "#"}</button>
-                    <span data-testid="rank-sort" title="sort by rank">{arrow(key)}</span>
-                  </span>
-                ) : <>{label}{key ? arrow(key) : ""}</>}
+                {key === "rank" ? <span data-testid="rank-sort">{label}{arrow(key)}</span> : <>{label}{key ? arrow(key) : ""}</>}
               </th>
             );
           })}
@@ -75,11 +61,14 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               key={r.player_id}
               className={`clickable ${r.player_id === selectedId ? "selected" : ""} ${r.rosterable ? "" : "unrosterable"} ${newTier ? "tier-start" : ""}`}
               onClick={() => onSelect(r.player_id)}
+              onDoubleClick={() => live && onBlock(r)}
+              title={live ? "double-click to put him on the block" : ""}
               data-testid={`rank-row-${r.player_id}`}
             >
-              <td className="num muted">{mode === "tier" && r.tier != null
-                ? <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} title={`rank #${r.rank} · tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>
-                : r.rank}</td>
+              <td className="rank-cell">
+                {r.tier != null && <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} title={`tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>}
+                {" "}<span className="rank-num muted">{r.rank}</span>
+              </td>
               <td>
                 <div className="player-cell">
                 <Headshot sleeperId={r.sleeper_id} name={r.full_name} size={34} />
@@ -112,13 +101,6 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 <strong className={`fit-num ${!r.fit ? "" : r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit ? r.fit.score : "—"}</strong>
               </td>
               <td className="num">{r.price != null ? <strong className="price">${r.price}</strong> : <span className="muted">—</span>}</td>
-              <td onClick={(e) => e.stopPropagation()}>
-                {live && (
-                  <div className="row-actions">
-                    <button className="small primary" onClick={() => onBlock(r)} title="put him on the block and record who wins him" data-testid={`btn-block-${r.player_id}`}>On the block</button>
-                  </div>
-                )}
-              </td>
             </tr>
           );
         })}
