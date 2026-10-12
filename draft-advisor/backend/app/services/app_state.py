@@ -18,7 +18,7 @@ from nba_fantasy_shared.storage import JsonStore
 from .. import config
 from ..engine.session import DraftSession
 from .league_repository import LeagueRepository, new_document
-from .pull_service import PlayerDetailCache, PullService, PullStatus, load_overrides, load_projections, load_records, save_overrides
+from .pull_service import PlayerDetailCache, PullService, PullStatus, load_overrides, load_projections, load_records, load_schedule, save_overrides
 from .sleeper_league import load_details
 from .valuation_service import ValuationService
 
@@ -64,7 +64,9 @@ class AppState:
                 for r in load_records(self.store, self.roster_season)
             }
             self.overrides = load_overrides(self.store)
+            self.schedule_games = load_schedule(self.store, self.roster_season)
             for session in self.sessions.values():
+                session.schedule_games = self.schedule_games
                 session.players = dict(self.players)
                 session.overrides = self.overrides
                 session.set_valuations(self.valuations_for(session.league.scoring, session.league.stats_season))
@@ -243,6 +245,7 @@ class AppState:
                 session.overrides = self.overrides  # shared, so edits propagate to every league
                 session.sleeper_details = load_details(self.store, doc.league.sleeper_league_id)
                 session.sleeper_history = self._history(doc.league)
+                session.schedule_games = self.schedule_games
                 self.sessions[league_id] = session
             return session
 

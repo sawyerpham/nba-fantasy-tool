@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .draft_state import DraftError
-from .ranking import rank_players
 
 GOOD_MIN_DOLLARS = 2
 GOOD_MIN_FRACTION = 0.10
@@ -65,8 +64,7 @@ def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[Kee
         computed = rule.price(c.last_price)
         price = c.keeper_price if c.keeper_price is not None else computed
         rec = session.recommend(c.player_id, c.manager_id)
-        rows = rank_players(session.league, session.players, session.overrides, session.valuations,
-                            session.engine.picks_for(c.manager_id), session.available_ids())
+        rows = session.rank(session.engine.picks_for(c.manager_id), session.available_ids())
         row = next((r for r in rows if r.player_id == c.player_id), None)
         surplus = round(rec.fair_value - price, 2)
         verdict = verdict_for(surplus, rec.fair_value)

@@ -102,6 +102,12 @@ class RankingSettings(BaseModel):
     # Bench spots per team that get real auction money; the rest are treated as $1 fills. Calibrated to
     # the league's 2025 auction (stars $90–105, #84 ≈ $6, 55 picks at $1).
     priced_bench_slots: int = 2
+    # Lock-In: more games in a week = more chances at a big night. 1 = scale the weekly-best ceiling by the
+    # team's games per week this season (fantasy playoff weeks count double); 0 = ignore the schedule.
+    schedule_weight: float = 1.0
+    # Position scarcity: 1 = value measured against the replacement player at the player's scarcest
+    # position (after every team fills its starters) instead of one league-wide level; 0 = off.
+    scarcity_weight: float = 1.0
 
 
 class ManagerBehavior(BaseModel):

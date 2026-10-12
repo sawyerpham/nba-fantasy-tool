@@ -20,7 +20,7 @@ from . import roster
 from .bidding import BidRecommendation, market_rate, recommend_bid
 from .budget import ManagerBudget
 from .draft_state import DraftEngine, DraftError, KeeperAssignment
-from .ranking import RankedPlayer, pool_values, rank_players
+from .ranking import RankedPlayer, pool_values, rank_players, scarcity_bonus, schedule_factors
 from .spending import SpendingGuide, spending_guide
 
 
@@ -50,7 +50,10 @@ class DraftSession:
     now: Callable[[], datetime] = utcnow
     sleeper_details: dict | None = None   # cached Sleeper league details (see services/sleeper_league.py)
     sleeper_history: list[dict] = field(default_factory=list)   # extra leagues, for draft habits only
+    schedule_games: dict[str, dict[str, int]] = field(default_factory=dict)   # team -> NBA week -> games
     _pool_values: dict[int, float] | None = field(default=None, init=False, repr=False)
+    _schedule: dict[str, float] | None = field(default=None, init=False, repr=False)
+    _scarcity: dict[int, float] = field(default_factory=dict, init=False, repr=False)
     _opening_rate: float | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -61,6 +64,7 @@ class DraftSession:
     def invalidate(self) -> None:
         """Call after any override, valuation, or league-settings change."""
         self._pool_values = None
+        self._schedule = None
         self._opening_rate = None
         self.engine.league = self.league
         self.engine.managers = self.managers
@@ -85,10 +89,29 @@ class DraftSession:
             raise DraftError("no manager is marked is_user")
         return user.manager_id
 
+    def schedule(self) -> dict[str, float]:
+        """Lock-In schedule factor per NBA team for this league's fantasy weeks."""
+        if self._schedule is None:
+            from ..services.sleeper_league import fantasy_weeks
+
+            weeks, playoffs = fantasy_weeks(self.sleeper_details, self.schedule_games)
+            self._schedule = schedule_factors(self.schedule_games, weeks, playoffs)
+        return self._schedule
+
     def pool_values(self) -> dict[int, float]:
+        """Every player's value (drafted or not), schedule and position scarcity included."""
         if self._pool_values is None:
-            self._pool_values = pool_values(self.players, self.overrides, self.valuations, self.league.ranking, self.league.scoring)
+            base = pool_values(self.players, self.overrides, self.valuations, self.league.ranking, self.league.scoring,
+                               self.schedule())
+            eligibility = {pid: o.eligibility for pid, o in self.overrides.items()}
+            self._scarcity = scarcity_bonus(base, eligibility, self.league)
+            self._pool_values = {pid: max(0.0, v + self._scarcity.get(pid, 0.0)) for pid, v in base.items()}
         return self._pool_values
+
+    def rank(self, my_picks, available_ids) -> list[RankedPlayer]:
+        self.pool_values()   # fills the scarcity bonuses
+        return rank_players(self.league, self.players, self.overrides, self.valuations, my_picks, available_ids,
+                            self.schedule(), self._scarcity)
 
     def available_ids(self) -> list[int]:
         drafted = self.engine.drafted_ids()
@@ -96,9 +119,7 @@ class DraftSession:
 
     def rankings(self, manager_id: str | None = None, limit: int | None = None) -> list[RankedPlayer]:
         manager_id = manager_id or self.user_manager_id()
-        rows = rank_players(
-            self.league, self.players, self.overrides, self.valuations,
-            self.engine.picks_for(manager_id), self.available_ids(),
+        rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
         if self.league.ranking.hide_unrosterable:
             rows = [r for r in rows if r.rosterable]
@@ -108,9 +129,7 @@ class DraftSession:
         manager_id = manager_id or self.user_manager_id()
         if not self.engine.is_available(player_id):
             raise DraftError(f"player {player_id} is not available")
-        rows = rank_players(
-            self.league, self.players, self.overrides, self.valuations,
-            self.engine.picks_for(manager_id), self.available_ids(),
+        rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
         target = next(r for r in rows if r.player_id == player_id)
         return recommend_bid(
@@ -121,7 +140,7 @@ class DraftSession:
     def opening_rate(self) -> float:
         """$/VAR with full budgets and nobody drafted: the baseline the spending guide measures inflation against."""
         if self._opening_rate is None:
-            rows = rank_players(self.league, self.players, self.overrides, self.valuations, [], list(self.players))
+            rows = self.rank([], list(self.players))
             self._opening_rate = market_rate(
                 self.league, self.managers, [], (r.value for r in rows), self.pool_values()
             ).dollars_per_var
@@ -129,9 +148,7 @@ class DraftSession:
 
     def spending_guide(self, manager_id: str | None = None, player_id: int | None = None) -> SpendingGuide:
         manager_id = manager_id or self.user_manager_id()
-        rows = rank_players(
-            self.league, self.players, self.overrides, self.valuations,
-            self.engine.picks_for(manager_id), self.available_ids(),
+        rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
         return spending_guide(
             self.league, self.managers, self.draft.picks, manager_id, rows, self.pool_values(),

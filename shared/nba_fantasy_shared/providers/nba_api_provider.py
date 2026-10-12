@@ -280,6 +280,26 @@ def apply_ages(bios: list[PlayerBio], age_rows: list[dict[str, Any]], season_off
 # ----------------------------------------------------------------------------- live provider
 
 
+def games_per_week(schedule: dict[str, Any]) -> dict[str, dict[str, int]]:
+    """{team tricode: {NBA week number: regular-season games}} from a ScheduleLeagueV2 response.
+
+    NBA weeks run Monday-Sunday from opening night, the same weeks Sleeper scores. Games whose teams are
+    not known yet (NBA Cup knockouts) are skipped.
+    """
+    out: dict[str, dict[str, int]] = {}
+    for day in schedule.get("leagueSchedule", {}).get("gameDates", []):
+        for g in day.get("games", []):
+            week = g.get("weekNumber") or 0
+            if not str(g.get("gameId", "")).startswith("002") or week <= 0:
+                continue
+            for side in ("homeTeam", "awayTeam"):
+                team = (g.get(side) or {}).get("teamTricode")
+                if team:
+                    weeks = out.setdefault(team, {})
+                    weeks[str(week)] = weeks.get(str(week), 0) + 1
+    return out
+
+
 class NbaApiProvider:
     source = "nba_api"
 
@@ -318,6 +338,16 @@ class NbaApiProvider:
         return self.runner.call(label, lambda: factory().get_normalized_dict())
 
     # ---- bulk ---------------------------------------------------------------------------
+
+    def fetch_schedule(self, roster_season: str) -> dict[str, dict[str, int]]:
+        """Games per team per NBA week for the season (see games_per_week)."""
+        from nba_api.stats.endpoints import scheduleleaguev2
+
+        data = self.runner.call(
+            f"ScheduleLeagueV2({roster_season})",
+            lambda: scheduleleaguev2.ScheduleLeagueV2(season=roster_season, league_id="00", timeout=self._timeout()).get_dict(),
+        )
+        return games_per_week(data)
 
     def fetch_player_pool(
         self, roster_season: str, on_progress: ProgressCallback | None = None
