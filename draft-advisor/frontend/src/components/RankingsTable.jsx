@@ -2,13 +2,12 @@ import React, { useState } from "react";
 import Headshot from "./Headshot.jsx";
 
 const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_term: "OUT-LT", out_season: "SEASON" };
-const CEILING_LABEL = { weekly_best: "Wk-best", best_game: "Best", top_quarter: "Top25%" };
 
-// Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is the ceiling.
+// Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
 const COLS = [
   ["rank", "#", "rank by value", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
   ["pos", "Pos", "fantasy positions (Sleeper, editable)"],
-  ["avg_fpts", "FP/G", "expected fantasy points per game: Sleeper projection blended with last season", "num"], ["ceiling", "CEILING", "", "num"],
+  ["avg_fpts", "FP/G", "expected fantasy points per game: Sleeper projection blended with last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num"],
   ["availability", "Avail", "weeks with a game / season weeks", "num"],
   ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
   ["value", "Value", "ranking score in FP units", "num"],
@@ -22,10 +21,9 @@ const trend = (r) => (r.proj_fpts == null || !r.last_fpts ? "" : r.proj_fpts - r
 // Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
 export const tierHue = (tier) => ({ "--h": Math.round(Math.min(tier - 1, 14) / 14 * 130) });
 
-export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort, ceilingMetric = "weekly_best" }) {
+export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort }) {
   // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
-  const ceilingLabel = CEILING_LABEL[ceilingMetric] || "Ceiling";
   const byRank = !sort || sort.key === "rank";
   // The first column shows value tiers (T1, T2 …) or plain rank numbers; remembered per browser.
   const [mode, setMode] = useState(() => { try { return localStorage.getItem("da.rankMode") || "tier"; } catch { return "tier"; } });
@@ -40,16 +38,14 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
       <thead>
         <tr>
           {COLS.map(([key, label, title, cls]) => {
-            const text = label === "CEILING" ? ceilingLabel : label;
-            const help = label === "CEILING" ? (ceilingMetric === "weekly_best" ? "average of each week's best game (FP) — what Lock-In scores" : title) : title;
             return (
-              <th key={label || "actions"} className={`${cls || ""} ${key && onSort ? "sortable" : ""} ${sort?.key === key ? "sorted" : ""}`} onClick={() => key && onSort && onSort(key)} title={help ? `${help}${key ? " · click to sort" : ""}` : (key ? "click to sort" : "")}>
+              <th key={label || "actions"} className={`${cls || ""} ${key && onSort ? "sortable" : ""} ${sort?.key === key ? "sorted" : ""}`} onClick={() => key && onSort && onSort(key)} title={title ? `${title}${key ? " · click to sort" : ""}` : (key ? "click to sort" : "")}>
                 {key === "rank" ? (
                   <span className="rank-head">
                     <button type="button" className="rank-toggle" onClick={toggleMode} title={mode === "tier" ? "showing tiers · click for rank numbers" : "showing rank numbers · click for tiers"} data-testid="rank-mode-toggle">{mode === "tier" ? "T" : "#"}</button>
                     <span data-testid="rank-sort" title="sort by rank">{arrow(key)}</span>
                   </span>
-                ) : <>{text}{key ? arrow(key) : ""}</>}
+                ) : <>{label}{key ? arrow(key) : ""}</>}
               </th>
             );
           })}
@@ -94,7 +90,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 <span className={`trend ${trend(r)}`}>{{ up: "▲", down: "▼" }[trend(r)] || ""}</span>
               </td>
-              <td className="num">{r.ceiling.toFixed(1)}</td>
+              <td className="num">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>
               <td className={`num ${r.proj_min == null ? "muted" : ""}`}>{(r.proj_min ?? r.last_min)?.toFixed(1) ?? "-"}</td>
               <td className="num" title={(r.injury_multiplier !== 1 || r.age_multiplier !== 1 || r.confidence !== 1) ? `× ${r.confidence} games confidence × ${r.injury_multiplier} injury × ${r.age_multiplier} age` : ""}>

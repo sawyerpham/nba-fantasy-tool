@@ -42,6 +42,7 @@ class RankedPlayer:
     last_fpts: float
     proj_min: float | None      # Sleeper's projected minutes per game
     last_min: float | None      # last season's minutes per game
+    owned_pct: float | None     # % of Sleeper leagues with him on a roster
     best_game_fpts: float
     weekly_best_avg: float
     top_quarter_avg: float
@@ -205,6 +206,7 @@ def rank_players(
                 last_fpts=valuation.avg_fpts if valuation else 0.0,
                 proj_min=round(rec.projection["sp"] / 60, 1) if rec.projection and rec.projection.get("sp") else None,
                 last_min=valuation.minutes_avg if valuation else None,
+                owned_pct=rec.projection.get("owned") if rec.projection else None,
                 best_game_fpts=valuation.best_game_fpts if valuation else 0.0,
                 weekly_best_avg=valuation.weekly_best_avg if valuation else 0.0,
                 top_quarter_avg=valuation.top_quarter_avg if valuation else 0.0,

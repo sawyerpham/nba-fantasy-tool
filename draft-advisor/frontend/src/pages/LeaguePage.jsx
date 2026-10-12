@@ -92,7 +92,7 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
       <div className="grid2" style={{ marginBottom: 8 }}>
         <div>
           <div className="small muted">Paste names, one per line (or comma-separated), in manager order:</div>
-          <textarea rows="3" style={{ width: "100%" }} value={names} onChange={(e) => setNames(e.target.value)} placeholder={"Sawyer\nEddie\nLucy\n…"} data-testid="bulk-names" />
+          <textarea rows="3" style={{ width: "100%" }} value={names} onChange={(e) => setNames(e.target.value)} placeholder={"Bob\nTimmy\nOwen\n…"} data-testid="bulk-names" />
           <button onClick={applyNames} disabled={!names.trim()} data-testid="bulk-names-apply">Apply names</button>
         </div>
         <div>

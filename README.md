@@ -26,7 +26,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ## Pull player data (pre-draft)
 
 ```powershell
-.\venv\Scripts\python.exe -m app.pull                 # nba_api pool + game logs, Sleeper players, projections and linked leagues; ~1.5 min first time
+.\venv\Scripts\python.exe -m app.pull                 # nba_api pool + game logs, Sleeper players, projections with Sleeper rostered %, and linked leagues; ~1.5 min first time
 .\venv\Scripts\python.exe -m app.pull --skip-logs     # re-reconcile and re-seed overrides only (seconds)
 .\venv\Scripts\python.exe -m app.pull --force-sleeper # bypass the 24 h Sleeper cache guard
 .\venv\Scripts\python.exe -m app.pull --fixtures      # offline run from tests\fixtures

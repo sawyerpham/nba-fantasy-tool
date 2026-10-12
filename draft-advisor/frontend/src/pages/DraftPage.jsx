@@ -254,7 +254,6 @@ export default function DraftPage({ leagueId }) {
               live={live}
               sort={sort}
               onSort={onSort}
-              ceilingMetric={settings?.ranking?.ceiling_metric}
             />
           </div>
         </div>
