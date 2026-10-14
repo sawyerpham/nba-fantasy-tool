@@ -20,14 +20,14 @@ export const ordinal = (n) => {
 const readOpen = () => { try { return localStorage.getItem("da.spending.open") !== "0"; } catch { return true; } };
 
 // Your money against the room, price inflation, the plan for your open slots, and targets you can afford.
-export default function SpendingGuide({ leagueId, live, refreshKey, onSelect }) {
+export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lot }) {
   const [g, setG] = useState(null);
   const [open, setOpen] = useState(readOpen);
 
   useEffect(() => {
     if (!live) { setG(null); return; }
-    api.get(`/leagues/${leagueId}/spending`).then(setG).catch(() => setG(null));
-  }, [leagueId, live, refreshKey]);
+    api.get(`/leagues/${leagueId}/spending` + (lot ? `?player_id=${lot.player_id}` : "")).then(setG).catch(() => setG(null));
+  }, [leagueId, live, refreshKey, lot?.player_id]);
 
   if (!live || !g) return null;
   const me = g.me;
@@ -46,6 +46,22 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect }) 
       </div>
       {open && (
         <>
+          {lot && g.focus && g.focus.player_id === lot.player_id && (() => {
+            const f = g.focus, bid = lot.high_bid ?? 0;
+            const go = f.verdict !== "cannot" && bid <= f.suggested;
+            return (
+              <div className={`guide-now ${go ? "go" : bid <= f.walk_away ? "maybe" : "stop"}`} data-testid="guide-now">
+                <div className="bid-label">Right now · {lot.full_name}</div>
+                <div className="guide-now-call">
+                  <VerdictBadge verdict={f.verdict} />{" "}
+                  {f.verdict === "cannot" ? "you can't afford him"
+                    : go ? <>bid up to <strong>${f.suggested}</strong> (high bid ${bid})</>
+                    : bid <= f.walk_away ? <>past your ${f.suggested}; only if he's your star (walk-away ${f.walk_away})</>
+                    : <>let him go: ${bid} is past your walk-away ${f.walk_away}</>}
+                </div>
+              </div>
+            );
+          })()}
           <div className="bid-grid">
             <div className="bid-cell primary">
               <div className="bid-label">You</div>

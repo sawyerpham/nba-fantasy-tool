@@ -4,6 +4,7 @@ import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import RoomBoard from "../components/RoomBoard.jsx";
+import LiveLot from "../components/LiveLot.jsx";
 import TeamsTable from "../components/TeamsTable.jsx";
 import NbaTeamsTable from "../components/NbaTeamsTable.jsx";
 import PickBar from "../components/PickBar.jsx";
@@ -37,8 +38,21 @@ export default function DraftPage({ leagueId }) {
   const [sync, setSync] = useState(() => { try { return localStorage.getItem(`da.sync.${leagueId}`) === "1"; } catch { return false; } });
   const [syncInfo, setSyncInfo] = useState(null);
   const syncBusy = useRef(false);
+  const syncSeen = useRef(false);   // false until the first sync of this session has caught up
   const SYNC_MS = 1000;   // Sleeper's public API allows ~1000 requests/min
   const [liveLot, setLiveLot] = useState(null);   // the lot in progress in Sleeper (player, high bid, leader, clock)
+  const [toasts, setToasts] = useState([]);       // "X drafted Y for $Z" notices from Sleeper sync
+  const toast = (items) => {
+    const stamped = items.map((a, i) => ({ ...a, key: `${a.player_id}-${Date.now()}-${i}` }));
+    setToasts((t) => [...stamped, ...t].slice(0, 6));
+    setTimeout(() => setToasts((t) => t.filter((x) => !stamped.some((s) => s.key === x.key))), 12000);
+  };
+  const goToManager = (id) => {
+    const el = document.querySelector(`[data-testid="manager-card-${id}"]`) || document.getElementById("room");
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.classList.add("flash");
+    setTimeout(() => el?.classList.remove("flash"), 1600);
+  };
 
   const loadView = useCallback(() => api.get(`/leagues/${leagueId}/draft`).then(setView), [leagueId]);
   const loadRankings = useCallback(
@@ -75,8 +89,9 @@ export default function DraftPage({ leagueId }) {
         const r = await api.post(`/leagues/${leagueId}/draft/sync`);
         setSyncInfo((old) => ({ ...r, total: (old?.total || 0) + r.added.length, lag: r.added.length && r.seconds_since_last_sleeper_pick < 600 ? r.seconds_since_last_sleeper_pick : old?.lag }));
         setLiveLot(r.live);
-        // Follow Sleeper's nomination: open the record bar on him unless you opened another player yourself.
-        if (r.live) setPick((p) => (!p || p.fromSleeper) && p?.player_id !== r.live.player_id ? { ...r.live, fromSleeper: true } : p);
+        // The first sync after turning it on catches up on every earlier pick: no notifications for those.
+        if (r.added.length && syncSeen.current) toast(r.added);
+        syncSeen.current = true;
         if (r.added.length) {
           setView(r.view);
           setPick((p) => (p && r.view.picks.some((x) => x.player_id === p.player_id) ? null : p));
@@ -89,6 +104,7 @@ export default function DraftPage({ leagueId }) {
         syncBusy.current = false;
       }
     };
+    syncSeen.current = false;
     tick();
     const t = setInterval(tick, SYNC_MS);
     return () => clearInterval(t);
@@ -266,15 +282,43 @@ export default function DraftPage({ leagueId }) {
         {notice && <div className="ok" data-testid="draft-notice">{notice}</div>}
       </div>
 
+      {toasts.length > 0 && (
+        <div className="toasts" data-testid="toasts">
+          {toasts.slice(0, 1).map((t) => {
+            const over = t.fair != null ? t.price - t.fair : null;
+            return (
+              <div key={t.key} className={`toast ${over == null ? "" : over > 2 ? "over" : over < -2 ? "under" : ""}`}
+                onClick={() => goToManager(t.manager_id)} title="go to his team in the room">
+                <strong>{t.manager}</strong> drafted <strong>{t.player}</strong> for <strong>${t.price}</strong>
+                {over != null && <span className="toast-tag">{over > 2 ? `overpaid $${over}` : over < -2 ? `bargain, $${-over} under` : "fair price"}</span>}
+                <span className="muted"> · ${t.left} left</span>
+                {toasts.length > 1 && <span className="muted"> · +{toasts.length - 1} more</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="draft-grid" ref={colsRef}>
         <section className="dg-left">
           <div className="dg-pane">
-            {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} />
+            {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected}
+              lot={sync ? liveLot : null} />
               : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
           </div>
         </section>
         <section className="dg-rank">
-          {live && (
+          {live && sync && !pick && (
+            <div className="block-bar live-bar">
+              {liveLot ? (
+                <LiveLot leagueId={leagueId} lot={liveLot} managers={view.managers}
+                  row={rankings.find((r) => r.player_id === liveLot.player_id)} onOpen={() => setSelected(liveLot.player_id)} />
+              ) : (
+                <><span className="live-dot" /><span className="muted">Sleeper sync on: waiting for the next nomination…</span><span className="spacer" />{markDrafted}</>
+              )}
+            </div>
+          )}
+          {live && !(sync && !pick) && (
             <div className="block-bar">
               {recordTarget ? (
                 <PickBar key={recordTarget.player_id} leagueId={leagueId} view={view} player={recordTarget} onPicked={onPicked}
@@ -334,7 +378,7 @@ export default function DraftPage({ leagueId }) {
         </section>
         <section className="dg-side">
           <div className="dg-pane">
-          <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} userName={userName} onSelectPlayer={setSelected}
+          <PlayerSidebar leagueId={leagueId} playerId={selected ?? (sync ? liveLot?.player_id : null)} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} userName={userName} onSelectPlayer={setSelected}
             onBlock={nominated?.player_id === selected} rankings={rankings} />
           </div>
         </section>

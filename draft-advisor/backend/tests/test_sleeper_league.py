@@ -55,8 +55,10 @@ def test_mock_draft_picks_are_matched_by_seat():
     ant = SimpleNamespace(player_id=11, sleeper_id="2133", full_name="Ant")
     recorded = []
     engine = SimpleNamespace(drafted_ids=lambda: set(), pick=lambda pid, mid, price, slot: recorded.append((pid, mid, price)))
+    engine.budget = lambda mid: SimpleNamespace(remaining=100)
     session = SimpleNamespace(players={10: luka, 11: ant}, managers=[me, other], league=SimpleNamespace(min_bid=1),
-                              draft=SimpleNamespace(status="live"), engine=engine, invalidate=lambda: None)
+                              draft=SimpleNamespace(status="live"), engine=engine, invalidate=lambda: None,
+                              recommend=lambda pid, mid: SimpleNamespace(fair_value=40.0))
     draft = {"status": "drafting", "draft_order": {"u4": 4}, "slot_to_roster_id": {"4": 4, "6": 6}}
     picks = [{"pick_no": 1, "player_id": "1970", "picked_by": "", "roster_id": None, "draft_slot": 4, "metadata": {"amount": "58"}},
              {"pick_no": 2, "player_id": "2133", "picked_by": "", "roster_id": None, "draft_slot": 6, "metadata": {"amount": "27"}}]

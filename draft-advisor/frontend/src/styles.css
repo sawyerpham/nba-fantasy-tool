@@ -419,3 +419,34 @@ th.sorted { color: var(--primary); }
 @keyframes live-pulse { 50% { opacity: 0.3; } }
 .live-clock { font-weight: 800; min-width: 2.2em; text-align: right; }
 .live-clock.low { color: var(--danger); }
+
+/* live lot (replaces "On the block" while Sleeper sync is on) */
+.live-bar { display: block; }
+.live-lot { display: flex; flex-direction: column; gap: 8px; }
+.live-lot-head { display: flex; align-items: center; gap: 14px; }
+.live-lot-who { flex: 1; min-width: 0; }
+.live-lot-name { font-size: 22px; font-weight: 800; cursor: pointer; } .live-lot-name:hover { color: var(--primary); }
+.live-lot-who .tier-tag { margin-left: 8px; }
+.live-lot-bid { text-align: right; padding: 6px 14px; border-radius: 12px; background: var(--panel-2); min-width: 140px; }
+.live-lot-bid.good { background: var(--good); } .live-lot-bid.even { background: var(--even); } .live-lot-bid.bad { background: var(--bad); }
+.live-lot-price { font-size: 34px; font-weight: 800; line-height: 1.05; }
+.live-lot-bid .live-clock { font-size: 18px; }
+.live-lot-limits { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.live-lot-limits .lim { display: inline-flex; align-items: baseline; gap: 6px; font-size: 16px; }
+.live-lot-call { font-weight: 700; padding: 6px 12px; border-radius: 10px; }
+.live-lot-call.good { background: var(--good); color: var(--good-t); }
+.live-lot-call.even { background: var(--even); color: var(--even-t); }
+.live-lot-call.bad { background: var(--bad); color: var(--bad-t); }
+.live-lot-tips div { margin-top: 2px; }
+
+/* pick notifications */
+.toasts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(820px, 60vw); }
+.toast { padding: 8px 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); cursor: pointer; font-size: 15px; animation: toast-in 0.25s ease-out; }
+.toast.over { border-left: 5px solid var(--danger); } .toast.under { border-left: 5px solid var(--ok); }
+.toast-tag { margin-left: 8px; font-size: 12.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--badge); }
+.toast.over .toast-tag { background: var(--bad); color: var(--bad-t); } .toast.under .toast-tag { background: var(--good); color: var(--good-t); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+.room-card.flash { outline: 3px solid var(--primary); outline-offset: 3px; transition: outline 0.2s; }
+.guide-now { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; border-left: 5px solid var(--muted); background: var(--panel-2); }
+.guide-now.go { border-left-color: var(--ok); } .guide-now.maybe { border-left-color: var(--even-t); } .guide-now.stop { border-left-color: var(--danger); }
+.guide-now-call { font-size: 15px; margin-top: 4px; }
