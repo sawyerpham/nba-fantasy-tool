@@ -37,7 +37,7 @@ export const TERMS = {
   est_fpg: ["Est FP/G", "Projected FP/G of the players in starting spots now."],
   open_starters: ["Open starters", "Starting spots still empty."],
   need: ["Need", "Open starting spots for this position across the whole room."],
-  supply: ["Left", "Starter-quality players left who can play it: available players among the top N by value, N = open starting spots in the room. A multi-position player is split across his positions (a PG/SG counts half for each)."],
+  supply: ["Left", "Starter-quality players left who can play it: available players among the top N by value, N = open starting spots in the room. Each player counts once, where he'll be used: a PF/C counts at whichever of PF or C has more unfilled spots."],
   pos_status: ["Market", "Scarce: fewer starter-quality players left than open spots, so prices will rise: buy early. Tight: under 1.3 per spot. Plenty: more than enough, wait for value."],
   tier_cliff: ["Top tier", "The best tier left at this position, how many players are left in it, and how much lower in value (fantasy points) the next tier's best player is. Last one in a tier = buy now or drop a level."],
   chasing: ["Chasing", "Rivals with an open spot here whose cap reaches the fair value of the best player left here. More chasers = bidding wars."],

@@ -162,4 +162,23 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         "talent_fpg": round(talent.get(abbr, 0.0), 1),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
         "teammates": [mate(fpg_of[pid], pid) for pid in shown],
+        "role": _team_role(session, roster, player_id),
     }
+
+
+def _team_role(session, roster: list[tuple[float, int]], player_id: int) -> dict | None:
+    """Is he his team's star? Rank by Sleeper's projected FP/G on the team (usage, minutes and role are baked into
+    it), his share of the top 8's projected FP/G, and the teammate he is compared with (#2 if he is #1, else #1)."""
+    rank = next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None)
+    if rank is None:
+        return None
+    fpg = roster[rank - 1][0]
+    top8 = sum(f for f, _ in roster[:8]) or 1.0
+    other = roster[1] if rank == 1 and len(roster) > 1 else roster[0]
+    lead = fpg / other[0] if other[0] else 1.0
+    if rank == 1:
+        label = "Clear #1 option" if lead >= 1.15 else "#1 option (shared)"
+    else:
+        label = {2: "#2 option", 3: "#3 option"}.get(rank, "Role player")
+    return {"rank": rank, "label": label, "star": rank == 1, "share": round(fpg / top8, 3), "fpg": round(fpg, 1),
+            "vs": {"name": session.players[other[1]].full_name, "fpg": round(other[0], 1)} if other[1] != player_id else None}
