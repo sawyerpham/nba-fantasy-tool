@@ -89,8 +89,9 @@ def age_multiplier(age: float | None, ranking: RankingSettings) -> float:
 # Sleeper projection stat keys -> GameLine attribute names used by the scoring formula.
 PROJECTION_KEYS = {"pts": "pts", "reb": "reb", "ast": "ast", "stl": "stl", "blk": "blk", "tov": "to",
                    "fgm": "fgm", "fga": "fga", "ftm": "ftm", "fg3m": "tpm"}
-# ponytail: one league-wide ceiling/avg ratio for players with no game logs; per-position ratios if it matters.
-NO_HISTORY_CEILING_RATIO = 1.3
+# ponytail: one league-wide ceiling/avg ratio for players with no game logs (median weekly-best ÷ FP/G of
+# 40+ game players, 2025-26); per-position ratios if it matters.
+NO_HISTORY_CEILING_RATIO = 1.26
 
 
 def projected_fpts(record: PlayerRecord, valuation: PlayerValuation | None, scoring: ScoringSettings | None) -> float | None:

@@ -126,11 +126,17 @@ def ceiling_value(valuation: PlayerValuation, ranking: RankingSettings) -> float
     return valuation.weekly_best_avg
 
 
+# A player with no games last season (rookie, season-long injury) tells us nothing about how often he plays,
+# so he gets the typical availability of players who did play (median of 8+ FP/G players, 2025-26) instead of 0.
+NO_GAMES_AVAILABILITY = 0.88
+
+
 def availability_factor(valuation: PlayerValuation, ranking: RankingSettings) -> float:
     w = max(0.0, min(1.0, ranking.availability_weight))
     if w == 0 or valuation.season_weeks == 0:
         return 1.0
-    return 1.0 - w * (1.0 - valuation.availability)
+    availability = NO_GAMES_AVAILABILITY if valuation.games_played == 0 else valuation.availability
+    return 1.0 - w * (1.0 - availability)
 
 
 def blended_value(valuation: PlayerValuation, ranking: RankingSettings) -> float:
