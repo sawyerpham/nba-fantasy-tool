@@ -59,13 +59,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
+        <span className="profile-tags">{ov.eligibility.join("/") || "no position"} · age {bio.age ?? "?"}</span>
         {rec_.sleeper_status && rec_.sleeper_status !== "ACT" && <span className="badge">{rec_.sleeper_status}</span>}
         {rec_.unsigned_per_sleeper && <span className="badge warn">unsigned per Sleeper</span>}
         {rec_.team_conflict && <span className="badge info">NBA.com {rec_.team_conflict.nba_api} / Sleeper {rec_.team_conflict.sleeper}</span>}
         {!rec_.has_stats && <span className="badge warn">no stats</span>}
       </h3>
       <div className="small muted">
-        {bio.position_raw ? `${bio.position_raw} · ` : ""}age {bio.age ?? "?"} · {bio.height_in ? `${Math.floor(bio.height_in / 12)}'${bio.height_in % 12}"` : "?"} · {bio.weight_lbs ?? "?"} lb
+        {bio.height_in ? `${Math.floor(bio.height_in / 12)}'${bio.height_in % 12}"` : "?"} · {bio.weight_lbs ?? "?"} lb
         {bio.years_exp != null ? ` · ${bio.years_exp} yrs exp` : ""}{bio.draft_year ? ` · drafted ${bio.draft_year} R${bio.draft_round} #${bio.draft_number}` : ""}
       </div>
       {error && <div className="error">{error}</div>}
@@ -98,7 +99,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
               </div>
             )}
             <div className="bid-cell">
-              <div className="bid-label">Fair value (league)</div>
+              <div className="bid-label">Fair value</div>
               <div className="bid-num">${Math.round(rec.fair_value)}</div>
             </div>
             <div className="bid-cell">
@@ -121,8 +122,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       )}
 
       <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
-        <span className="muted">Positions (Sleeper):</span> <strong>{ov.eligibility.join(" / ") || "none listed"}</strong>
-        {" · "}<span className="muted">Injury:</span>{" "}
+        <span className="muted">Status:</span>{" "}
         <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
         {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
       </div>
