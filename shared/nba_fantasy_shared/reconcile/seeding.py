@@ -32,6 +32,11 @@ def map_injury(raw: str | None, injury_map: Mapping[str, InjuryStatus]) -> Injur
 
 
 SHORT_TERM_TAGS = ("DTD", "GTD", "Questionable", "Doubtful")
+POSITION_ORDER = ("PG", "SG", "SF", "PF", "C")   # how positions read everywhere (Sleeper's lists come in any order)
+
+
+def ordered_positions(positions) -> list:
+    return sorted(positions, key=lambda p: POSITION_ORDER.index(p) if p in POSITION_ORDER else len(POSITION_ORDER))
 
 
 def seed_overrides(
@@ -57,7 +62,7 @@ def seed_overrides(
 
         fantasy = record.fantasy
         if fantasy is not None:
-            current.eligibility = list(fantasy.fantasy_positions)
+            current.eligibility = ordered_positions(fantasy.fantasy_positions)
             current.eligibility_source = "sleeper" if fantasy.fantasy_positions else "none"
             raw = fantasy.injury_status_raw
             minor = (raw in SHORT_TERM_TAGS and ignore_short_term) or (fantasy.injury_body_part or "").lower() == "rest"
