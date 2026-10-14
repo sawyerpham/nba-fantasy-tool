@@ -37,7 +37,8 @@ export default function DraftPage({ leagueId }) {
   const [sync, setSync] = useState(() => { try { return localStorage.getItem(`da.sync.${leagueId}`) === "1"; } catch { return false; } });
   const [syncInfo, setSyncInfo] = useState(null);
   const syncBusy = useRef(false);
-  const SYNC_MS = 3000;
+  const SYNC_MS = 1000;   // Sleeper's public API allows ~1000 requests/min
+  const [liveLot, setLiveLot] = useState(null);   // the lot in progress in Sleeper (player, high bid, leader, clock)
 
   const loadView = useCallback(() => api.get(`/leagues/${leagueId}/draft`).then(setView), [leagueId]);
   const loadRankings = useCallback(
@@ -72,7 +73,10 @@ export default function DraftPage({ leagueId }) {
       syncBusy.current = true;
       try {
         const r = await api.post(`/leagues/${leagueId}/draft/sync`);
-        setSyncInfo((old) => ({ ...r, total: r.added.length, lag: r.added.length && r.seconds_since_last_sleeper_pick < 600 ? r.seconds_since_last_sleeper_pick : old?.lag }));
+        setSyncInfo((old) => ({ ...r, total: (old?.total || 0) + r.added.length, lag: r.added.length && r.seconds_since_last_sleeper_pick < 600 ? r.seconds_since_last_sleeper_pick : old?.lag }));
+        setLiveLot(r.live);
+        // Follow Sleeper's nomination: open the record bar on him unless you opened another player yourself.
+        if (r.live) setPick((p) => (!p || p.fromSleeper) && p?.player_id !== r.live.player_id ? { ...r.live, fromSleeper: true } : p);
         if (r.added.length) {
           setView(r.view);
           setPick((p) => (p && r.view.picks.some((x) => x.player_id === p.player_id) ? null : p));
@@ -274,7 +278,8 @@ export default function DraftPage({ leagueId }) {
             <div className="block-bar">
               {recordTarget ? (
                 <PickBar key={recordTarget.player_id} leagueId={leagueId} view={view} player={recordTarget} onPicked={onPicked}
-                  nominatedBy={!pick && nominated ? nameOf(nominated.nominated_by) : null}
+                  nominatedBy={pick?.fromSleeper ? pick.nominated_by : !pick && nominated ? nameOf(nominated.nominated_by) : null}
+                  live={liveLot && liveLot.player_id === recordTarget.player_id ? liveLot : null}
                   tier={rankings.find((r) => r.player_id === recordTarget.player_id)} search={markDrafted}
                   onCancel={() => { if (pick) setPick(null); else setDismissed(nominated?.player_id); }} />
               ) : (
