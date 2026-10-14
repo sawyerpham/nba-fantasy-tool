@@ -1,10 +1,12 @@
 from .aggregate import (  # noqa: F401
     STAT_KEYS,
     availability_factor,
+    blend_availability,
     blended_value,
     ceiling_value,
     confidence_factor,
     season_span,
+    season_week_shares,
     valuate,
     valuate_all,
 )

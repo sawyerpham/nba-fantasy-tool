@@ -28,6 +28,15 @@ def standings_rel(stats_season: str) -> str:
     return f"cache/nba_standings_{stats_season}.json"
 
 
+AVAILABILITY_HISTORY_REL = "cache/availability_history.json"
+
+
+def prior_seasons(stats_season: str, n: int = 2) -> list[str]:
+    """The n seasons before stats_season, most recent first: "2025-26" -> ["2024-25", "2023-24"]."""
+    start = int(stats_season[:4])
+    return [f"{y}-{str(y + 1)[-2:]}" for y in range(start - 1, start - 1 - n, -1)]
+
+
 def schedule_rel(roster_season: str) -> str:
     return f"cache/nba_schedule_{roster_season}.json"
 

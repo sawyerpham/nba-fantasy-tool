@@ -175,7 +175,8 @@ class PlayerValuation(BaseModel):
     total_fpts: float = 0.0             # season total
     weeks_played: int = 0               # fantasy weeks (Mon-Sun) with at least one game
     season_weeks: int = 0               # fantasy weeks in the league season
-    availability: float = 0.0           # weeks_played / season_weeks
+    availability: float = 0.0           # weeks_played / season_weeks (the app blends in earlier seasons, see below)
+    availability_seasons: dict[str, float] = Field(default_factory=dict)   # season -> share of weeks played
     stat_averages: dict[str, float] = Field(default_factory=dict)   # pts, reb, ast, ... per game
     bonus_fpts_per_game: float = 0.0    # FP from bonus rules, per game
     bonus_counts: dict[str, int]

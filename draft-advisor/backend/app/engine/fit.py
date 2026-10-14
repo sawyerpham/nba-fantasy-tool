@@ -111,7 +111,7 @@ def team_fit(session, manager_id: str, player_id: int) -> TeamFit:
     if p.injury_status != "healthy":
         notes.append(f"{INJURY_LABEL.get(p.injury_status, p.injury_status)}{f': {p.injury_note}' if p.injury_note else ''}.")
     if p.games_played and p.availability < 0.75:
-        notes.append(f"Missed time: played in {round(p.availability * 100)}% of fantasy weeks last season ({p.games_played} games).")
+        notes.append(f"Missed time: played in {round(p.availability * 100)}% of fantasy weeks over the last 3 seasons ({p.games_played} games last season).")
     if p.age and p.age >= 33:
         notes.append(f"Age {int(p.age)}: more rest days and decline risk.")
 

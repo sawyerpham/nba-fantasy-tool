@@ -192,7 +192,12 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <div>
             <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
           </div>
-          <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game (<Term k="avail">{Math.round(val.availability * 100)}% avail</Term>) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
+          <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({val.season_weeks ? Math.round(100 * val.weeks_played / val.season_weeks) : 0}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
+          {Object.keys(val.availability_seasons || {}).length > 0 && (
+            <div data-testid="avail-seasons"><Term k="avail" />: <strong>{Math.round(val.availability * 100)}%</strong>
+              <span className="muted"> = {Object.entries(val.availability_seasons).map(([s, x]) => `${Math.round(x * 100)}% (${s})`).join(" · ")}</span>
+            </div>
+          )}
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}
 
