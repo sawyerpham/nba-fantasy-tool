@@ -107,3 +107,23 @@ def test_preseason_short_term_tags_and_rest_seed_as_healthy_but_out_still_counts
     in_season = seed_overrides([record(1, fa("DTD", "Ankle"))], {}, now=NOW)[1]
     assert in_season.injury_status == "day_to_day"
     assert seed_overrides([record(1, fa("DTD", "Rest"))], {}, now=NOW)[1].injury_status == "healthy"
+
+
+def test_json_store_retries_a_briefly_locked_target(tmp_path, monkeypatch):
+    import os
+
+    from nba_fantasy_shared.storage import json_store
+
+    real, calls = os.replace, []
+
+    def flaky(src, dst):
+        calls.append(1)
+        if len(calls) < 3:
+            raise PermissionError("Access is denied")
+        real(src, dst)
+
+    monkeypatch.setattr(json_store.os, "replace", flaky)
+    monkeypatch.setattr(json_store.time, "sleep", lambda s: None)
+    store = json_store.JsonStore(tmp_path)
+    store.write_json("x.json", {"a": 1})
+    assert store.read_json("x.json") == {"a": 1} and len(calls) == 3

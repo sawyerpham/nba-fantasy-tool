@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, TypeVar
@@ -47,7 +48,7 @@ class JsonStore:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, ensure_ascii=False, indent=indent)
-            os.replace(tmp_name, target)
+            _replace(tmp_name, target)
         except BaseException:
             try:
                 os.unlink(tmp_name)
@@ -72,3 +73,16 @@ class JsonStore:
 
     def write_models(self, rel: str, models: list[BaseModel], indent: int | None = None) -> Path:
         return self.write_json(rel, [m.model_dump(mode="json") for m in models], indent=indent)
+
+
+def _replace(src: str, dst: Path, attempts: int = 10, wait_s: float = 0.05) -> None:
+    """os.replace, retried briefly: on Windows it fails with 'Access is denied' while another process (an antivirus
+    scan, a second server reading the same data folder) has the target open for a moment."""
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(wait_s * (i + 1))
