@@ -451,3 +451,5 @@ th.sorted { color: var(--primary); }
 .guide-now.go { border-left-color: var(--ok); } .guide-now.maybe { border-left-color: var(--even-t); } .guide-now.stop { border-left-color: var(--danger); }
 .guide-now-call { font-size: 15px; margin-top: 4px; }
 .ideal-team td { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-tags { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.profile-ranks { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
