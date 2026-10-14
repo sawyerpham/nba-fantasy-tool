@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import Headshot from "./Headshot.jsx";
 
 // Page 2 of the draft: one card per manager with money, roster by spot, needs, habits, and "bait":
 // available players they need and are likely to overpay for, i.e. who to nominate to make them spend.
@@ -51,12 +52,17 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                   <div key={`${s.slot}-${i}`} className={`room-slot ${p ? "filled" : ""} ${s.slot === "BN" ? "bench" : ""}`}>
                     <span className="room-slot-pos">{s.slot}</span>
                     {p ? (
-                      <span className={`room-slot-player ${onEditPick ? "editable" : ""}`} draggable={Boolean(onEditPick)}
+                      <span className="room-slot-player" draggable={Boolean(onEditPick)}
                         onDragStart={(e) => { setDragging(p); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
                         onDragEnd={() => { setDragging(null); setOver(null); }}
-                        onClick={() => onEditPick?.(p)} title={`${p.player_name} ${p.team_abbr || ""} $${p.price}${p.is_keeper ? " (keeper)" : ""}${onEditPick ? " · click to edit, drag to move" : ""}`}
-                        data-testid={`pick-chip-${p.pick_number}`}>
-                        <span className="room-slot-name">{p.player_name}</span><strong>${p.price}</strong>
+                        onClick={() => onSelectPlayer?.(p.player_id)}
+                        title={`${p.player_name} ${p.team_abbr || ""} · ${p.fpg ?? "?"} FP/G · $${p.price}${p.is_keeper ? " (keeper)" : ""} · click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
+                        <Headshot sleeperId={p.sleeper_id} name={p.player_name} size={18} />
+                        <span className="room-slot-name">{p.player_name}</span>
+                        <span className="room-slot-fpg">{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
+                        <strong>${p.price}</strong>
+                        {onEditPick && <button type="button" className="pick-edit" title="edit or remove this pick"
+                          onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`}>✎</button>}
                       </span>
                     ) : <span className="muted">—</span>}
                   </div>
@@ -66,10 +72,13 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
             <div className="small muted room-bench">
               BN {(bySlot.BN || []).length}/{benchSize}{(bySlot.BN || []).length > 0 && ": "}
               {(bySlot.BN || []).map((p, i) => (
-                <span key={p.pick_number} className={onEditPick ? "room-slot-player editable" : ""} style={{ display: "inline" }}
-                  draggable={Boolean(onEditPick)} onDragStart={(e) => { setDragging(p); e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
-                  onDragEnd={() => { setDragging(null); setOver(null); }} onClick={() => onEditPick?.(p)} data-testid={`pick-chip-${p.pick_number}`}>
+                <span key={p.pick_number} className="bench-pick" draggable={Boolean(onEditPick)}
+                  onDragStart={(e) => { setDragging(p); e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
+                  onDragEnd={() => { setDragging(null); setOver(null); }} onClick={() => onSelectPlayer?.(p.player_id)}
+                  title={`${p.player_name} · ${p.fpg ?? "?"} FP/G · $${p.price} · click for his profile`}>
                   {i > 0 && ", "}<span style={{ color: "var(--text)" }}>{p.player_name.split(" ").slice(-1)[0]}</span> ${p.price}
+                  {onEditPick && <button type="button" className="pick-edit" title="edit or remove this pick"
+                    onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`}>✎</button>}
                 </span>
               ))}
             </div>

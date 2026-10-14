@@ -4,7 +4,7 @@ import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
 
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, row }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, row, onSelectPlayer }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -141,6 +141,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <div className="teammates">
             {data.team.teammates.map((m, i) => (
               <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
+                onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
                 title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
                 <span className="teammate-rank">{i + 1}</span>
                 <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />

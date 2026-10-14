@@ -340,12 +340,13 @@ th.sorted { color: var(--primary); }
 .room-money { display: flex; align-items: baseline; gap: 12px; font-size: 13.5px; }
 .room-money .big { font-size: 22px; font-weight: 700; }
 .room-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
-.room-slot { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 4px; padding: 1px 4px; border-radius: 6px; font-size: 13px; min-width: 0; }
+.room-slot { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 4px; padding: 1px 4px; min-height: 26px; border-radius: 6px; font-size: 13px; min-width: 0; }
 .room-slot.filled { background: var(--panel-2); }
 .room-slot-pos { font-size: 11px; font-weight: 700; color: var(--info-t); }
 .room-slot.bench .room-slot-pos { color: var(--muted); }
-.room-slot-player { display: flex; gap: 4px; min-width: 0; }
-.room-slot-player.editable { cursor: pointer; } .room-slot-player.editable:hover { color: var(--primary); }
+.room-slot-player { display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; }
+.room-slot-player:hover .room-slot-name { color: var(--primary); }
+.room-slot-fpg { color: var(--muted); font-size: 12px; font-weight: 600; }
 .room-slot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .room-habits { line-height: 1.35; }
 .room-bait { margin-top: 2px; padding: 6px 8px; border-radius: 10px; background: var(--panel-2); }
@@ -374,3 +375,16 @@ th.sorted { color: var(--primary); }
 .teammate-rank { font-size: 11px; color: var(--muted); text-align: right; }
 .teammate-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .teammate-fpg { font-weight: 600; color: var(--muted); }
+.pick-edit { border: 0; background: transparent; padding: 0 2px; font-size: 13px; color: var(--muted); opacity: 0; cursor: pointer; }
+.room-slot-player:hover .pick-edit, .bench-pick:hover .pick-edit, .pick-edit:focus-visible { opacity: 1; }
+.pick-edit:hover { color: var(--primary); }
+.bench-pick { cursor: pointer; } .bench-pick:hover > span { color: var(--primary) !important; }
+.teammate:not(.self) { cursor: pointer; } .teammate:not(.self):hover .teammate-name { color: var(--primary); }
+.room-slot { min-height: 21px; padding: 0 4px; font-size: 12.5px; }
+.room-slots { gap: 1px; }
+.room-card { gap: 4px; }
+.room-habits, .room-bench { font-size: 12.5px; }
+.room { padding-top: 6px; }
+.room-title { margin-bottom: 8px; }
+.room-card { padding: 8px 10px; }
+.room-grid { gap: 10px; }
