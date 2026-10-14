@@ -327,13 +327,22 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
     by_sleeper = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
     by_user = {m.sleeper_user_id: m for m in session.managers if m.sleeper_user_id}
     by_roster = {m.sleeper_roster_id: m for m in session.managers if m.sleeper_roster_id is not None}
+    # Mock drafts send picks with no picked_by / roster_id, only the seat (draft_slot): seat -> user via
+    # draft_order (that is how you are found), else seat -> roster via slot_to_roster_id.
+    seat_user = {int(slot): uid for uid, slot in (draft.get("draft_order") or {}).items()}
+    seat_roster = {int(slot): rid for slot, rid in (draft.get("slot_to_roster_id") or {}).items()}
+
+    def manager_for(p: dict):
+        seat = p.get("draft_slot")
+        return (by_user.get(p.get("picked_by")) or by_roster.get(p.get("roster_id"))
+                or by_user.get(seat_user.get(seat)) or by_roster.get(seat_roster.get(seat)))
     min_bid = session.league.min_bid
     added, errors = [], []
     if session.draft.status == "live":
         drafted = session.engine.drafted_ids()
         for p in sorted(picks, key=lambda x: x.get("pick_no") or 0):
             rec = by_sleeper.get(str(p.get("player_id")))
-            manager = by_user.get(p.get("picked_by")) or by_roster.get(p.get("roster_id"))
+            manager = manager_for(p)
             meta = p.get("metadata") or {}
             name = rec.full_name if rec else (f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip() or f"Sleeper player {p.get('player_id')}")
             if rec is not None and rec.player_id in drafted:
