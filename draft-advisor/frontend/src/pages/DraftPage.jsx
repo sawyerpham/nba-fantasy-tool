@@ -311,7 +311,7 @@ export default function DraftPage({ leagueId }) {
         <section className="dg-side">
           <div className="dg-pane">
           <PlayerSidebar leagueId={leagueId} playerId={selected} live={live} refreshKey={refreshKey} onOverridesChanged={onOverridesChanged} userName={userName} onSelectPlayer={setSelected}
-            onBlock={nominated?.player_id === selected} row={rankings.find((r) => r.player_id === selected)} />
+            onBlock={nominated?.player_id === selected} rankings={rankings} />
           </div>
         </section>
       </div>

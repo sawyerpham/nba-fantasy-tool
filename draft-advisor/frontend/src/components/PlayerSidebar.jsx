@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, qs } from "../api.js";
 import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
 
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, row, onSelectPlayer }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -12,28 +12,32 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
 
+  // All four requests are fetched together and applied in one update, so the card never rebuilds piece by piece;
+  // the previous player stays on screen until the new one is ready, and late answers for an older click are dropped.
+  const latest = useRef(0);
   const load = useCallback(() => {
     if (!playerId) return;
-    api.get(`/players/${playerId}` + qs({ league_id: leagueId })).then((d) => {
-      setData(d);
-      setNotes(d.overrides?.notes || "");
-    }).catch((e) => setError(e.message));
-    api.get(`/leagues/${leagueId}/fit/${playerId}`).then(setFit).catch(() => setFit(null));   // drafted players get no fit read
-    if (live) {
-      api.get(`/leagues/${leagueId}/recommend/${playerId}`).then(setRec).catch(() => setRec(null));
-      api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => setSpend(g.focus)).catch(() => setSpend(null));
-    } else {
-      setRec(null);
-      setSpend(null);
-    }
+    const ticket = ++latest.current;
+    const opt = (p) => p.catch(() => null);   // drafted players have no fit / bid guide
+    Promise.all([
+      api.get(`/players/${playerId}` + qs({ league_id: leagueId })),
+      opt(api.get(`/leagues/${leagueId}/fit/${playerId}`)),
+      live ? opt(api.get(`/leagues/${leagueId}/recommend/${playerId}`)) : null,
+      live ? opt(api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => g.focus)) : null,
+    ]).then(([d, f, r, sp]) => {
+      if (ticket !== latest.current) return;
+      setData(d); setNotes(d.overrides?.notes || ""); setFit(f); setRec(r); setSpend(sp); setError("");
+    }).catch((e) => { if (ticket === latest.current) setError(e.message); });
   }, [leagueId, playerId, live]);
 
-  useEffect(() => { setError(""); load(); }, [load, refreshKey]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   if (!playerId) return <div className="panel muted">Select a player to see details, edit eligibility / injury, and get a bid recommendation.</div>;
   if (!data) return <div className="panel">{error || "Loading…"}</div>;
 
   const rec_ = data.record;
+  const shownId = rec_.player_id;   // the player on screen (the previous one until a new click finishes loading)
+  const row = rankings?.find((r) => r.player_id === shownId);
   const bio = rec_.bio;
   const ov = data.overrides || { eligibility: [], eligibility_source: "none", injury_status: "healthy", injury_source: "none" };
   const val = data.valuation;
@@ -42,7 +46,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const patch = async (body) => {
     setError("");
     try {
-      await api.patch(`/players/${playerId}/overrides`, body);
+      await api.patch(`/players/${shownId}/overrides`, body);
       onOverridesChanged?.();
       load();
     } catch (e) {
@@ -66,7 +70,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       </div>
       {error && <div className="error">{error}</div>}
 
-      {fit && fit.player_id === playerId && (
+      {fit && fit.player_id === shownId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
           <div className="fit-head"><span className="bid-label">Fit for your team (same as the Fit column)</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
           <ul className="small guide-lines">{fit.score_lines.map((r, i) => <li key={i}>{r}</li>)}</ul>
