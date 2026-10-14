@@ -304,6 +304,7 @@ export default function DraftPage({ leagueId }) {
               live={live}
               sort={sort}
               onSort={onSort}
+              posFilter={posFilter}
             />
           </div>
         </section>
