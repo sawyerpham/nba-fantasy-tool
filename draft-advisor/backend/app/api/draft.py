@@ -176,7 +176,7 @@ def rankings(
 
 
 def _sleeper_pos_ranks(session) -> dict[int, str]:
-    """Sleeper's positional rank ("SG2"): order by Sleeper's standard ADP within each player's main Sleeper
+    """Sleeper's positional rank ("#2 SG"): order by Sleeper's standard ADP within each player's main Sleeper
     position, over the whole pool (drafted players keep their pre-draft rank, as in Sleeper)."""
     by_pos: dict[str, list[tuple[float, int]]] = {}
     for pid, rec in session.players.items():
@@ -184,7 +184,7 @@ def _sleeper_pos_ranks(session) -> dict[int, str]:
         pos = rec.fantasy.position if rec.fantasy else None
         if adp and pos:
             by_pos.setdefault(pos, []).append((adp, pid))
-    return {pid: f"{pos}{i}" for pos, lst in by_pos.items() for i, (_, pid) in enumerate(sorted(lst), 1)}
+    return {pid: f"#{i} {pos}" for pos, lst in by_pos.items() for i, (_, pid) in enumerate(sorted(lst), 1)}
 
 
 def _prices(session, rows, manager_id: str | None) -> dict[int, int]:
