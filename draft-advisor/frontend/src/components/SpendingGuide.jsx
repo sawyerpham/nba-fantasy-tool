@@ -120,9 +120,8 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
                 </tbody>
               </table>
             )}
-          <details className="small" style={{ marginTop: 6 }}>
-            <summary>everyone's money</summary>
-            <table className="small" style={{ marginTop: 4 }}>
+          <div className="bid-label" style={{ marginTop: 10 }}>Everyone's money</div>
+            <table className="small" data-testid="everyones-money">
               <thead><tr><th>Manager</th><th>$ left</th><th>Slots</th><th>$/slot</th><th>Max bid</th></tr></thead>
               <tbody>
                 {g.managers.map((m) => (
@@ -132,7 +131,6 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
                 ))}
               </tbody>
             </table>
-          </details>
         </>
       )}
     </div>

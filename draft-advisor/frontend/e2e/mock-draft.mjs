@@ -164,10 +164,10 @@ try {
   await page.getByTestId("pos-C").click();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid^="rank-row-"]')].every((tr) => tr.children[3].textContent.includes("C")));
   await page.getByTestId("pos-C").click();
-  await page.locator('[data-testid="rankings-table"] th', { hasText: "Rost%" }).click();
+  await page.locator('[data-testid="rankings-table"] th', { hasText: "Proj FP/G" }).click();
   await page.waitForFunction(() => {
     const rows = [...document.querySelectorAll('[data-testid^="rank-row-"]')];
-    return rows.length > 2 && (parseFloat(rows[0].children[5].textContent) || 0) >= (parseFloat(rows[1].children[5].textContent) || 0);
+    return rows.length > 2 && (parseFloat(rows[0].children[4].textContent) || 0) >= (parseFloat(rows[1].children[4].textContent) || 0);
   });
   assert((await page.locator('[data-testid="value-legend"]').count()) === 0, "formula legend removed from the draft page");
   await page.locator('[data-testid^="rank-row-"]').first().click();

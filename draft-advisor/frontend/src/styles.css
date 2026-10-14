@@ -453,3 +453,22 @@ th.sorted { color: var(--primary); }
 .ideal-team td { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-tags { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .profile-ranks { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+
+/* no horizontal scroll on laptop-size screens: drop Tm (moves into the sub-line), Rost% and Min; let text wrap */
+.sub-team { display: none; }
+@media (max-width: 1700px) {
+  [data-testid="rankings-table"] .col-narrow-hide { display: none; }
+  .sub-team { display: inline; }
+  [data-testid="rankings-table"] .player-sub { white-space: normal; }
+  [data-testid="rankings-table"] th { white-space: normal; }
+}
+.room-money { flex-wrap: wrap; row-gap: 0; white-space: normal; }
+.room-money > span { white-space: nowrap; }
+.ideal-team { table-layout: fixed; width: 100%; }
+.ideal-team th:first-child, .ideal-team td:first-child { width: 44px; }
+.ideal-team td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1500px) {
+  [data-testid="rankings-table"] th, [data-testid="rankings-table"] td { padding: 7px 4px; }
+  [data-testid="spending-guide"] table.small th, [data-testid="spending-guide"] table.small td { padding: 5px 3px; font-size: 12.5px; white-space: normal; }
+  [data-testid="spending-guide"] .verdict { padding: 2px 6px; font-size: 11.5px; }
+}
