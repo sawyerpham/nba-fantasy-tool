@@ -196,3 +196,21 @@ def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixtur
     assert len(board) == 12 and board[0]["is_user"] and board[0]["outbids_me"] is None
     jokic = board[1]["picks"][0]
     assert jokic["player_id"] == JOKIC and jokic["fpg"] > 0 and jokic["pos"] == ["C"]
+
+
+def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(fixture_world):
+    from app.engine.market import market_board
+
+    s = make_session(fixture_world)
+    s.start([])
+    s.engine.pick(JOKIC, "m2", 80)
+    s.invalidate()
+    b = market_board(s, "m1")
+    c = next(p for p in b["positions"] if p["pos"] == "C")
+    assert [p["pos"] for p in b["positions"]] == ["PG", "SG", "SF", "PF", "C"]
+    per_team = next(x.count for x in s.league.roster_slots if x.slot == "C")
+    assert c["need"] == 12 * per_team - 1 and c["my_open"] == per_team and c["status"] in {"scarce", "tight", "plenty"}
+    assert c["cliff"]["left"] >= 1 and all(ch["name"] != s.managers[0].name for ch in c["chasers"])
+    sale = b["sales"][0]
+    assert sale["player_id"] == JOKIC and sale["price"] == 80 and sale["diff"] == 80 - sale["fair"] and sale["fair"] > 1
+    assert b["levels"][0] == 1.0 and len(b["levels"]) == 2

@@ -36,6 +36,12 @@ export const TERMS = {
   win_score: ["Win score", "Projected weekly Lock-In score of the finished lineup: each starter's expected best game of the week × availability, empty starting spots filled with what the team's money buys. Higher = more likely to win the league."],
   est_fpg: ["Est FP/G", "Projected FP/G of the players in starting spots now."],
   open_starters: ["Open starters", "Starting spots still empty."],
+  need: ["Need", "Open starting spots for this position across the whole room."],
+  supply: ["Left", "Starter-quality players left who can play it: available players among the top N by value, N = open starting spots in the room. A multi-position player is split across his positions (a PG/SG counts half for each)."],
+  pos_status: ["Market", "Scarce: fewer starter-quality players left than open spots, so prices will rise: buy early. Tight: under 1.3 per spot. Plenty: more than enough, wait for value."],
+  tier_cliff: ["Top tier", "The best tier left at this position, how many players are left in it, and how much lower in value (fantasy points) the next tier's best player is. Last one in a tier = buy now or drop a level."],
+  chasing: ["Chasing", "Rivals with an open spot here whose cap reaches the fair value of the best player left here. More chasers = bidding wars."],
+  room_trend: ["Room trend", "How the room is spending: the price level after each sale (dashed line = draft-start prices) and the last sales vs fair value at that moment."],
   overpaid: ["Overpaid / bargain", "Sold price vs fair value. Within $2 counts as a fair price."],
   keep_call: ["Keep call", "GOOD keep: this year's keeper price is under fair value by at least $2 and 10%. BAD keep: over it by that much. EVEN: in between."],
 };
