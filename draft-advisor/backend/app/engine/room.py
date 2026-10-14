@@ -30,6 +30,13 @@ def room_board(session, my_manager_id: str) -> list[dict]:
     rate = market_rate(lg, session.managers, session.draft.picks, (pool.get(p, 0.0) for p in available), pool)
     fair = lambda v: round(lg.min_bid + max(0.0, v - rate.replacement) * rate.dollars_per_var)
     mine = {r.player_id: r for r in session.rank(session.engine.picks_for(my_manager_id), available)}
+    from .ranking import expected_fpts
+
+    def with_photo(pick: dict) -> dict:
+        """A roster pick plus his Sleeper photo id and projected FP/G (for the room cards)."""
+        rec = session.players.get(pick["player_id"])
+        fpg = expected_fpts(rec, session.valuations.get(rec.player_id), lg.ranking, lg.scoring)[0] if rec else None
+        return {**pick, "sleeper_id": rec.sleeper_id if rec else None, "fpg": round(fpg, 1) if fpg is not None else None}
 
     out = []
     for s in session.manager_summaries():
@@ -66,7 +73,7 @@ def room_board(session, my_manager_id: str) -> list[dict]:
             bait = bait[:BAIT_PER_MANAGER]
         out.append({
             "manager_id": s.manager_id, "name": s.name, "is_user": s.is_user, "is_next_nominator": s.is_next_nominator,
-            "budget": s.budget.__dict__, "open_slots": s.open_slots, "picks": s.picks, "stack": s.stack,
+            "budget": s.budget.__dict__, "open_slots": s.open_slots, "picks": [with_photo(p) for p in s.picks], "stack": s.stack,
             "tendency": t or None, "outbids_me": None, "bait": bait,
         })
     my_max = next(m["budget"]["max_bid"] for m in out if m["manager_id"] == my_manager_id)
