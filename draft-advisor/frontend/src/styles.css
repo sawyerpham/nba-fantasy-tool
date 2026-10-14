@@ -450,3 +450,4 @@ th.sorted { color: var(--primary); }
 .guide-now { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; border-left: 5px solid var(--muted); background: var(--panel-2); }
 .guide-now.go { border-left-color: var(--ok); } .guide-now.maybe { border-left-color: var(--even-t); } .guide-now.stop { border-left-color: var(--danger); }
 .guide-now-call { font-size: 15px; margin-top: 4px; }
+.ideal-team td { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

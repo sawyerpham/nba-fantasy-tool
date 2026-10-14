@@ -103,11 +103,9 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
               </tbody>
             </table>
           )}
-          <details className="small" style={{ marginTop: 4 }}>
-            <summary>more: advice, slot plan, everyone's money</summary>
-            <ul className="small guide-lines">{g.advice.slice(1).map((line, i) => <li key={i}>{line}</li>)}</ul>
-            {g.plan.length > 0 && (
-              <table className="small">
+          {g.plan.length > 0 && <div className="bid-label" style={{ marginTop: 10 }}>Ideal team for your open spots</div>}
+          {g.plan.length > 0 && (
+              <table className="small ideal-team" data-testid="ideal-team">
                 <thead><tr><th>Slot</th><th>Best available</th><th>Within ${g.allowance}</th></tr></thead>
                 <tbody>
                   {g.plan.map((p, i) => (
@@ -122,6 +120,8 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
                 </tbody>
               </table>
             )}
+          <details className="small" style={{ marginTop: 6 }}>
+            <summary>everyone's money</summary>
             <table className="small" style={{ marginTop: 4 }}>
               <thead><tr><th>Manager</th><th>$ left</th><th>Slots</th><th>$/slot</th><th>Max bid</th></tr></thead>
               <tbody>
