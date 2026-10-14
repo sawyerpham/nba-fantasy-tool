@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { PosList, PosTag, posClass } from "./Pos.jsx";
 import { tierHue } from "./RankingsTable.jsx";
 import { api, qs } from "../api.js";
-import { VerdictBadge } from "./SpendingGuide.jsx";
+import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
 
 
@@ -34,7 +34,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (!playerId) return <div className="panel muted">Select a player to see details, edit eligibility / injury, and get a bid recommendation.</div>;
+  if (!playerId) return <div className="panel muted">Select a player to see his profile, his Fit for your team and your max.</div>;
   if (!data) return <div className="panel">{error || "Loading…"}</div>;
 
   const rec_ = data.record;
@@ -65,8 +65,8 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
           {(row?.pos_rank || row?.tier != null) && (
             <span className="profile-ranks">
-              {row.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} title="Sleeper positional rank (ADP within his main position)">{row.pos_rank}</span>}
-              {row.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} title={`tier ${row.tier}: ${row.tier_left} of ${row.tier_size} left`}>T{row.tier}</span>}
+              {row.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{row.pos_rank}</span>}
+              {row.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={`Tier ${row.tier}: ${row.tier_left} of ${row.tier_size} still available. ${TERMS.tier[1]}`}>T{row.tier}</span>}
             </span>
           )}
         </span>
@@ -83,7 +83,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       {fit && fit.player_id === shownId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
-          <div className="fit-head"><span className="bid-label">Fit for your team (same as the Fit column)</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
+          <div className="fit-head"><span className="bid-label"><Term k="fit" /> for your team</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
           <ul className="small guide-lines">{fit.score_lines.map((r, i) => <li key={i}>{r}</li>)}</ul>
           {fit.notes.length > 0 && (
             <>
@@ -97,30 +97,31 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       {rec && (
         <div data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
-          <div className={`bid-grid ${spend && spend.verdict !== "cannot" ? "four" : ""}`}>
+          <div className={`bid-grid ${rec.can_bid ? "four" : ""}`}>
             <div className="bid-cell primary">
-              <div className="bid-label">Pay up to</div>
-              <div className="bid-num" data-testid="rec-max">{rec.can_bid ? `$${spend && spend.verdict !== "cannot" ? spend.suggested : rec.recommended_max}` : "—"}</div>
+              <div className="bid-label"><Term k="your_max" /></div>
+              <div className="bid-num" data-testid="rec-max">{spend && spend.verdict !== "cannot" ? `$${spend.suggested}` : "—"}</div>
             </div>
-            {spend && spend.verdict !== "cannot" && (
+            {rec.can_bid && (
               <div className="bid-cell">
-                <div className="bid-label">Market max</div>
+                <div className="bid-label"><Term k="market" /></div>
                 <div className="bid-num">${rec.recommended_max}</div>
               </div>
             )}
             <div className="bid-cell">
-              <div className="bid-label">Fair value</div>
+              <div className="bid-label"><Term k="fair" /></div>
               <div className="bid-num">${Math.round(rec.fair_value)}</div>
             </div>
             <div className="bid-cell">
-              <div className="bid-label">Your cap</div>
+              <div className="bid-label"><Term k="cap">Your cap</Term></div>
               <div className="bid-num">${rec.my_max_bid}</div>
             </div>
           </div>
           {spend && rec.can_bid && (
-            <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict" title={spend.text}>
-              <VerdictBadge verdict={spend.verdict} />
-              {spend.verdict !== "cannot" && <span className="muted"> stretch ${spend.stretch} · walk-away ${spend.walk_away} · hover for why</span>}
+            <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict">
+              <CallBadge call={spend.verdict} />
+              {spend.verdict !== "cannot" && <span className="muted"> <Term k="comfort">comfort limit</Term> ${spend.stretch} · <Term k="walk">walk-away</Term> ${spend.walk_away}</span>}
+              <div className="muted" style={{ marginTop: 3 }}>{spend.text}</div>
             </div>
           )}
           {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
@@ -175,7 +176,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <h3>Fantasy points</h3>
       {row && (
         <div className="small" data-testid="fp-this-season">
-          This season: <strong>{row.avg_fpts.toFixed(1)} FP/G</strong>{" "}
+          This season: <strong>{row.avg_fpts.toFixed(1)} <Term k="fpg">FP/G</Term></strong>{" "}
           {row.proj_fpts != null ? "(Sleeper projection, used by the rankings)" : "(no Sleeper projection, so last season's number)"}
           {row.proj_fpts != null && row.last_fpts ? <span className={row.proj_fpts >= row.last_fpts ? "ok" : "warn-text"}> · {(row.proj_fpts - row.last_fpts) >= 0 ? "+" : ""}{(row.proj_fpts - row.last_fpts).toFixed(1)} vs last season</span> : null}
           {row.fpg_reason && row.fpg_reason.reason !== "steady" && (
@@ -192,7 +193,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <div>
             <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
           </div>
-          <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
+          <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game (<Term k="avail">{Math.round(val.availability * 100)}% avail</Term>) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}
 

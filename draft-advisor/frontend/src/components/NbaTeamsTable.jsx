@@ -30,7 +30,7 @@ export default function NbaTeamsTable({ leagueId, refreshKey, onSelectPlayer }) 
         <tr>
           <th className="num">#</th>
           {COLS.map(([key, label, title, cls]) => (
-            <th key={key} className={`${cls} sortable ${sort.key === key ? "sorted" : ""}`} title={title} onClick={() => onSort(key)}>
+            <th key={key} className={`${cls} sortable ${sort.key === key ? "sorted" : ""}`} data-tip={title} onClick={() => onSort(key)}>
               {label}<span className="sort-arrow">{sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>
             </th>
           ))}
@@ -38,11 +38,11 @@ export default function NbaTeamsTable({ leagueId, refreshKey, onSelectPlayer }) 
       </thead>
       <tbody>
         {rows.map((t, i) => (
-          <tr key={t.abbr} className="clickable" onClick={() => t.best_id && onSelectPlayer?.(t.best_id)} title="open his team card">
+          <tr key={t.abbr} className="clickable" onClick={() => t.best_id && onSelectPlayer?.(t.best_id)} data-tip="open his team card">
             <td className="num muted">{i + 1}</td>
             <td><span className="player-cell"><img src={t.logo} alt="" width={30} height={30} className="team-logo-sm" /> <strong>{t.name}</strong></span></td>
             <td>{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</td>
-            <td className="num" title={t.proj_source || "no win total: add it to data/win_totals.json"}><strong>{t.proj_wins ?? "—"}</strong></td>
+            <td className="num" data-tip={t.proj_source || "no win total: add it to data/win_totals.json"}><strong>{t.proj_wins ?? "—"}</strong></td>
             <td className="num">{t.talent_fpg.toFixed(1)}</td>
             <td className="num">{t.wins != null ? `${t.wins}-${t.losses}` : "—"}</td>
             <td className={`num ${t.diff > 0 ? "ok" : t.diff < 0 ? "warn-text" : ""}`}>{t.diff != null ? `${t.diff > 0 ? "+" : ""}${t.diff.toFixed(1)}` : "—"}</td>
