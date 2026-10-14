@@ -416,3 +416,12 @@ def test_player_detail_has_his_team_with_teammates_and_ranks(pulled):
     assert team["teammates"][:len(starters)] == starters
     order = ["PG", "SG", "SF", "PF", "C"]
     assert [order.index(m["depth"][:-1]) for m in starters] == sorted(order.index(m["depth"][:-1]) for m in starters)
+
+
+def test_nba_teams_and_room_strength(pulled):
+    client, *_ = pulled
+    league(client, "lg-nba", "NBA League")
+    teams = client.get("/api/leagues/lg-nba/nba-teams").json()
+    assert teams and teams == sorted(teams, key=lambda t: -t["strength"]) and all(t["talent_fpg"] > 0 for t in teams)
+    room = client.get("/api/leagues/lg-nba/room").json()
+    assert len(room) == 12 and all(m["win_score"] > 0 and m["per_slot"] > 0 for m in room)   # empty rosters still score

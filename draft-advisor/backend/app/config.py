@@ -24,6 +24,10 @@ def game_logs_rel(stats_season: str) -> str:
     return f"cache/game_logs_{stats_season}.json"
 
 
+def standings_rel(stats_season: str) -> str:
+    return f"cache/nba_standings_{stats_season}.json"
+
+
 def schedule_rel(roster_season: str) -> str:
     return f"cache/nba_schedule_{roster_season}.json"
 

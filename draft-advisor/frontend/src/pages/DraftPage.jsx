@@ -4,6 +4,8 @@ import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import RoomBoard from "../components/RoomBoard.jsx";
+import TeamsTable from "../components/TeamsTable.jsx";
+import NbaTeamsTable from "../components/NbaTeamsTable.jsx";
 import PickBar from "../components/PickBar.jsx";
 import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
@@ -27,7 +29,8 @@ export default function DraftPage({ leagueId }) {
   const [dismissed, setDismissed] = useState(null); // nominated player whose bar was closed
   const [editPick, setEditPick] = useState(null);
   const [startOpen, setStartOpen] = useState(false);
-  const [orderOpen, setOrderOpen] = useState(null);   // null = open in setup, closed once live
+  const [orderOpen, setOrderOpen] = useState(null);
+  const [view2, setView2] = useState("players");   // rankings: players | managers (fantasy teams) | nba (NBA teams)   // null = open in setup, closed once live
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -110,7 +113,13 @@ export default function DraftPage({ leagueId }) {
     const { key, dir } = sort;
     const sign = dir === "asc" ? 1 : -1;
     return rows.slice().sort((a, b) => {
-      const val = (r) => (key === "pos" ? (r.eligibility.length ? Math.min(...r.eligibility.map((p) => POSITIONS.indexOf(p))) : 99)
+      // Pos sorts by best in role: the positional rank number (#1s first), position order breaking ties.
+      const posRank = (r) => {
+        const label = posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank;
+        const n = label ? Number(label.slice(1).split(" ")[0]) : 9999;
+        return n * 10 + (label ? POSITIONS.indexOf(label.split(" ")[1]) : 9);
+      };
+      const val = (r) => (key === "pos" ? posRank(r)
         : key === "min" ? (r.proj_min ?? r.last_min) : key === "fit" ? r.fit?.score : r[key]);
       const x = val(a), y = val(b);
       if (x === y) return a.rank - b.rank;
@@ -286,6 +295,12 @@ export default function DraftPage({ leagueId }) {
 
           <div className="toolbar">
             <h3>Rankings</h3>
+            <span className="chips">
+              <button className={`small chip ${view2 === "players" ? "on" : ""}`} onClick={() => setView2("players")} data-testid="rank-view-players">Players</button>
+              <button className={`small chip ${view2 === "teams" ? "on" : ""}`} onClick={() => setView2("teams")} data-testid="rank-view-teams">Managers</button>
+              <button className={`small chip ${view2 === "nba" ? "on" : ""}`} onClick={() => setView2("nba")} data-testid="rank-view-nba">NBA Teams</button>
+            </span>
+            {view2 === "players" && <>
             <input type="text" placeholder="Search players…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
             <span className="chips">
               <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>All</button>
@@ -293,11 +308,14 @@ export default function DraftPage({ leagueId }) {
             </span>
             <span className="spacer" />
             <label className="inline small muted"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> show unrosterable</label>
-            <label className="inline small muted">top <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>
+            </>}
+            {view2 === "players" && <label className="inline small muted">top <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>}
             <button className="ghost" onClick={() => { loadRankings(); loadView(); }} title="Refresh">↻</button>
           </div>
           <div className="panel scroll" style={{ padding: "0 4px" }}>
-            <RankingsTable
+            {view2 === "nba" ? <NbaTeamsTable leagueId={leagueId} refreshKey={refreshKey} onSelectPlayer={setSelected} />
+              : view2 === "teams" ? <TeamsTable leagueId={leagueId} refreshKey={`${refreshKey}-${view.picks.length}`}
+              onOpenRoom={() => document.getElementById("room")?.scrollIntoView({ behavior: "smooth" })} /> : <RankingsTable
               rows={visible}
               selectedId={selected}
               onSelect={setSelected}
@@ -306,7 +324,7 @@ export default function DraftPage({ leagueId }) {
               sort={sort}
               onSort={onSort}
               posFilter={posFilter}
-            />
+            />}
           </div>
         </section>
         <section className="dg-side">

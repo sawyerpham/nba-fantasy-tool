@@ -101,14 +101,11 @@ def patch_overrides(player_id: int, body: OverridePatch, state: AppState = Depen
 ROTATION = 8   # players per team counted for the team's projected fantasy talent
 
 
-def _team_block(state: AppState, session, player_id: int) -> dict:
-    """His NBA team: logo, his rank on the team, the team's projected-fantasy-talent rank (sum of the top 8
-    players' projected FP/G, 1 = most), and the top teammates with photos. Not a win projection."""
+def team_rosters(session) -> tuple[dict[str, list[tuple[float, int]]], dict[str, float]]:
+    """({team: [(projected FP/G, player id), ...]}, {team: sum of the top 8 projected FP/G})."""
     from ..engine.ranking import expected_fpts
 
     lg = session.league
-    drafted = {p.player_id: p.manager_id for p in session.draft.picks}
-    names = {m.manager_id: m.name for m in session.managers}
     by_team: dict[str, list[tuple[float, int]]] = {}
     for pid, rec in session.players.items():
         if not rec.team_abbr or not (rec.projection or session.valuations.get(pid)):
@@ -116,6 +113,15 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         fpg = expected_fpts(rec, session.valuations.get(pid), lg.ranking, lg.scoring)[0]
         by_team.setdefault(rec.team_abbr, []).append((fpg, pid))
     talent = {t: sum(f for f, _ in sorted(lst, reverse=True)[:ROTATION]) for t, lst in by_team.items()}
+    return by_team, talent
+
+
+def _team_block(state: AppState, session, player_id: int) -> dict:
+    """His NBA team: logo, his rank on the team, the team's projected-fantasy-talent rank (sum of the top 8
+    players' projected FP/G, 1 = most), and the top teammates with photos. Not a win projection."""
+    drafted = {p.player_id: p.manager_id for p in session.draft.picks}
+    names = {m.manager_id: m.name for m in session.managers}
+    by_team, talent = team_rosters(session)
     order = sorted(talent, key=lambda t: -talent[t])
     abbr = session.players[player_id].team_abbr
     roster = sorted(by_team.get(abbr, []), reverse=True)

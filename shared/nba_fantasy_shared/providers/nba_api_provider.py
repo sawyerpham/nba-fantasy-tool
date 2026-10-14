@@ -339,6 +339,16 @@ class NbaApiProvider:
 
     # ---- bulk ---------------------------------------------------------------------------
 
+    def fetch_standings(self, season: str) -> dict[str, dict]:
+        """Final regular-season record per team tricode: wins, losses, conference, point differential per game."""
+        from nba_api.stats.endpoints import leaguestandingsv3
+
+        rows = self._normalized(f"LeagueStandingsV3({season})",
+                                lambda: leaguestandingsv3.LeagueStandingsV3(season=season, timeout=self._timeout())).get("Standings") or []
+        abbr = {t.team_id: t.abbreviation for t in self.list_teams()}
+        return {abbr[r["TeamID"]]: {"wins": r["WINS"], "losses": r["LOSSES"], "conference": r["Conference"],
+                                    "diff": r["DiffPointsPG"]} for r in rows if r.get("TeamID") in abbr}
+
     def fetch_schedule(self, roster_season: str) -> dict[str, dict[str, int]]:
         """Games per team per NBA week for the season (see games_per_week)."""
         from nba_api.stats.endpoints import scheduleleaguev2

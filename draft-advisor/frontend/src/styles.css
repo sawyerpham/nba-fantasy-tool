@@ -300,7 +300,7 @@ th.sorted { color: var(--primary); }
 .draft-top .draft-head { flex-wrap: nowrap; }
 .draft-top .draft-head > * { flex-shrink: 0; }
 .draft-top .draft-head .upcoming { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dg-rank .toolbar { flex-wrap: nowrap; }
+.dg-rank .toolbar { flex-wrap: wrap; row-gap: 6px; }
 .dg-rank .toolbar label { white-space: nowrap; }
 @media (max-width: 1500px) { .draft-top .draft-head .progress { display: none; } }
 
@@ -407,3 +407,5 @@ th.sorted { color: var(--primary); }
 .pos-c { font-weight: 600; }
 .pos-PG { color: var(--pos-PG) !important; } .pos-SG { color: var(--pos-SG) !important; } .pos-SF { color: var(--pos-SF) !important; }
 .pos-PF { color: var(--pos-PF) !important; } .pos-C { color: var(--pos-C) !important; }
+.room-money { white-space: nowrap; gap: 10px; }
+.team-logo-sm { width: 30px; height: 30px; object-fit: contain; }
