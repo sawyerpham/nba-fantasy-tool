@@ -180,6 +180,7 @@ class PullService:
             assert self.roster_season and self.stats_season
             nba_bios = self._pull_nba_pool()
             self._pull_schedule()
+            self._pull_standings()
             sleeper_all, fantasy = self._pull_sleeper(sources, force_sleeper)
             self._pull_projections(sources)
             self._pull_sleeper_leagues(sources)
@@ -224,6 +225,20 @@ class PullService:
             indent=None,
         )
         return bios
+
+    def _pull_standings(self) -> None:
+        """Last season's records, for the NBA Teams view (an upgrade, never a requirement)."""
+        if not hasattr(self.stats, "fetch_standings"):
+            return
+        self._phase("nba_standings")
+        try:
+            standings = self.stats.fetch_standings(self.stats_season)
+        except (CallFailed, ValueError, KeyError) as exc:
+            log.warning("NBA standings unavailable (%s); keeping the previous cache", exc)
+            return
+        if standings:
+            self.store.write_json(config.standings_rel(self.stats_season),
+                                  {"pulled_at": utcnow().isoformat(), "teams": standings}, indent=None)
 
     def _pull_schedule(self) -> None:
         if not hasattr(self.stats, "fetch_schedule"):

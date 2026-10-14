@@ -275,3 +275,34 @@ def room(league_id: str, manager_id: str | None = Query(None), state: AppState =
         return room_board(session, manager_id or session.user_manager_id())
     except DraftError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.get("/nba-teams")
+def nba_teams(league_id: str, state: AppState = Depends(get_state)) -> list[dict]:
+    """The 30 NBA teams: projected fantasy talent (top 8 projected FP/G), last season's record and point
+    differential, and a rough strength estimate = average of the two as z-scores. Not a betting-market forecast."""
+    from statistics import mean, pstdev
+
+    from .. import config
+    from .players import team_rosters
+
+    session = _session(state, league_id)
+    by_team, talent = team_rosters(session)
+    rel = config.standings_rel(session.league.stats_season)
+    standings = state.store.read_json(rel)["teams"] if state.store.exists(rel) else {}
+    refs = {t.abbreviation: t.full_name for t in state.stats.list_teams()} if hasattr(state.stats, "list_teams") else {}
+    z = lambda xs: (lambda m, sd: {k: (v - m) / sd if sd else 0.0 for k, v in xs.items()})(mean(xs.values()), pstdev(xs.values())) if xs else {}
+    zt, zd = z(talent), z({t: s["diff"] for t, s in standings.items() if t in talent})
+    out = []
+    for abbr, fp in talent.items():
+        roster = sorted(by_team[abbr], reverse=True)
+        best = session.players[roster[0][1]] if roster else None
+        st = standings.get(abbr)
+        out.append({
+            "abbr": abbr, "name": refs.get(abbr, abbr), "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
+            "talent_fpg": round(fp, 1), "best": best.full_name if best else None, "best_sleeper_id": best.sleeper_id if best else None,
+            "best_fpg": round(roster[0][0], 1) if roster else None, "best_id": best.player_id if best else None,
+            "wins": st["wins"] if st else None, "losses": st["losses"] if st else None, "diff": st["diff"] if st else None,
+            "strength": round((zt[abbr] + zd[abbr]) / 2 if abbr in zd else zt[abbr], 2),
+        })
+    return sorted(out, key=lambda t: -t["strength"])

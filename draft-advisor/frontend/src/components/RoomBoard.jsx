@@ -40,8 +40,9 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
               {m.outbids_me && <span className="badge warn" title="their max bid is higher than yours">can outbid you</span>}
             </div>
             <div className="room-money">
-              <span><span className="big" data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span> <span className="muted">left</span></span>
-              <span className="muted">max bid <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
+              <span><span className="big" data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span></span>
+              <span className="muted">max <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
+              <span className="muted"><strong style={{ color: "var(--text)" }}>${m.per_slot}</strong>/slot</span>
               <span className="muted">{b.open_mandatory} open</span>
             </div>
             <div className="room-slots">
@@ -59,7 +60,7 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                         <Headshot sleeperId={p.sleeper_id} name={p.player_name} size={30} />
                         <span className="room-slot-who">
                           <span className="room-slot-name">{p.player_name}</span>
-                          <span className="room-slot-sub">{p.team_abbr || "FA"} · <PosList list={p.pos} />{p.age ? ` · ${p.age}` : ""}{p.is_keeper ? " · keeper" : ""}</span>
+                          <span className="room-slot-sub">{p.team_abbr || "FA"} · <PosList list={p.pos} />{p.age ? ` · ${p.age}` : ""} · <span className={p.avail != null && p.avail < 0.75 ? "warn-text" : ""} title="share of fantasy weeks he played last season">{p.avail != null ? `${Math.round(p.avail * 100)}% wks` : "new"}</span>{p.is_keeper ? " · keeper" : ""}</span>
                         </span>
                         <span className="room-slot-fpg" title="projected FP/G">{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
                         <strong className="room-slot-price">${p.price}</strong>
