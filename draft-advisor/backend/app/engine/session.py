@@ -146,13 +146,13 @@ class DraftSession:
             ).dollars_per_var
         return self._opening_rate
 
-    def spending_guide(self, manager_id: str | None = None, player_id: int | None = None) -> SpendingGuide:
+    def spending_guide(self, manager_id: str | None = None, player_id: int | None = None, call_ids=()) -> SpendingGuide:
         manager_id = manager_id or self.user_manager_id()
         rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
         return spending_guide(
             self.league, self.managers, self.draft.picks, manager_id, rows, self.pool_values(),
-            self.engine.progress(), self.opening_rate(), focus_player_id=player_id,
+            self.engine.progress(), self.opening_rate(), focus_player_id=player_id, call_ids=call_ids,
         )
 
     def manager_summaries(self) -> list[ManagerSummary]:

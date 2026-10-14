@@ -188,7 +188,7 @@ def recommend_bid(
             competitors=competitors, rationale=rationale,
         )
     if me.max_bid < min_bid:
-        rationale.append(f"Your max bid is ${me.max_bid}: ${me.remaining} remaining with {me.open_mandatory} mandatory slots to fill.")
+        rationale.append(f"Your cap is ${me.max_bid}: ${me.remaining} remaining with {me.open_mandatory} mandatory slots to fill.")
         return BidRecommendation(
             player_id=target.player_id, can_bid=False, fair_value=round(fair_value, 2), recommended_max=0,
             my_max_bid=me.max_bid, my_budget_remaining=me.remaining, my_open_mandatory=me.open_mandatory,
@@ -203,8 +203,8 @@ def recommend_bid(
     recommended = int(round(adjusted))
     recommended = max(min_bid, min(recommended, me.max_bid))
     rationale.append(
-        f"Recommended max ${recommended} = ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
-        f"capped at your max bid ${me.max_bid} (${me.remaining} remaining − ${me.reserved} reserved for "
+        f"Market price ${recommended} = ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
+        f"limited to your cap ${me.max_bid} (${me.remaining} remaining − ${me.reserved} reserved for "
         f"{max(0, me.open_mandatory - 1)} other mandatory slot(s))."
     )
     return BidRecommendation(

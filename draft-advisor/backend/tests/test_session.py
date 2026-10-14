@@ -133,7 +133,6 @@ def test_export_round_trip(fixture_world):
 
 
 def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
-    from app.api.draft import _prices
     from app.engine.fit import fit_scores, team_fit
 
     s = make_session(fixture_world)
@@ -141,9 +140,14 @@ def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
     assert before.score == 100 and before.score_lines[2].startswith("Price: not counted")
     s.start([])
     rows = s.rankings("m1", 40)
-    column = fit_scores(s, "m1", rows, _prices(s, rows, "m1"))
+    calls = s.spending_guide("m1", call_ids=[r.player_id for r in rows]).calls
+    column = fit_scores(s, "m1", rows, calls)
     for pid in (r.player_id for r in rows[:8]):
         assert team_fit(s, "m1", pid).score == column[pid]["score"]
+        # one call and one "your max" per player, whichever screen asks
+        focus = s.spending_guide("m1", pid).focus
+        assert (focus.verdict, focus.suggested, focus.recommended) == (calls[pid].verdict, calls[pid].suggested, calls[pid].recommended)
+        assert focus.suggested <= focus.walk_away or focus.verdict == "cannot"
     # Fill every slot a center can start in (C, UTIL×2): another center is now bench only and scores lower.
     centers = [pid for pid, o in s.overrides.items() if "C" in o.eligibility and pid in s.players and pid != JOKIC and s.engine.is_available(pid)][:3]
     for pid, slot in zip(centers, ("C", "UTIL", "UTIL")):
@@ -174,8 +178,12 @@ def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
     s.start([])
     rows = s.rankings("m1", 30)
     top = rows[0]
-    fits = fit_scores(s, "m1", rows, {top.player_id: 10_000})
-    assert fits[top.player_id]["score"] == 0 and "more than you can bid" in fits[top.player_id]["why"]
+    from dataclasses import replace
+
+    call = s.spending_guide("m1", top.player_id).focus
+    for verdict, score, word in (("pricey", 40, "TOO PRICEY"), ("star", 85, "STAR ONLY"), ("cannot", 0, "CAN'T")):
+        fits = fit_scores(s, "m1", rows, {top.player_id: replace(call, verdict=verdict)})
+        assert fits[top.player_id]["score"] == score and f"call {word}" in fits[top.player_id]["why"]
 
 
 def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixture_world):

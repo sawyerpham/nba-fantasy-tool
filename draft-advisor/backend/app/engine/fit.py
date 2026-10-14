@@ -3,7 +3,7 @@ the player profile.
 
     fit = 100 × value ÷ best value left (rosterable)
           × role:  1 if he fills an open starting spot, 0.6 bench only, 0 no spot
-          × price: 1 within my stretch price, 0.85 past it, 0.4 past my walk-away, 0 above my max bid (live only)
+          × price: the call on him (live only): BUY 1, STAR ONLY 0.85, TOO PRICEY 0.4, CAN'T 0
 
 The profile also lists 'worth knowing' notes (injury, missed weeks, age, schedule, projection trend, tier,
 alternatives). They are context only and never change the score, so the card and the column always agree.
@@ -17,7 +17,8 @@ from dataclasses import dataclass, field
 from .ranking import tiers
 
 BENCH_FIT = 0.6          # a bench player rarely scores under Lock-In
-PRICE_FIT = {"ok": 1.0, "stretch": 0.85, "past walk-away": 0.4, "can't afford": 0.0}
+PRICE_FIT = {"buy": 1.0, "star": 0.85, "pricey": 0.4, "cannot": 0.0}
+CALL_LABEL = {"buy": "BUY", "star": "STAR ONLY", "pricey": "TOO PRICEY", "cannot": "CAN'T"}
 INJURY_LABEL = {"day_to_day": "Day-to-day", "out_short_term": "Out short term", "out_long_term": "Out long term", "out_season": "Out for the season"}
 
 
@@ -45,21 +46,8 @@ def _best_value(session, manager_id: str) -> float:
     return max((r.value for r in rows if r.rosterable), default=0.0) or 1.0
 
 
-def _bands(session, manager_id: str, rows) -> tuple[int, int, int] | None:
-    """(stretch, walk-away, max bid) for me right now; None before the draft.
-
-    ponytail: one stretch / walk-away pair (from a starter target) for every player; per-slot bands if bench
-    prices ever matter.
-    """
-    if session.draft.status != "live":
-        return None
-    starter = next((r for r in rows if r.assignable_slot not in (None, "BN")), None)
-    focus = session.spending_guide(manager_id, starter.player_id).focus if starter else None
-    return (focus.stretch, focus.walk_away, session.engine.budget(manager_id).max_bid) if focus else None
-
-
-def _score(r, best: float, bands, price: int | None) -> tuple[int, str, str, str]:
-    """(score, quality line, role line, price line)."""
+def _score(r, best: float, call) -> tuple[int, str, str, str]:
+    """(score, quality line, role line, price line); `call` is the spending guide's TargetAdvice, None before the draft."""
     pct = round(100 * r.value / best)
     quality = f"Quality: {pct}% of the best player left (value {r.value:.1f})."
     if r.assignable_slot is None:
@@ -68,25 +56,22 @@ def _score(r, best: float, bands, price: int | None) -> tuple[int, str, str, str
         role_f, role = BENCH_FIT, f"Role: bench only, your {'/'.join(r.eligibility) or 'matching'} starting spots are full (×{BENCH_FIT})."
     else:
         role_f, role = 1.0, f"Role: starts for you at {r.assignable_slot} (×1)."
-    band = "ok"
-    if bands is None or price is None:
-        price_line = "Price: not counted until the draft is live."
+    if call is None:
+        price_f, price_line = 1.0, "Price: not counted until the draft is live."
     else:
-        stretch, walk, cap = bands
-        band = "can't afford" if price > cap else "past walk-away" if price > walk else "stretch" if price > stretch else "ok"
-        what = {"ok": "fits your budget", "stretch": "is past your stretch price", "past walk-away": "is past your walk-away",
-                "can't afford": "is more than you can bid"}[band]
-        price_line = f"Price: ${price} {what} (stretch ${stretch}, walk-away ${walk}) (×{PRICE_FIT[band]})."
-    return round(pct * role_f * PRICE_FIT[band]), quality, role, price_line
+        price_f = PRICE_FIT[call.verdict]
+        detail = ("you can't bid on him" if call.verdict == "cannot" else
+                  f"market price ${call.recommended}, comfort limit ${call.stretch}, walk-away ${call.walk_away}")
+        price_line = f"Price: call {CALL_LABEL[call.verdict]} ({detail}) (×{price_f})."
+    return round(pct * role_f * price_f), quality, role, price_line
 
 
-def fit_scores(session, manager_id: str, rows, prices: dict[int, int]) -> dict[int, dict]:
+def fit_scores(session, manager_id: str, rows, calls: dict) -> dict[int, dict]:
     """The Fit column: {player_id: {score, why}} for the listed rows."""
     best = _best_value(session, manager_id)
-    bands = _bands(session, manager_id, rows) if prices else None
     out = {}
     for r in rows:
-        score, *lines = _score(r, best, bands, prices.get(r.player_id))
+        score, *lines = _score(r, best, calls.get(r.player_id))
         out[r.player_id] = {"score": score, "why": " ".join(lines)}
     return out
 
@@ -98,19 +83,16 @@ def team_fit(session, manager_id: str, player_id: int) -> TeamFit:
     p = next((r for r in rows if r.player_id == player_id), None)
     if p is None:
         raise ValueError(f"player {player_id} is not available")
-    price = None
-    if session.draft.status == "live":
-        rec = session.recommend(player_id, manager_id)
-        price = rec.recommended_max if rec.can_bid else round(rec.fair_value)
-    score, quality, role, price_line = _score(p, _best_value(session, manager_id), _bands(session, manager_id, rows), price)
+    call = session.spending_guide(manager_id, player_id).focus if session.draft.status == "live" else None
+    score, quality, role, price_line = _score(p, _best_value(session, manager_id), call)
     verdict = verdict_for(score)
 
     # Headline: the score plus whatever pulled it down most (or why it is high).
+    v = call.verdict if call else None
     drags = [t for t, bad in (("bench only", p.assignable_slot == "BN"), ("no open spot", p.assignable_slot is None),
-                             ("can't afford him", "more than you can bid" in price_line),
-                             ("past your walk-away", "past your walk-away" in price_line),
-                             ("past your stretch price", "past your stretch" in price_line)) if bad]
-    why = ", ".join(drags) if drags else f"starts at {p.assignable_slot}" + (", price fits" if "fits your budget" in price_line else "")
+                             ("you can't bid on him", v == "cannot" and p.assignable_slot is not None),
+                             ("too pricey", v == "pricey"), ("star only at his price", v == "star")) if bad]
+    why = ", ".join(drags) if drags else f"starts at {p.assignable_slot}" + (", call BUY" if v == "buy" else "")
     headline = f"Fit {score} · {verdict}: {why}"
 
     notes: list[str] = []

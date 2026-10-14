@@ -16,7 +16,15 @@ INJURY = {"day_to_day": "DTD", "out_short_term": "OUT", "out_long_term": "OUT-LT
 
 def _money(m) -> str:
     b = m.budget
-    return f"${b.remaining} left, max bid ${b.max_bid}, {b.open_mandatory} slots to fill"
+    return f"${b.remaining} left, cap ${b.max_bid}, {b.open_mandatory} slots to fill"
+
+
+def _call_cells(c, label) -> str:
+    if c is None:
+        return "- | - | -"
+    if c.verdict == "cannot":
+        return f"${round(c.fair_value)} | - | CAN'T"
+    return f"${c.recommended} | ${c.suggested} | {label[c.verdict]}"
 
 
 def draft_context(session, manager_id: str, focus_player_id: int | None = None, top: int = 60) -> str:
@@ -107,28 +115,18 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
         g = session.spending_guide(manager_id)
         w("\n## My money vs the room")
         w(f"- Me: ${g.me.remaining} for {g.me.open_mandatory} slots (${g.me.per_slot}/slot), {g.money_rank} of {g.num_managers} in money. "
-          f"Room: ${g.room_remaining} for {g.room_open_mandatory} slots. Prices vs the opening rate: {g.inflation:.2f}×.")
-        if g.targets:
-            w("- Targets I can afford (go-to price · call):")
-            for t in g.targets[:10]:
-                w(f"  - {t.name} ({t.slot}): go to ${t.suggested}, market ~${t.recommended} · {t.verdict}")
+          f"Room: ${g.room_remaining} for {g.room_open_mandatory} slots. Price level: {g.inflation:.2f}×.")
 
     # ---- best available
     rows = session.rank(session.engine.picks_for(manager_id), session.available_ids())
     tier = tiers(session.pool_values())
     left = Counter(tier.get(r.player_id) for r in rows)
     size = Counter(tier.values())
-    prices = {}
-    if d.status == "live":
-        from .bidding import market_rate, recommend_bid
-
-        rate = market_rate(lg, session.managers, d.picks, (r.value for r in rows), session.pool_values())
-        for r in rows[:top]:
-            rec = recommend_bid(lg, session.managers, d.picks, manager_id, r, rows, session.pool_values(), session.engine.progress(), rate=rate)
-            prices[r.player_id] = rec.recommended_max if rec.can_bid else round(rec.fair_value)
+    calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in rows[:top]]).calls if d.status == "live" else {}
+    label = {"buy": "BUY", "star": "STAR ONLY", "pricey": "TOO PRICEY", "cannot": "CAN'T"}
     w(f"\n## Best available (top {min(top, len(rows))} by value; my slot = where he'd go on my roster)")
-    w("| # | tier | player | team | pos | FP/G | wk-best | avail | age | value | $ | my slot | notes |")
-    w("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    w("| # | tier | player | team | pos | FP/G | wk-best | avail | age | value | market | your max | call | my slot | notes |")
+    w("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in rows[:top]:
         notes = [INJURY[r.injury_status]] if r.injury_status in INJURY else []
         if r.proj_fpts is not None and r.last_fpts and abs(r.proj_fpts - r.last_fpts) >= 1:
@@ -136,7 +134,7 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
         t = tier.get(r.player_id)
         w(f"| {r.rank} | T{t}{' (last 2)' if size[t] >= 3 and left[t] <= 2 else ''} | {r.full_name} | {r.team_abbr or '-'} | {'/'.join(r.eligibility)} | "
           f"{r.avg_fpts:.1f} | {r.ceiling:.1f} | {round(r.availability * 100)}% | {int(r.age) if r.age else '-'} | {r.value:.1f} | "
-          f"{'$' + str(prices[r.player_id]) if r.player_id in prices else '-'} | {r.assignable_slot or '-'} | {', '.join(notes)} |")
+          f"{_call_cells(calls.get(r.player_id), label)} | {r.assignable_slot or '-'} | {', '.join(notes)} |")
 
     # ---- the player I'm asking about
     focus = focus_player_id or (d.current_nomination.player_id if d.current_nomination else None)
@@ -155,5 +153,10 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
 
     w("\n## How to read this")
     w("- FP/G = expected fantasy points per game (Sleeper projection). wk-best = expected best game of a week (what Lock-In scores). "
-      "avail = share of fantasy weeks he played last season. value = my tool's ranking score in FP. $ = my tool's 'pay up to' for me now.")
+      "avail = share of fantasy weeks he played last season. value = my tool's ranking score in FP. "
+      "market = the price he'll likely go for in this room. your max = the most I should bid. "
+      "call: BUY (market price within my comfort limit), STAR ONLY (between my comfort limit and walk-away: only worth it as my star), "
+      "TOO PRICEY (past my walk-away; my max is the walk-away), CAN'T (no slot or above my cap). "
+      "Comfort limit = paying more leaves under 80% of the room's average per open starter; walk-away = under 50%. "
+      "Cap = the most a manager may legally bid. Fit = 0-100 match for my team (quality vs best left × role × price call).")
     return "\n".join(out)

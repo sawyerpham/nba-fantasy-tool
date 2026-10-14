@@ -49,8 +49,8 @@ def test_opening_picture_at_draft_start():
     assert g.allowance == 12  # ($50 - 2 bench at $1) / 4 starter slots
     assert not g.can_outbid_me
     assert g.advice[0] == "$50 for 6 slots ($8/slot): 1st most money of 3, 1st per open slot."
-    assert g.advice[1] == "Prices are near the opening rate."
-    assert g.advice[-1] == "Nobody can outbid your max of $45."
+    assert g.advice[1] == "Price level near 1.00×: prices as at the start."
+    assert g.advice[-1] == "Nobody has a higher cap than your $45."
     assert [m.manager_id for m in g.managers] == ["m1", "m2", "m3"]
 
 
@@ -77,24 +77,25 @@ def test_targets_are_affordable_and_ranked_by_value():
     assert all(1 <= t.suggested <= 45 for t in g.targets)
     assert [t.tier for t in g.targets] == ["top", "top", "top", "starter", "starter"]
     assert all(t.left_after == 50 - t.suggested for t in g.targets)
-    assert all(t.verdict in {"go", "fair-only", "fits", "stretch", "pass"} for t in g.targets)
+    assert all(t.verdict in {"buy", "star", "pricey"} for t in g.targets)
     assert all(t.room_per_starter == 12.0 for t in g.targets)  # ($150 - 6 bench) / 12 open starter slots
 
 
-def test_everyone_equal_at_the_start_a_star_is_a_stretch_and_a_mid_player_fits():
+def test_everyone_equal_at_the_start_a_star_is_star_only_and_a_mid_player_is_a_buy():
     g = guide(*setup(), focus=1)
     f = g.focus
     # $50 - $2 bench - 3 other starters × 0.8 × $12 = $19 stretch; × 0.5 = $30 walk-away
     assert (f.stretch, f.walk_away, f.all_in) == (19, 30, 45)
     assert f.rivals_above_market == 2 and f.stretch < f.recommended <= f.walk_away
-    assert f.verdict == "stretch" and f.suggested == f.recommended
-    assert f.text.startswith(f"Ace Center is worth the market max ${f.recommended} only as your star: you'd have ${50 - f.recommended} for 5 slots")
+    assert f.verdict == "star" and f.suggested == f.recommended
+    assert f.text.startswith(f"STAR ONLY: ${f.recommended} for Ace Center is past your comfort limit $19; pay it only if he's your star. "
+                             f"After that you'd have ${50 - f.recommended} for 5 slots")
     assert f.per_starter_after == pytest.approx((50 - f.recommended - 2) / 3, abs=0.1)
     dee = next(t for t in g.targets if t.name == "Dee Point")
-    assert dee.verdict == "fits" and dee.suggested == dee.recommended <= 19
+    assert dee.verdict == "buy" and dee.suggested == dee.recommended <= 19
 
 
-def test_go_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
+def test_buy_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m2", 30)   # rivals blow $30 each on spares: $20 left, max bid $16
     pick(e, 11, "m3", 30)
@@ -103,19 +104,20 @@ def test_go_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
     assert g.inflation < 1.0  # money left the room faster than talent did
     f = g.focus
     assert f.player_id == 1 and f.slot == "C" and f.tier == "top" and f.rivals_at_fair == 2 and f.rivals_above_market == 2
-    assert f.verdict == "go" and f.recommended < f.suggested == min(f.stretch, round(f.recommended * 1.25))
-    assert f.text.startswith(f"Go for Ace Center: pay up to ${f.suggested} (market max ${f.recommended}, fair ${round(f.fair_value)}). 2 rivals can also reach")
+    assert f.verdict == "buy" and f.recommended < f.suggested == min(f.stretch, round(f.recommended * 1.25))
+    assert f.text.startswith(f"BUY: bid up to ${f.suggested} for Ace Center (market price ${f.recommended}, fair value ${round(f.fair_value)}); "
+                             "2 rivals can reach the market price")
     assert f.left_after == 50 - f.suggested and f.per_starter_after == pytest.approx((50 - f.suggested - 2) / 3, abs=0.1)
 
 
-def test_go_at_market_when_few_rivals_can_go_past_it():
+def test_no_overpay_when_few_rivals_can_reach_the_market_price():
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m2", 40)   # m2: $10 left, max bid $6 -> cannot reach the market max; m3 still can
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
     assert f.rivals_at_fair >= 1 and f.rivals_above_market == 1
-    assert f.verdict == "go" and f.suggested == f.recommended
-    assert f.text.startswith(f"Go for Ace Center: pay up to ${f.suggested} (fair ${round(f.fair_value)}). Only 1 rival can go past that")
+    assert f.suggested == min(f.recommended, f.walk_away)
+    assert f.verdict == ("buy" if f.recommended <= f.stretch else "star" if f.recommended <= f.walk_away else "pricey")
 
 
 def test_fair_only_when_nobody_else_can_pay_fair_value():
@@ -124,30 +126,29 @@ def test_fair_only_when_nobody_else_can_pay_fair_value():
     pick(e, 11, "m3", 45)
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
-    assert f.rivals_at_fair == 0 and f.verdict == "fair-only"
-    assert f.suggested == round(f.fair_value) and f.suggested <= f.recommended
-    assert f.text.startswith(f"Nobody else can pay fair value (${f.suggested}) for Ace Center. Bid to ${f.suggested} and stop")
-    assert not g.can_outbid_me and g.advice[-1] == "Nobody can outbid your max of $45."
+    assert f.rivals_at_fair == 0 and f.suggested == min(round(f.fair_value), f.walk_away) <= f.recommended
+    assert f.verdict != "buy" or "nobody else can pay fair value, so don't go past it" in f.text
+    assert not g.can_outbid_me and g.advice[-1] == "Nobody has a higher cap than your $45."
 
 
-def test_pass_when_the_market_max_would_gut_the_other_starter_slots():
+def test_too_pricey_when_the_market_price_would_gut_the_other_starter_slots():
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 3, "m1", 20)   # I paid $20 for Cy Wing: $30 left, 3 starter slots + 2 bench
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
-    assert f.verdict == "pass" and f.suggested == f.walk_away < f.recommended
-    assert f.text.startswith(f"Walk away from Ace Center at ${f.walk_away}: the market max is ${f.recommended}, but paying it leaves")
-    assert "under half the room's" in f.text and f.text.endswith("2 rivals can outbid you anyway.")
+    assert f.verdict == "pricey" and f.suggested == f.walk_away < f.recommended
+    assert f.text.startswith(f"TOO PRICEY: Ace Center's market price ${f.recommended} is past your walk-away ${f.walk_away}. Stop at ${f.walk_away}: paying")
+    assert "under half the room's" in f.text
 
 
-def test_bench_slot_is_capped_at_the_market_max():
+def test_bench_slot_is_capped_at_the_market_price():
     lg, mgrs, e, players, overrides, valuations = setup()
     for pid, price in ((2, 5), (5, 5), (1, 5), (3, 5)):  # PG, SG, C, UTIL filled: only bench left
         pick(e, pid, "m1", price)
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=4)
     f = g.focus
-    assert f.slot == "BN" and f.verdict == "fits" and f.suggested == min(f.recommended, g.me.max_bid)
-    assert f.text.startswith("Bench slot: pay up to $")
+    assert f.slot == "BN" and f.verdict == "buy" and f.suggested == min(f.recommended, g.me.max_bid)
+    assert f.text.startswith("BUY: bid up to $")
     assert g.advice[2].startswith("Only bench slots left: $")
 
 
@@ -155,7 +156,7 @@ def test_cheap_keeper_inflates_prices():
     lg, mgrs, e, players, overrides, valuations = setup([KeeperAssignment("m2", 1, 1)])  # Ace Center kept for $1
     g = guide(lg, mgrs, e, players, overrides, valuations)
     assert g.inflation > 1.05 and g.current_dollars_per_var > g.opening_dollars_per_var
-    assert g.advice[1].startswith(f"Prices are running {g.inflation:.2f}× the opening rate")
+    assert g.advice[1].startswith(f"Price level {g.inflation:.2f}×: more money than talent")
     assert all(t.player_id != 1 for t in g.targets) and all(pl.best_id != 1 for pl in g.plan)
 
 
@@ -165,7 +166,7 @@ def test_can_outbid_lists_richer_managers_by_max_bid():
     g = guide(lg, mgrs, e, players, overrides, valuations)
     assert g.money_rank == 3 and g.me.max_bid == 16
     assert [m.manager_id for m in g.can_outbid_me] == ["m2", "m3"]
-    assert g.advice[-1] == "2 managers can outbid your max of $16: Manager 2 $45, Manager 3 $45."
+    assert g.advice[-1] == "2 managers have a higher cap than your $16: Manager 2 $45, Manager 3 $45."
     assert [pl.slot for pl in g.plan] == ["PG", "SG", "UTIL"]  # C is filled
 
 
