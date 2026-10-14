@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { posClass } from "../components/Pos.jsx";
 import { api, qs } from "../api.js";
 import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
@@ -288,7 +289,7 @@ export default function DraftPage({ leagueId }) {
             <input type="text" placeholder="Search players…" value={filter} onChange={(e) => setFilter(e.target.value)} data-testid="rank-filter" />
             <span className="chips">
               <button className={`small chip ${posFilter === "" ? "on" : ""}`} onClick={() => setPosFilter("")}>All</button>
-              {POSITIONS.map((p) => <button key={p} className={`small chip ${posFilter === p ? "on" : ""}`} onClick={() => setPosFilter(posFilter === p ? "" : p)} data-testid={`pos-${p}`}>{p}</button>)}
+              {POSITIONS.map((p) => <button key={p} className={`small chip ${posClass(p)} ${posFilter === p ? "on" : ""}`} onClick={() => setPosFilter(posFilter === p ? "" : p)} data-testid={`pos-${p}`}>{p}</button>)}
             </span>
             <span className="spacer" />
             <label className="inline small muted"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> show unrosterable</label>
@@ -319,7 +320,7 @@ export default function DraftPage({ leagueId }) {
       <section className="room" id="room">
         <div className="room-title">
           <h2 style={{ margin: 0 }}>The room</h2>
-          <span className="small muted">every manager's money and roster · <strong>bait</strong> = available players they need and are likely to overpay for: nominate them to drain that manager's budget</span>
+          <span className="small muted">every manager's money, max bid, roster and habits · click a player for his profile</span>
           <span className="spacer" />
           <button className="small ghost" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑ Draft</button>
         </div>

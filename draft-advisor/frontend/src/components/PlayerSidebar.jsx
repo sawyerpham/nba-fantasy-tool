@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { PosList, PosTag } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
@@ -59,7 +60,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
-        <span className="profile-tags">{ov.eligibility.join("/") || "no position"} · age {bio.age ?? "?"}</span>
+        <span className="profile-tags">{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
         {rec_.sleeper_status && rec_.sleeper_status !== "ACT" && <span className="badge">{rec_.sleeper_status}</span>}
         {rec_.unsigned_per_sleeper && <span className="badge warn">unsigned per Sleeper</span>}
         {rec_.team_conflict && <span className="badge info">NBA.com {rec_.team_conflict.nba_api} / Sleeper {rec_.team_conflict.sleeper}</span>}
@@ -150,7 +151,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
                   <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
                     onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
                     title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
-                    <span className="teammate-rank">{m.depth || "—"}</span>
+                    <PosTag className="teammate-rank" text={m.depth || "—"} />
                     <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
                     <span className="teammate-name">{m.name}</span>
                     <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>

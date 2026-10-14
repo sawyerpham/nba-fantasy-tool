@@ -349,9 +349,6 @@ th.sorted { color: var(--primary); }
 .room-slot-fpg { color: var(--muted); font-size: 12px; font-weight: 600; }
 .room-slot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .room-habits { line-height: 1.35; }
-.room-bait { margin-top: 2px; padding: 6px 8px; border-radius: 10px; background: var(--panel-2); }
-.room-bait-row { display: flex; align-items: baseline; gap: 6px; padding: 1px 0; font-size: 13.5px; white-space: nowrap; min-width: 0; }
-.room-bait-why { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .fits-dot { font-size: 11px; font-weight: 700; color: var(--info-t); }
 .room-bench { line-height: 1.35; }
 .clickable-name { font-weight: 600; cursor: pointer; } .clickable-name:hover { color: var(--primary); }
@@ -391,3 +388,22 @@ th.sorted { color: var(--primary); }
 .room-grid { gap: 10px; }
 
 .profile-tags { margin-left: auto; font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+
+/* the room: 6 cards a row, each half the screen tall; player rows stretch to fill the card */
+.room-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(calc((100vh - 140px) / 2), auto); }
+@media (max-width: 1500px) { .room-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.room-slots { flex: 1; grid-auto-rows: minmax(26px, 1fr); }
+.room-slot { font-size: 13.5px; min-height: 0; }
+.room-slot-player { gap: 8px; }
+.room-slot-who { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.room-slot-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-slot-name { font-weight: 600; }
+.room-slot-fpg { font-size: 13px; }
+.room-slot-price { min-width: 2.6em; text-align: right; }
+
+/* position colours, used everywhere a position is shown (components/Pos.jsx) */
+:root { --pos-PG: #60a5fa; --pos-SG: #2dd4bf; --pos-SF: #fbbf24; --pos-PF: #fb923c; --pos-C: #c084fc; }
+[data-theme="light"] { --pos-PG: #2563eb; --pos-SG: #0d9488; --pos-SF: #b45309; --pos-PF: #c2410c; --pos-C: #7e22ce; }
+.pos-c { font-weight: 600; }
+.pos-PG { color: var(--pos-PG) !important; } .pos-SG { color: var(--pos-SG) !important; } .pos-SF { color: var(--pos-SF) !important; }
+.pos-PF { color: var(--pos-PF) !important; } .pos-C { color: var(--pos-C) !important; }
