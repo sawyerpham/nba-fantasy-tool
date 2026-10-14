@@ -207,6 +207,7 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
   const [newId, setNewId] = useState("");
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
+  const [picked, setPicked] = useState(() => new Set());   // leagues ticked for "Delete selected"
 
   const loadList = useCallback(() => api.get("/leagues").then(setLeagues).catch((e) => setError(e.message)), []);
   const loadDoc = useCallback(() => {
@@ -236,16 +237,34 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
     loadList();
   };
 
+  const toggle = (id) => setPicked((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const mocks = leagues.filter((l) => l.league_id.startsWith("mock-")).map((l) => l.league_id);
+  const removeMany = async () => {
+    const ids = [...picked];
+    if (!ids.length || !window.confirm(`Delete ${ids.length} league${ids.length > 1 ? "s" : ""}?\n\n${ids.join("\n")}`)) return;
+    setError("");
+    for (const id of ids) {
+      try { await api.del(`/leagues/${id}`); } catch (e) { setError(`${id}: ${e.message}`); }
+    }
+    if (ids.includes(leagueId)) setLeagueId("");
+    setPicked(new Set());
+    loadList();
+  };
+
   return (
     <div>
       <h2>Leagues</h2>
       {error && <div className="error">{error}</div>}
       <div className="panel">
         <table>
-          <thead><tr><th>id</th><th>name</th><th>status</th><th>managers</th><th>picks</th><th>season</th><th></th></tr></thead>
+          <thead><tr>
+            <th><input type="checkbox" checked={leagues.length > 0 && picked.size === leagues.length} title="select all"
+              onChange={(e) => setPicked(new Set(e.target.checked ? leagues.map((l) => l.league_id) : []))} data-testid="league-pick-all" /></th>
+            <th>id</th><th>name</th><th>status</th><th>managers</th><th>picks</th><th>season</th><th></th></tr></thead>
           <tbody>
             {leagues.map((l) => (
               <tr key={l.league_id} className={l.league_id === leagueId ? "selected" : ""}>
+                <td><input type="checkbox" checked={picked.has(l.league_id)} onChange={() => toggle(l.league_id)} data-testid={`league-pick-${l.league_id}`} /></td>
                 <td>{l.league_id}</td><td>{l.name}</td><td>{l.status}</td><td>{l.managers}</td><td>{l.picks}</td><td>{l.roster_season}</td>
                 <td>
                   <button onClick={() => setLeagueId(l.league_id)} data-testid={`select-league-${l.league_id}`}>Select</button>{" "}
@@ -253,9 +272,13 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
                 </td>
               </tr>
             ))}
-            {!leagues.length && <tr><td colSpan="7" className="muted">No leagues yet — create one below.</td></tr>}
+            {!leagues.length && <tr><td colSpan="8" className="muted">No leagues yet — create one below.</td></tr>}
           </tbody>
         </table>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button onClick={() => setPicked(new Set(mocks))} disabled={!mocks.length} data-testid="league-pick-mocks">Select mock leagues ({mocks.length})</button>
+          <button className="danger" onClick={removeMany} disabled={!picked.size} data-testid="league-delete-selected">Delete selected ({picked.size})</button>
+        </div>
         <div className="row" style={{ marginTop: 8 }}>
           <input type="text" placeholder="league id (letters, digits, - _ .)" value={newId} onChange={(e) => setNewId(e.target.value)} data-testid="create-league-id" />
           <input type="text" placeholder="name" value={newName} onChange={(e) => setNewName(e.target.value)} data-testid="create-league-name" />
