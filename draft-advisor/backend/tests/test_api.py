@@ -403,3 +403,12 @@ def test_gate_export_round_trips_with_no_data_loss(pulled):
     lonely = DraftSession.from_export(exported, {}, {}, {})
     assert {p.player_id for p in lonely.draft.picks} <= set(lonely.players)
     assert lonely.engine.budget("m3").remaining == 150
+
+
+def test_player_detail_has_his_team_with_teammates_and_ranks(pulled):
+    client, *_ = pulled
+    league(client, "lg-team", "Team League")
+    team = client.get(f"/api/players/{JOKIC}?league_id=lg-team&include_history=false").json()["team"]
+    assert team["abbr"] == "DEN" and team["logo"].endswith("/den.png")
+    assert team["player_rank"] == 1 and 1 <= team["talent_rank"] <= team["teams"]
+    assert team["teammates"][0]["is_self"] and all(m["fpg"] >= team["teammates"][-1]["fpg"] for m in team["teammates"])

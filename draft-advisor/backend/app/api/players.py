@@ -77,6 +77,7 @@ def player_detail(
         scoring_hash = ScoringSettings().scoring_hash()
     detail = state.details.get(player_id) if (include_history and rec.has_stats) else None
     return {
+        "team": _team_block(state, state.get_session(league_id), player_id) if league_id and rec.team_abbr else None,
         "record": rec.model_dump(mode="json"),
         "overrides": state.overrides.get(player_id).model_dump(mode="json") if player_id in state.overrides else None,
         "valuation": valuation.model_dump(mode="json") if valuation else None,
@@ -95,3 +96,44 @@ def patch_overrides(player_id: int, body: OverridePatch, state: AppState = Depen
     except KeyError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown player {player_id}") from exc
     return updated.model_dump(mode="json")
+
+
+ROTATION = 8   # players per team counted for the team's projected fantasy talent
+
+
+def _team_block(state: AppState, session, player_id: int) -> dict:
+    """His NBA team: logo, his rank on the team, the team's projected-fantasy-talent rank (sum of the top 8
+    players' projected FP/G, 1 = most), and the top teammates with photos. Not a win projection."""
+    from ..engine.ranking import expected_fpts
+
+    lg = session.league
+    drafted = {p.player_id: p.manager_id for p in session.draft.picks}
+    names = {m.manager_id: m.name for m in session.managers}
+    by_team: dict[str, list[tuple[float, int]]] = {}
+    for pid, rec in session.players.items():
+        if not rec.team_abbr or not (rec.projection or session.valuations.get(pid)):
+            continue
+        fpg = expected_fpts(rec, session.valuations.get(pid), lg.ranking, lg.scoring)[0]
+        by_team.setdefault(rec.team_abbr, []).append((fpg, pid))
+    talent = {t: sum(f for f, _ in sorted(lst, reverse=True)[:ROTATION]) for t, lst in by_team.items()}
+    order = sorted(talent, key=lambda t: -talent[t])
+    abbr = session.players[player_id].team_abbr
+    roster = sorted(by_team.get(abbr, []), reverse=True)
+    team_ref = next((t for t in state.stats.list_teams() if t.abbreviation == abbr), None) if hasattr(state.stats, "list_teams") else None
+
+    def mate(fpg: float, pid: int) -> dict:
+        rec = session.players[pid]
+        proj_min = (rec.projection or {}).get("sp")
+        return {"player_id": pid, "name": rec.full_name, "sleeper_id": rec.sleeper_id, "fpg": round(fpg, 1),
+                "min": round(proj_min / 60, 1) if proj_min else None,
+                "pos": (session.overrides.get(pid).eligibility if session.overrides.get(pid) else []),
+                "drafted_by": names.get(drafted.get(pid)), "is_self": pid == player_id}
+
+    return {
+        "abbr": abbr, "name": team_ref.full_name if team_ref else abbr,
+        "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
+        "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
+        "talent_fpg": round(talent.get(abbr, 0.0), 1),
+        "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
+        "teammates": [mate(f, pid) for f, pid in roster[:ROTATION + 2]],
+    }

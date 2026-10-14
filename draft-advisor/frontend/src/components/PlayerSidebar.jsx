@@ -124,6 +124,34 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       </div>
       <div><textarea rows="1" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
+      {data.team && (
+        <div className="team-card" data-testid="team-card">
+          <div className="team-card-head">
+            <img src={data.team.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+            <div>
+              <div className="team-name">{data.team.name}</div>
+              <div className="small muted">
+                {data.team.player_rank && <><strong style={{ color: "var(--text)" }}>#{data.team.player_rank}</strong> on the team · </>}
+                <span title={`sum of the top 8 players' projected FP/G (${data.team.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
+                  team <strong style={{ color: "var(--text)" }}>#{data.team.talent_rank}</strong> of {data.team.teams} in projected fantasy talent
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="teammates">
+            {data.team.teammates.map((m, i) => (
+              <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
+                title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
+                <span className="teammate-rank">{i + 1}</span>
+                <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
+                <span className="teammate-name">{m.name}</span>
+                <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <h3>Fantasy points</h3>
       {row && (
         <div className="small" data-testid="fp-this-season">
