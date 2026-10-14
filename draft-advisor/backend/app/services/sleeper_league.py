@@ -319,12 +319,25 @@ def draft_id(details: dict | None, override: str | None = None) -> str | None:
     return seasons[0]["league"].get("draft_id") if seasons else None
 
 
+def _fresh(platform: Any, path: str) -> Any:
+    """A live-draft read that skips both caches in the way: Sleeper's CDN caches draft endpoints for 15-30 s (a unique
+    query string forces a fresh answer) and the provider's polite 0.6 s gap between calls (meant for NBA.com)."""
+    http = getattr(platform, "session", None)
+    if http is None:   # test doubles
+        return platform.get_json(path)
+    resp = http.get(f"{platform.base_url}/{path}", params={"_": int(datetime.now(timezone.utc).timestamp() * 1000)}, timeout=5)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()
+
+
 def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
     """Fetch the Sleeper draft's picks live and record the ones not recorded yet (manual entries win)."""
     from ..engine.draft_state import DraftError
 
-    draft = platform.get_json(f"draft/{sleeper_draft_id}") or {}
-    picks = platform.get_json(f"draft/{sleeper_draft_id}/picks") or []
+    draft = _fresh(platform, f"draft/{sleeper_draft_id}") or {}
+    picks = _fresh(platform, f"draft/{sleeper_draft_id}/picks") or []
     by_sleeper = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
     by_user = {m.sleeper_user_id: m for m in session.managers if m.sleeper_user_id}
     by_roster = {m.sleeper_roster_id: m for m in session.managers if m.sleeper_roster_id is not None}

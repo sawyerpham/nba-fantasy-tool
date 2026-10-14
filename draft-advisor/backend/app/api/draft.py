@@ -76,7 +76,7 @@ def sync_from_sleeper(league_id: str, state: AppState = Depends(get_state)) -> d
     result = sync_picks(state.platform, session, did)
     if result["added"]:
         state.save_session(league_id)
-    return {**result, "view": _draft_view(session)}
+    return {**result, "view": _draft_view(session) if result["added"] else None}   # the view only changes with a pick
 
 
 @router.post("/draft/start")
