@@ -105,3 +105,11 @@ def test_pool_values_cover_every_player_including_no_stats():
     players[99] = record(99, "No Stats", "UTA", has_stats=False)
     values = pool_values(players, overrides, valuations, RankingSettings())
     assert set(values) == set(players) and values[99] == 0.0 and values[1] > values[2] > 0
+
+
+def test_no_games_last_season_is_not_treated_as_never_available():
+    from nba_fantasy_shared.scoring.aggregate import NO_GAMES_AVAILABILITY, availability_factor
+
+    r = RankingSettings(availability_weight=0.3)
+    missed_all = valuation(1, 0.0, 0.0, gp=0, weeks=0)
+    assert availability_factor(missed_all, r) == 1 - 0.3 * (1 - NO_GAMES_AVAILABILITY)
