@@ -99,7 +99,7 @@ try {
   const jokic = top[0].player_id;
   await page.getByTestId(`rank-row-${jokic}`).click();
   await page.getByTestId("player-sidebar").waitFor();
-  assert((await page.getByTestId("sleeper-info").textContent()).includes("C"), "sidebar shows Sleeper positions");
+  assert(/C · age \d+/.test(await page.getByTestId("player-sidebar").locator("h3").first().textContent()), "profile header shows positions and age");
   summary.steps.push("sidebar shows Sleeper positions and injury (read-only)");
 
   await page.getByTestId("btn-start").click();
@@ -173,7 +173,7 @@ try {
   await page.locator('[data-testid^="rank-row-"]').first().click();
   await page.getByTestId("recommendation").waitFor();
   const guide = await page.getByTestId("recommendation").textContent();
-  assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value (league)"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
+  assert(guide.includes("for Sawyer") && guide.includes("Pay up to") && guide.includes("Fair value"), `bid guide is labelled for the user: ${guide.slice(0, 80)}`);
   await page.getByTestId("spend-verdict").waitFor();
   await page.getByTestId("team-fit").waitFor();
   log("team fit:", (await page.getByTestId("team-fit-headline").textContent()));

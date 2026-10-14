@@ -389,3 +389,5 @@ th.sorted { color: var(--primary); }
 .room-title { margin-bottom: 8px; }
 .room-card { padding: 8px 10px; }
 .room-grid { gap: 10px; }
+
+.profile-tags { margin-left: auto; font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; }
