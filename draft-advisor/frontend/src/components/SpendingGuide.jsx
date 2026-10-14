@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PosTag } from "./Pos.jsx";
 import { api } from "../api.js";
-import { CallBadge, Term, liveCall } from "./Terms.jsx";
+import { CallBadge, Term, TERMS, liveCall } from "./Terms.jsx";
 
 export const ordinal = (n) => {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
@@ -10,7 +10,7 @@ export const ordinal = (n) => {
 
 const readOpen = () => { try { return localStorage.getItem("da.spending.open") !== "0"; } catch { return true; } };
 
-// Your money against the room, the live call on the nominee, your best fits, the ideal team and everyone's money.
+// Your money against the room, the live call on the nominee, the plan for your open spots and everyone's money.
 export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lot, rankings }) {
   const [g, setG] = useState(null);
   const [open, setOpen] = useState(readOpen);
@@ -26,8 +26,6 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
     setOpen(!open);
     try { localStorage.setItem("da.spending.open", open ? "0" : "1"); } catch { /* ignore */ }
   };
-  const bestFits = (rankings || []).filter((r) => r.fit && r.call && r.call !== "cannot")
-    .sort((a, b) => b.fit.score - a.fit.score).slice(0, 5);
 
   return (
     <div className="panel" data-testid="spending-guide">
@@ -73,41 +71,36 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
               ))}
             </div>
           )}
-          {bestFits.length > 0 && (
-            <table className="small" data-testid="best-fits">
-              <thead><tr><th><Term k="best_fits" /></th><th className="num"><Term k="fit" /></th><th className="num"><Term k="your_max" /></th><th><Term k="call" /></th></tr></thead>
-              <tbody>
-                {bestFits.map((r) => (
-                  <tr key={r.player_id} className="clickable" onClick={() => onSelect?.(r.player_id)} data-testid={`best-fit-${r.player_id}`}>
-                    <td>{r.full_name}</td>
-                    <td className="num"><strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong></td>
-                    <td className="num"><strong>${r.price}</strong></td>
-                    <td><CallBadge call={r.call} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {g.plan.length > 0 && <div className="bid-label" style={{ marginTop: 10 }}><Term k="ideal" /> for your open spots</div>}
-          {g.plan.length > 0 && (
-            <table className="small ideal-team" data-testid="ideal-team">
-              <thead><tr><th>Slot</th><th>Best available</th><th><Term k="even_split">Even split ${g.allowance}</Term></th></tr></thead>
-              <tbody>
-                {g.plan.map((p, i) => (
-                  <tr key={i}>
-                    <td><PosTag text={p.slot} /></td>
-                    <td>{p.best_name ? `${p.best_name} $${p.best_price}` : "—"}</td>
-                    <td>{p.fit_name ? `${p.fit_name} $${p.fit_price}` : "nobody"}</td>
-                  </tr>
-                ))}
-                <tr><td>BN ×{me.open_bench}</td><td colSpan="2">${g.bench_total} at the minimum</td></tr>
-                <tr><th>Total</th><th>${g.plan_best_total} ({g.slack_best >= 0 ? `$${g.slack_best} spare` : `$${-g.slack_best} short`})</th><th>${g.plan_fit_total} ({g.slack_fit >= 0 ? `$${g.slack_fit} spare` : `$${-g.slack_fit} short`})</th></tr>
-              </tbody>
-            </table>
-          )}
-          <div className="bid-label" style={{ marginTop: 10 }}>Everyone's money</div>
-          <table className="small" data-testid="everyones-money">
-            <thead><tr><th>Manager</th><th><Term k="left" /></th><th><Term k="open" /></th><th><Term k="per_slot" /></th><th><Term k="cap" /></th></tr></thead>
+          {g.plan.length > 0 && (() => {
+            // One row per open starting spot: the best player left for it (his Fit, your max coloured by the call)
+            // and the best one within your even split. Totals use your max where the rankings have it.
+            const row = (id) => (rankings || []).find((r) => r.player_id === id);
+            const lines = g.plan.map((p) => ({ p, r: row(p.best_id) }));
+            const total = lines.reduce((t, { p, r }) => t + (r?.price ?? p.best_price), 0) + g.bench_total;
+            const spare = me.remaining - total;
+            return (
+              <table className="small plan-table" data-testid="ideal-team">
+                <thead><tr><th></th><th><Term k="ideal">Best</Term></th><th className="num"><Term k="fit" /></th><th className="num"><Term k="your_max">Max</Term></th><th><Term k="even_split">≤ ${g.allowance}</Term></th></tr></thead>
+                <tbody>
+                  {lines.map(({ p, r }, i) => (
+                    <tr key={i}>
+                      <td><PosTag text={p.slot} /></td>
+                      <td className="clip clickable" onClick={() => p.best_id && onSelect?.(p.best_id)} data-testid={p.best_id ? `best-fit-${p.best_id}` : undefined}>{p.best_name || "—"}</td>
+                      <td className="num">{r?.fit ? <strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong> : ""}</td>
+                      <td className="num">{p.best_name ? <strong className={r?.call ? `call-${r.call}` : ""} data-tip={r?.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}` : "his market price"}>${r?.price ?? p.best_price}</strong> : ""}</td>
+                      <td className="clip clickable muted" onClick={() => p.fit_id && onSelect?.(p.fit_id)}>{p.fit_name ? `${p.fit_name} $${p.fit_price}` : "nobody"}</td>
+                    </tr>
+                  ))}
+                  <tr><td colSpan="5" className="plan-total">
+                    Best: <strong>${total}</strong> <span className={spare >= 0 ? "ok" : "warn-text"}>({spare >= 0 ? `$${spare} spare` : `$${-spare} short`})</span>
+                    {" · "}≤ ${g.allowance}: <strong>${g.plan_fit_total}</strong> <span className="muted">· incl. {me.open_bench} BN at $1</span>
+                  </td></tr>
+                </tbody>
+              </table>
+            );
+          })()}
+          <table className="small money-table" data-testid="everyones-money">
+            <thead><tr><th>Manager</th><th><Term k="left">Left</Term></th><th><Term k="open" /></th><th><Term k="per_slot">/slot</Term></th><th><Term k="cap" /></th></tr></thead>
             <tbody>
               {g.managers.map((m) => (
                 <tr key={m.manager_id} className={m.is_user ? "selected" : ""}>

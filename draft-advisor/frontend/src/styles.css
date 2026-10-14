@@ -450,7 +450,6 @@ th.sorted { color: var(--primary); }
 .guide-now { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; border-left: 5px solid var(--muted); background: var(--panel-2); }
 .guide-now.go { border-left-color: var(--ok); } .guide-now.maybe { border-left-color: var(--even-t); } .guide-now.stop { border-left-color: var(--danger); }
 .guide-now-call { font-size: 15px; margin-top: 4px; }
-.ideal-team td { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-tags { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .profile-ranks { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 
@@ -464,9 +463,6 @@ th.sorted { color: var(--primary); }
 }
 .room-money { flex-wrap: wrap; row-gap: 0; white-space: normal; }
 .room-money > span { white-space: nowrap; }
-.ideal-team { table-layout: fixed; width: 100%; }
-.ideal-team th:first-child, .ideal-team td:first-child { width: 44px; }
-.ideal-team td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 1500px) {
   [data-testid="rankings-table"] th, [data-testid="rankings-table"] td { padding: 7px 4px; }
   [data-testid="spending-guide"] table.small th, [data-testid="spending-guide"] table.small td { padding: 5px 3px; font-size: 12.5px; white-space: normal; }
@@ -481,3 +477,25 @@ th.sorted { color: var(--primary); }
   line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: normal; text-align: left; pointer-events: none; }
 .tip.up { transform: translate(-50%, -100%); }
 .call-buy { color: var(--ok); } .call-star { color: var(--even-t); } .call-pricey, .call-cannot { color: var(--danger); }
+
+/* spending guide: one plan table, compact money table, no scrolling */
+.plan-table, .money-table { table-layout: fixed; width: 100%; margin-top: 8px; }
+.plan-table td, .plan-table th, .money-table td, .money-table th { padding: 4px 3px; }
+.plan-table th:nth-child(1) { width: 32px; } .plan-table th:nth-child(3) { width: 30px; } .plan-table th:nth-child(4) { width: 42px; }
+.plan-table td.clip, .money-table td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.money-table th:not(:first-child) { width: 46px; }
+[data-testid="spending-guide"] table.plan-table td, [data-testid="spending-guide"] table.plan-table th,
+[data-testid="spending-guide"] table.money-table td, [data-testid="spending-guide"] table.money-table th { padding: 3px 3px; line-height: 1.25; font-size: 13px; }
+[data-testid="spending-guide"] .bid-grid { margin: 8px 0; }
+[data-testid="spending-guide"] .bid-cell { padding: 6px 9px; }
+[data-testid="spending-guide"] .bid-cell .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-testid="spending-guide"] .nom-ideas { margin: 8px 0; padding: 6px 10px; }
+[data-testid="spending-guide"] .nom-row { padding: 2px 0; }
+[data-testid="spending-guide"] table.plan-table td.plan-total { white-space: normal; font-size: 12.5px; }
+/* shorter screens: tighter rows so the guide still fits without scrolling */
+@media (max-height: 950px) {
+  [data-testid="spending-guide"] table.plan-table td, [data-testid="spending-guide"] table.plan-table th,
+  [data-testid="spending-guide"] table.money-table td, [data-testid="spending-guide"] table.money-table th { padding: 1px 3px; font-size: 12.5px; }
+  [data-testid="spending-guide"] .bid-num { font-size: 19px; }
+  [data-testid="spending-guide"] .bid-cell > .small { display: none; }
+}
