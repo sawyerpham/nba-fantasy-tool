@@ -63,3 +63,10 @@ def test_mock_draft_picks_are_matched_by_seat():
     platform = SimpleNamespace(get_json=lambda path: picks if path.endswith("/picks") else draft)
     out = sync_picks(platform, session, "D")
     assert out["errors"] == [] and recorded == [(10, "m4", 58), (11, "m6", 27)]
+
+    # the lot in progress comes from the draft metadata (player, high bid and its seat, nominator, clock)
+    session.players[12] = SimpleNamespace(player_id=12, sleeper_id="1380", full_name="Giannis", team_abbr="MIA")
+    draft["metadata"] = {"nominated_player_id": "1380", "highest_offer": "39", "offering_slot": "6", "offering_user_id": "",
+                         "nominating_slot": "4", "timer_end_at": "2026-10-14T11:44:09Z"}
+    live = sync_picks(platform, session, "D")["live"]
+    assert live["player_id"] == 12 and live["high_bid"] == 39 and live["leader"] == "six" and live["nominated_by"] == "me"

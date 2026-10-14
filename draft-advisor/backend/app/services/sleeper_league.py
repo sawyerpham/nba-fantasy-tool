@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 from typing import Any, Mapping
 
 from nba_fantasy_shared.models.league import KeeperEscalation, Manager
+from nba_fantasy_shared.providers.base import as_int
 from nba_fantasy_shared.models.players import PlayerRecord
 from nba_fantasy_shared.storage import JsonStore
 
@@ -361,7 +362,21 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
             session.invalidate()
     last_picked = draft.get("last_picked")
     now_ms = datetime.now(timezone.utc).timestamp() * 1000
+
+    # The lot in progress: Sleeper's draft metadata carries the nominated player, the high bid and its seat, the
+    # nominating seat and when the clock ends (seen live in a mock auction, 2026-10-14).
+    meta = draft.get("metadata") or {}
+    live = None
+    nominee = by_sleeper.get(str(meta.get("nominated_player_id") or ""))
+    if draft.get("status") == "drafting" and nominee is not None and nominee.player_id not in session.engine.drafted_ids():
+        seat = lambda key: (lambda m: m.name if m else None)(manager_for({"draft_slot": as_int(meta.get(key))}))
+        leader = by_user.get(meta.get("offering_user_id")) if meta.get("offering_user_id") else None
+        live = {"player_id": nominee.player_id, "full_name": nominee.full_name, "team_abbr": nominee.team_abbr,
+                "sleeper_id": nominee.sleeper_id, "high_bid": as_int(meta.get("highest_offer")),
+                "leader": leader.name if leader else seat("offering_slot"), "nominated_by": seat("nominating_slot"),
+                "timer_end_at": meta.get("timer_end_at")}
     return {
+        "live": live,
         "draft_id": sleeper_draft_id,
         "sleeper_status": draft.get("status"),
         "sleeper_picks": len(picks),
