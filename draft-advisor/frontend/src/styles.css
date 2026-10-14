@@ -359,3 +359,5 @@ th.sorted { color: var(--primary); }
 .dg-side .guide-lines li { margin: 0; line-height: 1.35; }
 .dg-side .fit-card { margin: 8px 0 2px; padding: 8px 10px; }
 .dg-side .panel { padding: 12px 14px; }
+
+.pos-rank { font-size: 12px; color: var(--muted); font-weight: 600; }
