@@ -12,6 +12,7 @@ import StartDraftDialog from "../components/StartDraftDialog.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import NominationOrderBar from "../components/NominationOrderBar.jsx";
 import SpendingGuide from "../components/SpendingGuide.jsx";
+import MarketPanel from "../components/MarketPanel.jsx";
 import EditPickDialog from "../components/EditPickDialog.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -301,11 +302,12 @@ export default function DraftPage({ leagueId }) {
 
       <div className="draft-grid" ref={colsRef}>
         <section className="dg-left">
-          <div className="dg-pane">
+          <div className={`dg-pane ${live ? "fit-content" : ""}`}>
             {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected}
               lot={sync ? liveLot : null} rankings={rankings} />
               : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
           </div>
+          {live && <div className="dg-pane market-pane"><MarketPanel leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected} /></div>}
         </section>
         <section className="dg-rank">
           {live && sync && !pick && (

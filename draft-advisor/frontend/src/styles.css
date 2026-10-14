@@ -499,3 +499,23 @@ th.sorted { color: var(--primary); }
   [data-testid="spending-guide"] .bid-num { font-size: 19px; }
   [data-testid="spending-guide"] .bid-cell > .small { display: none; }
 }
+
+/* position market + room trend (under the spending guide, fills the leftover height) */
+.market-pane { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.market-table { table-layout: fixed; width: 100%; }
+.market-table td, .market-table th { padding: 3px 3px !important; font-size: 13px; }
+.market-table th:nth-child(1) { width: 38px; } .market-table th:nth-child(2), .market-table th:nth-child(3) { width: 36px; }
+.market-table th:nth-child(4) { width: 58px; } .market-table th:nth-child(6) { width: 44px; }
+.market-table .verdict { font-size: 11px; padding: 1px 6px; }
+.market-table td.clip, .sale-row .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-left: 3px; vertical-align: middle; }
+.spark { flex: 1; min-width: 60px; height: 26px; display: block; }
+.trend-head { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; white-space: nowrap; }
+.spark-base { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.spark-line { fill: none; stroke: var(--primary); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark-line.hot { stroke: var(--danger); } .spark-line.cold { stroke: var(--ok); }
+.sale-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px 34px minmax(0, 0.8fr); gap: 6px; align-items: baseline; font-size: 13px; padding: 1px 0; }
+.sale-row strong { text-align: right; }
+.sale-diff { text-align: right; font-weight: 700; color: var(--muted); } .sale-diff.over { color: var(--danger); } .sale-diff.under { color: var(--ok); }
+.sale-row:hover .clip:first-child { color: var(--primary); }
+@media (max-height: 1100px) { .market-pane { display: none; } }

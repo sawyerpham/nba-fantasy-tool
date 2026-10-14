@@ -245,6 +245,18 @@ def fit(league_id: str, player_id: int, manager_id: str | None = Query(None), st
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
+@router.get("/market")
+def market(league_id: str, manager_id: str | None = Query(None), state: AppState = Depends(get_state)) -> dict:
+    """Per-position supply vs demand, tier cliffs and who's chasing; recent sales vs fair value and the price level."""
+    from ..engine.market import market_board
+
+    session = _session(state, league_id)
+    try:
+        return market_board(session, manager_id or session.user_manager_id())
+    except DraftError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
 @router.get("/context", response_class=PlainTextResponse)
 def context(league_id: str, manager_id: str | None = Query(None), player_id: int | None = Query(None),
             top: int = Query(60, ge=10, le=300), state: AppState = Depends(get_state)) -> str:

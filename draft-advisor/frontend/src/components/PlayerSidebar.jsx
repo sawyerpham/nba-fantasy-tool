@@ -121,13 +121,12 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <div className="small" style={{ margin: "4px 0" }} data-testid="spend-verdict">
               <CallBadge call={spend.verdict} />
               {spend.verdict !== "cannot" && <span className="muted"> <Term k="comfort">comfort limit</Term> ${spend.stretch} · <Term k="walk">walk-away</Term> ${spend.walk_away}</span>}
-              <div className="muted" style={{ marginTop: 3 }}>{spend.text}</div>
             </div>
           )}
           {!rec.can_bid && <div className="warn-text small">You can't bid: {rec.rationale[rec.rationale.length - 1]}</div>}
           <details className="small" style={{ marginTop: 4 }}>
             <summary>show the math</summary>
-            <ul>{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
+            <ul>{spend?.text && <li data-testid="call-why">{spend.text}</li>}{rec.rationale.map((line, i) => <li key={i}>{line}</li>)}</ul>
           </details>
         </div>
       )}
