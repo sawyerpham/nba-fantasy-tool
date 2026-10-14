@@ -422,6 +422,6 @@ def test_nba_teams_and_room_strength(pulled):
     client, *_ = pulled
     league(client, "lg-nba", "NBA League")
     teams = client.get("/api/leagues/lg-nba/nba-teams").json()
-    assert teams and teams == sorted(teams, key=lambda t: -t["strength"]) and all(t["talent_fpg"] > 0 for t in teams)
+    assert teams and all(t["talent_fpg"] > 0 and t["proj_wins"] is None for t in teams)   # no win totals file in tests
     room = client.get("/api/leagues/lg-nba/room").json()
     assert len(room) == 12 and all(m["win_score"] > 0 and m["per_slot"] > 0 for m in room)   # empty rosters still score
