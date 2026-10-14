@@ -10,7 +10,7 @@ export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClo
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Max this manager could pay for this pick: their max bid, plus this pick's own money when it is already theirs.
+  // Max this manager could pay for this pick: their cap, plus this pick's own money when it is already theirs.
   const maxFor = (m) => (m.manager_id === pick.manager_id
     ? m.budget.remaining + pick.price - minBid * m.budget.open_mandatory
     : m.budget.max_bid);
@@ -67,7 +67,7 @@ export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClo
           </label>
           <label>Price $
             <input type="number" min={minBid} max={maxBid} value={price} onChange={(e) => setPrice(e.target.value)} data-testid="edit-pick-price" autoFocus />
-            <span className="small muted"> max for this manager: ${maxBid}</span>
+            <span className="small muted"> cap for this manager: ${maxBid}</span>
             <div className="row" style={{ marginTop: 4 }}>
               <button type="button" className="small" onClick={() => setPrice(clamp(Number(price) - 1))}>−1</button>
               <button type="button" className="small" onClick={() => setPrice(clamp(Number(price) + 1))}>+1</button>

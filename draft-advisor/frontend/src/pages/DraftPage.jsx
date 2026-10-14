@@ -248,7 +248,7 @@ export default function DraftPage({ leagueId }) {
           <span className="spacer" />
           {live && (
             <span className="sync-box" data-testid="sync-box">
-              <label className="inline small" title="check the Sleeper draft every 3 s and record new picks automatically">
+              <label className="inline small" data-tip="Checks the Sleeper draft every second: records picks, shows the live nomination and bid.">
                 <input type="checkbox" checked={sync} onChange={(e) => setSync(e.target.checked)} data-testid="sync-toggle" /> Sleeper sync
               </label>
               {sync && syncInfo && (
@@ -288,9 +288,9 @@ export default function DraftPage({ leagueId }) {
             const over = t.fair != null ? t.price - t.fair : null;
             return (
               <div key={t.key} className={`toast ${over == null ? "" : over > 2 ? "over" : over < -2 ? "under" : ""}`}
-                onClick={() => goToManager(t.manager_id)} title="go to his team in the room">
+                onClick={() => goToManager(t.manager_id)}>
                 <strong>{t.manager}</strong> drafted <strong>{t.player}</strong> for <strong>${t.price}</strong>
-                {over != null && <span className="toast-tag">{over > 2 ? `overpaid $${over}` : over < -2 ? `bargain, $${-over} under` : "fair price"}</span>}
+                {over != null && <span className="toast-tag" data-tip={`Sold price vs his fair value ($${t.fair}). Within $2 counts as a fair price.`}>{over > 2 ? `overpaid $${over}` : over < -2 ? `bargain, $${-over} under` : "fair price"}</span>}
                 <span className="muted"> · ${t.left} left</span>
                 {toasts.length > 1 && <span className="muted"> · +{toasts.length - 1} more</span>}
               </div>
@@ -303,7 +303,7 @@ export default function DraftPage({ leagueId }) {
         <section className="dg-left">
           <div className="dg-pane">
             {live ? <SpendingGuide leagueId={leagueId} live={live} refreshKey={refreshKey} onSelect={setSelected}
-              lot={sync ? liveLot : null} />
+              lot={sync ? liveLot : null} rankings={rankings} />
               : <div className="panel muted small">The spending guide appears here once the draft starts.</div>}
           </div>
         </section>
@@ -335,7 +335,7 @@ export default function DraftPage({ leagueId }) {
                       <span className="small muted">by {nameOf(nominated.nominated_by)}</span>
                       <button className="primary" onClick={() => setDismissed(null)} data-testid="btn-record-bid">Record winner</button>
                     </>
-                  ) : <span className="muted">Nobody yet — click On the block on a player, or turn on Sleeper sync</span>}
+                  ) : <span className="muted">Nobody yet: double-click a player in the rankings, or turn on Sleeper sync</span>}
                 </>
               )}
               {!recordTarget && <><span className="spacer" />{markDrafted}</>}
@@ -387,7 +387,7 @@ export default function DraftPage({ leagueId }) {
       <section className="room" id="room">
         <div className="room-title">
           <h2 style={{ margin: 0 }}>The room</h2>
-          <span className="small muted">every manager's money, max bid, roster and habits · click a player for his profile</span>
+          <span className="small muted">every manager's money, cap, roster and habits · click a player for his profile</span>
           <span className="spacer" />
           <button className="small ghost" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑ Draft</button>
         </div>

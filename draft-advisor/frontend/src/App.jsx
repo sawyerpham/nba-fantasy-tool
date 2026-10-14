@@ -4,6 +4,7 @@ import DataPage from "./pages/DataPage.jsx";
 import LeaguePage from "./pages/LeaguePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import DraftPage from "./pages/DraftPage.jsx";
+import { TipLayer } from "./components/Terms.jsx";
 
 const TABS = [
   ["data", "Data"],
@@ -71,6 +72,7 @@ export default function App() {
         {tab === "settings" && <SettingsPage leagueId={leagueId} />}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
       </main>
+      <TipLayer />
     </>
   );
 }

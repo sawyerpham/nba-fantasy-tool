@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { Term } from "./Terms.jsx";
 
 // The rankings' Managers view: every fantasy team's money and two strength estimates (see backend engine/room.py).
+// [sort key, label or glossary term, class]
 const COLS = [
-  ["name", "Manager", ""],
-  ["fp_gen", "Est FP/G", "projected FP/G of the players in starting spots now", "num"],
-  ["win_score", "Win score", "projected weekly Lock-In score of the finished lineup: starters' expected best game of the week × availability, empty starting spots filled with what the team's money buys (higher = more likely to win the league)", "num"],
-  ["remaining", "$ left", "", "num"],
-  ["per_slot", "$/slot", "money per open roster spot", "num"],
-  ["max_bid", "Max bid", "", "num"],
-  ["empty_starters", "Open starters", "starting spots still empty", "num"],
+  ["name", "Manager"], ["fp_gen", "est_fpg", "num"], ["win_score", "win_score", "num"], ["remaining", "left", "num"],
+  ["per_slot", "per_slot", "num"], ["max_bid", "cap", "num"], ["empty_starters", "open_starters", "num"],
 ];
 
 export default function TeamsTable({ leagueId, refreshKey, onOpenRoom }) {
@@ -29,17 +26,17 @@ export default function TeamsTable({ leagueId, refreshKey, onOpenRoom }) {
     <table data-testid="teams-table">
       <thead>
         <tr>
-          <th className="num" title="rank by win score">#</th>
-          {COLS.map(([key, label, title, cls]) => (
-            <th key={key} className={`${cls || ""} sortable ${sort.key === key ? "sorted" : ""}`} title={title} onClick={() => onSort(key)}>
-              {label}<span className="sort-arrow">{sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>
+          <th className="num"><span data-tip="Rank by win score.">#</span></th>
+          {COLS.map(([key, label, cls]) => (
+            <th key={key} className={`${cls || ""} sortable ${sort.key === key ? "sorted" : ""}`} onClick={() => onSort(key)}>
+              {key === "name" ? label : <Term k={label} />}<span className="sort-arrow">{sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>
             </th>
           ))}
         </tr>
       </thead>
       <tbody>
         {rows.map((t) => (
-          <tr key={t.manager_id} className={`clickable ${t.is_user ? "selected" : ""}`} onClick={() => onOpenRoom?.()} title="open the room">
+          <tr key={t.manager_id} className={`clickable ${t.is_user ? "selected" : ""}`} onClick={() => onOpenRoom?.()}>
             <td className="num muted">{byWin.indexOf(t.manager_id) + 1}</td>
             <td><strong>{t.name}</strong>{t.is_user && <span className="muted"> (you)</span>}{t.tendency?.style === "star chaser" && <span className="badge warn">star chaser</span>}</td>
             <td className="num">{t.fp_gen.toFixed(1)}</td>

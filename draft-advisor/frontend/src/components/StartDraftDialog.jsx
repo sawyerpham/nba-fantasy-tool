@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import PlayerSearch from "./PlayerSearch.jsx";
+import { Term } from "./Terms.jsx";
 
 const VERDICT = {
   good: { label: "GOOD keep", cls: "good" },
@@ -12,9 +13,9 @@ function Verdict({ ev }) {
   if (!ev) return null;
   const v = VERDICT[ev.verdict] || VERDICT.even;
   return (
-    <span className={`verdict ${v.cls}`} data-testid="keeper-verdict" title={ev.note}>
-      {v.label}: ${ev.keeper_price} vs fair ${ev.fair_value.toFixed(0)} ({ev.surplus >= 0 ? "+" : "−"}${Math.abs(ev.surplus).toFixed(0)})
-      {ev.rank ? ` · rank #${ev.rank}` : ""}{!ev.affordable ? " · over max bid!" : ""}
+    <span className={`verdict ${v.cls}`} data-testid="keeper-verdict" data-tip={ev.note}>
+      {v.label}: ${ev.keeper_price} vs fair value ${ev.fair_value.toFixed(0)} ({ev.surplus >= 0 ? "+" : "−"}${Math.abs(ev.surplus).toFixed(0)})
+      {ev.rank ? ` · rank #${ev.rank}` : ""}{!ev.affordable ? " · over his cap!" : ""}
     </span>
   );
 }
@@ -111,7 +112,7 @@ export default function StartDraftDialog({ leagueId, view, keeperSettings, onClo
           One row per manager{perManager > 1 ? ` (${perManager} each, the league's keeper limit)` : ""}. Find the player, type <strong>last year's price</strong>; this year's price follows the league rule ({ruleText}) and can be overridden. Rows without a player are ignored.
         </p>
         <table>
-          <thead><tr><th>manager</th><th>player</th><th>last year $</th><th>this year $</th><th>keep?</th><th></th></tr></thead>
+          <thead><tr><th>manager</th><th>player</th><th>last year $</th><th>this year $</th><th><Term k="keep_call">keep?</Term></th><th></th></tr></thead>
           <tbody>
             {rows.map((r, i) => {
               const m = managers.find((x) => x.manager_id === r.manager_id);

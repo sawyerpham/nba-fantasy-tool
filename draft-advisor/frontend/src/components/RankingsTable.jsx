@@ -1,19 +1,18 @@
 import React from "react";
 import { PosList, posClass } from "./Pos.jsx";
+import { Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
 
 const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_term: "OUT-LT", out_season: "SEASON" };
 
-// Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
+// Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [4] is Proj FP/G.
+// [sort key, glossary term (or plain label), class]; hover a header for the term's definition.
 const COLS = [
-  ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", "", "col-narrow-hide"],
-  ["pos", "Pos", "fantasy positions (Sleeper); below: Sleeper's positional rank, e.g. #2 SG"],
-  ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num col-narrow-hide"],
-  ["availability", "Avail", "weeks with a game / season weeks", "num"],
-  ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num col-narrow-hide"],
-  ["fit", "Fit", "fit for your team, 0-100: how good he is vs the best left, × 0.6 if he'd only reach your bench, × less if his price is past your stretch / walk-away", "num"],
-  ["price", "$", "pay up to: the record bar's recommended max for you right now", "num"],
+  ["rank", "rank", "num"], ["full_name", "Player"], ["team_abbr", "Tm", "col-narrow-hide"], ["pos", "pos_rank"],
+  ["avg_fpts", "fpg", "num"], ["owned_pct", "rost", "num col-narrow-hide"], ["availability", "avail", "num"],
+  ["min", "min", "num col-narrow-hide"], ["fit", "fit", "num"], ["price", "your_max", "num"],
 ];
+const HEAD = { rank: "#", pos_rank: "Pos" };
 
 // ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
 // Hover text for the Value cell: every factor that moved this player away from plain FP.
@@ -44,10 +43,11 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
     <table data-testid="rankings-table">
       <thead>
         <tr>
-          {COLS.map(([key, label, title, cls]) => {
+          {COLS.map(([key, term, cls]) => {
+            const label = TERMS[term] ? <Term k={term}>{HEAD[term]}</Term> : term;
             return (
-              <th key={label || "actions"} className={`${cls || ""} ${key && onSort ? "sortable" : ""} ${sort?.key === key ? "sorted" : ""}`} onClick={() => key && onSort && onSort(key)} title={title ? `${title}${key ? " · click to sort" : ""}` : (key ? "click to sort" : "")}>
-                {key === "rank" ? <span data-testid="rank-sort">{label}{arrow(key)}</span> : <>{label}{key ? arrow(key) : ""}</>}
+              <th key={key} className={`${cls || ""} ${onSort ? "sortable" : ""} ${sort?.key === key ? "sorted" : ""}`} onClick={() => onSort && onSort(key)}>
+                {key === "rank" ? <span data-testid="rank-sort">{label}{arrow(key)}</span> : <>{label}{arrow(key)}</>}
               </th>
             );
           })}
@@ -63,11 +63,10 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               className={`clickable ${r.player_id === selectedId ? "selected" : ""} ${r.rosterable ? "" : "unrosterable"} ${newTier ? "tier-start" : ""}`}
               onClick={() => onSelect(r.player_id)}
               onDoubleClick={() => live && onBlock(r)}
-              title={live ? "double-click to put him on the block" : ""}
               data-testid={`rank-row-${r.player_id}`}
             >
               <td className="rank-cell">
-                {r.tier != null && <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} title={`tier ${r.tier}: ${r.tier_left} of ${r.tier_size} left`}>T{r.tier}</span>}
+                {r.tier != null && <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} data-tip={`Tier ${r.tier}: ${r.tier_left} of ${r.tier_size} still available. ${TERMS.tier[1]}`}>T{r.tier}</span>}
                 {" "}<span className="rank-num muted">{r.rank}</span>
               </td>
               <td>
@@ -76,32 +75,34 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 <div>
                 <div className="player-name">
                   {r.full_name}
-                  {inj && <span className={`inj ${inj === "DTD" ? "" : "out"}`} title={r.injury_note || r.injury_status}>{inj}</span>}
-                  {!r.has_stats && <span className="badge warn" title="no NBA.com stats (Sleeper-only player)">no stats</span>}
-                  {r.unsigned_per_sleeper && <span className="badge" title="Sleeper lists this player as unsigned">FA?</span>}
-                  {r.team_conflict && <span className="badge info" title={`NBA.com ${r.team_conflict.nba_api} vs Sleeper ${r.team_conflict.sleeper}`}>team?</span>}
-                  {r.eligibility_source === "none" && <span className="badge none" title="eligibility not set — edit in the sidebar">elig?</span>}
+                  {inj && <span className={`inj ${inj === "DTD" ? "" : "out"}`} data-tip={r.injury_note || r.injury_status}>{inj}</span>}
+                  {!r.has_stats && <span className="badge warn" data-tip="no NBA.com stats (Sleeper-only player)">no stats</span>}
+                  {r.unsigned_per_sleeper && <span className="badge" data-tip="Sleeper lists this player as unsigned">FA?</span>}
+                  {r.team_conflict && <span className="badge info" data-tip={`NBA.com ${r.team_conflict.nba_api} vs Sleeper ${r.team_conflict.sleeper}`}>team?</span>}
+                  {r.eligibility_source === "none" && <span className="badge none" data-tip="eligibility not set — edit in the sidebar">elig?</span>}
                 </div>
                 <div className="player-sub">
-                  <span className="sub-team">{r.team_abbr || "FA"} · </span>age {r.age ?? "?"} · {r.games_played} GP · last yr {r.last_fpts.toFixed(1)}{r.proj_fpts == null && <span className="badge" title="Sleeper has no projection; last season only">no proj</span>}
-                  {r.stack_if_added > 1 && <span className="badge" title="players from this NBA team you would have">{r.team_abbr} ×{r.stack_if_added}</span>}
+                  <span className="sub-team">{r.team_abbr || "FA"} · </span>age {r.age ?? "?"} · {r.games_played} GP · last yr {r.last_fpts.toFixed(1)}{r.proj_fpts == null && <span className="badge" data-tip="Sleeper has no projection; last season only">no proj</span>}
+                  {r.stack_if_added > 1 && <span className="badge" data-tip="players from this NBA team you would have">{r.team_abbr} ×{r.stack_if_added}</span>}
                 </div>
                 </div>
                 </div>
               </td>
               <td className="muted col-narrow-hide">{r.team_abbr || "FA"}</td>
-              <td><PosList list={r.eligibility} />{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className={`pos-rank ${posClass(posFilter ? r.pos_ranks[posFilter] : r.pos_rank)}`} title={posFilter ? `rank among every ${posFilter}-eligible player by Sleeper ADP` : "Sleeper's positional rank (by Sleeper ADP within his main position)"}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
-              <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
+              <td><PosList list={r.eligibility} />{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className={`pos-rank ${posClass(posFilter ? r.pos_ranks[posFilter] : r.pos_rank)}`} data-tip={posFilter ? `Rank among every ${posFilter}-eligible player by Sleeper average draft position.` : TERMS.pos_rank[1]}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
+              <td className="num" data-tip={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
-                {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
+                {(({ dir, n, diff }) => <span className={`trend ${dir}`} data-tip={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
               </td>
               <td className="num col-narrow-hide">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>
               <td className={`num col-narrow-hide ${r.proj_min == null ? "muted" : ""}`}>{(r.proj_min ?? r.last_min)?.toFixed(1) ?? "-"}</td>
-              <td className="num" title={[r.fit?.why, valueWhy(r)].filter(Boolean).join(" · ")}>
+              <td className="num" data-tip={[r.fit?.why, valueWhy(r) && `Value: ${valueWhy(r)}`].filter(Boolean).join(" ")}>
                 <strong className={`fit-num ${!r.fit ? "" : r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit ? r.fit.score : "—"}</strong>
               </td>
-              <td className="num">{r.price != null ? <strong className="price">${r.price}</strong> : <span className="muted">—</span>}</td>
+              <td className="num" data-tip={r.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}${r.market != null ? ` Market price $${r.market}.` : ""}` : "Your max shows once the draft is live."}>
+                {r.price != null ? <strong className={`call-${r.call}`} data-testid="your-max">${r.price}</strong> : <span className="muted">{r.call === "cannot" ? "CAN'T" : "—"}</span>}
+              </td>
             </tr>
           );
         })}

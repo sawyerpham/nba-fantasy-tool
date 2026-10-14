@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import Headshot from "./Headshot.jsx";
 import { tierHue } from "./RankingsTable.jsx";
+import { Term, TERMS } from "./Terms.jsx";
 
 // Inline "who won it?" bar: price is prefilled with the recommendation, one click on a manager records the pick.
 // The slot is assigned automatically (most specific open slot); fix it afterwards from the pick chip if needed.
@@ -59,9 +60,9 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
           <span className="label">{nominatedBy ? "On the block" : "Mark drafted"}</span>
           <span className="on-block" data-testid={nominatedBy ? "on-the-block" : undefined}>{player.full_name}</span>
           {nominatedBy && <span className="small muted">by {nominatedBy}</span>}
-          {tier && tier.tier_size > 1 && <span className={`tier-tag ${tier.tier_left <= 2 ? "last" : ""}`} style={tierHue(tier.tier)} title="players of similar value still available">T{tier.tier} · {tier.tier_left - 1 === 0 ? "last one in his tier" : `${tier.tier_left - 1} more like him left`}</span>}
+          {tier && tier.tier_size > 1 && <span className={`tier-tag ${tier.tier_left <= 2 ? "last" : ""}`} style={tierHue(tier.tier)} data-tip={TERMS.tier[1]}>T{tier.tier} · {tier.tier_left - 1 === 0 ? "last one in his tier" : `${tier.tier_left - 1} more like him left`}</span>}
           {live && <LiveBid live={live} />}
-          {rec && <span className="small muted">pay up to <strong data-testid="pick-recommended">${rec.recommended_max}</strong> · fair ${Math.round(rec.fair_value)}</span>}
+          {rec && <span className="small muted"><Term k="market">market price</Term> <strong data-testid="pick-recommended">${rec.recommended_max}</strong> · <Term k="fair">fair value</Term> ${Math.round(rec.fair_value)}</span>}
           <span className="spacer" />
           {search}
           <button type="button" className="small ghost" onClick={onCancel} title="close (Esc)" data-testid="pick-cancel">Cancel</button>
@@ -74,10 +75,10 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
               <button
                 key={m.manager_id} type="button" className={`mgr-btn ${m.is_user ? "you" : ""}`}
                 disabled={busy || empty || tooMuch} onClick={() => record(m.manager_id)}
-                title={empty ? "enter a price first" : tooMuch ? `max bid $${m.budget.max_bid}` : `${m.name} wins at $${n}`}
+                title={empty ? "enter a price first" : tooMuch ? `cap $${m.budget.max_bid}` : `${m.name} wins at $${n}`}
                 data-testid={`pick-mgr-${m.manager_id}`}
               >
-                {m.name}<span className="mgr-max" data-testid={`pick-max-${m.manager_id}`}>${m.budget.max_bid}</span>
+                {m.name}<span className="mgr-max" data-testid={`pick-max-${m.manager_id}`} data-tip={`${m.name}'s cap: ${TERMS.cap[1]}`}>${m.budget.max_bid}</span>
               </button>
             );
           })}

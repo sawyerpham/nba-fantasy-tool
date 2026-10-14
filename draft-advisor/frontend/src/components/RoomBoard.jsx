@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { PosList, PosTag } from "./Pos.jsx";
 import { api } from "../api.js";
 import Headshot from "./Headshot.jsx";
+import { Term, TERMS } from "./Terms.jsx";
 
 // Page 2 of the draft: one card per manager with money, roster by spot, needs and habits.
 // Click a player for his profile; ✎ edits the pick; drag it onto another card to move it.
@@ -37,13 +38,13 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
               {t.style === "star chaser" && <span className="badge warn" data-testid={`tendency-${m.manager_id}`}>star chaser</span>}
               {t.style === "spreads money" && <span className="badge">spreads money</span>}
               {t.style === "new" && <span className="badge info">new</span>}
-              {m.outbids_me && <span className="badge warn" title="their max bid is higher than yours">can outbid you</span>}
+              {m.outbids_me && <span className="badge warn" data-tip="Their cap is higher than yours: they can always bid more than you.">can outbid you</span>}
             </div>
             <div className="room-money">
               <span><span className="big" data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span></span>
-              <span className="muted">max <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
-              <span className="muted"><strong style={{ color: "var(--text)" }}>${m.per_slot}</strong>/slot</span>
-              <span className="muted">{b.open_mandatory} open</span>
+              <span className="muted"><Term k="cap">cap</Term> <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
+              <span className="muted"><strong style={{ color: "var(--text)" }}>${m.per_slot}</strong><Term k="per_slot">/slot</Term></span>
+              <span className="muted">{b.open_mandatory} <Term k="open">open</Term></span>
             </div>
             <div className="room-slots">
               {slots.flatMap((s) => Array.from({ length: s.count }, (_, i) => {
@@ -56,13 +57,13 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                         onDragStart={(e) => { setDragging(p); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
                         onDragEnd={() => { setDragging(null); setOver(null); }}
                         onClick={() => onSelectPlayer?.(p.player_id)}
-                        title={`${p.player_name} ${p.team_abbr || ""} · ${p.fpg ?? "?"} FP/G · $${p.price}${p.is_keeper ? " (keeper)" : ""} · click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
+                        data-tip={`${p.player_name} ${p.team_abbr || ""} · ${p.fpg ?? "?"} FP/G · $${p.price}${p.is_keeper ? " (keeper)" : ""} · click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
                         <Headshot sleeperId={p.sleeper_id} name={p.player_name} size={30} />
                         <span className="room-slot-who">
                           <span className="room-slot-name">{p.player_name}</span>
-                          <span className="room-slot-sub">{p.team_abbr || "FA"} · <PosList list={p.pos} />{p.age ? ` · ${p.age}` : ""} · <span className={p.avail != null && p.avail < 0.75 ? "warn-text" : ""} title="share of fantasy weeks he played last season">{p.avail != null ? `${Math.round(p.avail * 100)}% wks` : "new"}</span>{p.is_keeper ? " · keeper" : ""}</span>
+                          <span className="room-slot-sub">{p.team_abbr || "FA"} · <PosList list={p.pos} />{p.age ? ` · ${p.age}` : ""} · <span className={p.avail != null && p.avail < 0.75 ? "warn-text" : ""} data-tip={TERMS.avail[1]}>{p.avail != null ? `${Math.round(p.avail * 100)}% avail` : "new"}</span>{p.is_keeper ? " · keeper" : ""}</span>
                         </span>
-                        <span className="room-slot-fpg" title="projected FP/G">{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
+                        <span className="room-slot-fpg" data-tip={TERMS.fpg[1]}>{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
                         <strong className="room-slot-price">${p.price}</strong>
                         {onEditPick && <button type="button" className="pick-edit" title="edit or remove this pick"
                           onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`}>✎</button>}
