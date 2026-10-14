@@ -168,23 +168,33 @@ def rankings(
     from ..engine.fit import fit_scores
 
     fits = fit_scores(session, manager_id or session.user_manager_id(), rows, prices)
-    pos_rank = _sleeper_pos_ranks(session)
+    pos_rank, pos_ranks = _sleeper_pos_ranks(session)
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
              "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
-             "pos_rank": pos_rank.get(r.player_id)}
+             "pos_rank": pos_rank.get(r.player_id), "pos_ranks": pos_ranks.get(r.player_id, {})}
             for r in rows]
 
 
-def _sleeper_pos_ranks(session) -> dict[int, str]:
-    """Sleeper's positional rank ("#2 SG"): order by Sleeper's standard ADP within each player's main Sleeper
-    position, over the whole pool (drafted players keep their pre-draft rank, as in Sleeper)."""
-    by_pos: dict[str, list[tuple[float, int]]] = {}
+def _sleeper_pos_ranks(session) -> tuple[dict[int, str], dict[int, dict[str, str]]]:
+    """Positional ranks by Sleeper's standard ADP, over the whole pool (drafted players keep their pre-draft rank):
+    - main: within each player's main Sleeper position, as Sleeper shows it ("#2 SG");
+    - every position he is eligible at ({"PG": "#3 PG", "SG": "#2 SG"}), for the position filter."""
+    main_lists: dict[str, list[tuple[float, int]]] = {}
+    elig_lists: dict[str, list[tuple[float, int]]] = {}
     for pid, rec in session.players.items():
         adp = (rec.projection or {}).get("adp_std")
-        pos = rec.fantasy.position if rec.fantasy else None
-        if adp and pos:
-            by_pos.setdefault(pos, []).append((adp, pid))
-    return {pid: f"#{i} {pos}" for pos, lst in by_pos.items() for i, (_, pid) in enumerate(sorted(lst), 1)}
+        if not adp or not rec.fantasy:
+            continue
+        if rec.fantasy.position:
+            main_lists.setdefault(rec.fantasy.position, []).append((adp, pid))
+        for pos in rec.fantasy.fantasy_positions:
+            elig_lists.setdefault(pos, []).append((adp, pid))
+    main = {pid: f"#{i} {pos}" for pos, lst in main_lists.items() for i, (_, pid) in enumerate(sorted(lst), 1)}
+    every: dict[int, dict[str, str]] = {}
+    for pos, lst in elig_lists.items():
+        for i, (_, pid) in enumerate(sorted(lst), 1):
+            every.setdefault(pid, {})[pos] = f"#{i} {pos}"
+    return main, every
 
 
 def _prices(session, rows, manager_id: str | None) -> dict[int, int]:

@@ -35,7 +35,7 @@ const trend = (r) => {
 // Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
 export const tierHue = (tier) => ({ "--h": Math.round(Math.min(tier - 1, 14) / 14 * 130) });
 
-export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort }) {
+export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort, posFilter }) {
   // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
   const byRank = !sort || sort.key === "rank";
@@ -89,7 +89,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 </div>
               </td>
               <td className="muted">{r.team_abbr || "FA"}</td>
-              <td>{r.eligibility.join("/")}{r.pos_rank && <div className="pos-rank" title="Sleeper's positional rank (by Sleeper ADP within his main position)">{r.pos_rank}</div>}</td>
+              <td>{r.eligibility.join("/")}{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className="pos-rank" title={posFilter ? `rank among every ${posFilter}-eligible player by Sleeper ADP` : "Sleeper's positional rank (by Sleeper ADP within his main position)"}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
