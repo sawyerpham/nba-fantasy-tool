@@ -134,7 +134,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           <div className="team-card-head">
             <img src={data.team.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
             <div>
-              <div className="team-name">{data.team.name}</div>
+              <div className="team-name">{data.team.name}{data.team.conference && <span className={`conf conf-${data.team.conference}`}>{data.team.conference}</span>}</div>
               <div className="small muted">
                 {data.team.player_rank && <><strong style={{ color: "var(--text)" }}>#{data.team.player_rank}</strong> on the team · </>}
                 <span title={`sum of the top 8 players' projected FP/G (${data.team.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
