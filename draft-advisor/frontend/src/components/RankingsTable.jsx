@@ -6,11 +6,11 @@ const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_te
 
 // Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
 const COLS = [
-  ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
+  ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", "", "col-narrow-hide"],
   ["pos", "Pos", "fantasy positions (Sleeper); below: Sleeper's positional rank, e.g. #2 SG"],
-  ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num"],
+  ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num col-narrow-hide"],
   ["availability", "Avail", "weeks with a game / season weeks", "num"],
-  ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
+  ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num col-narrow-hide"],
   ["fit", "Fit", "fit for your team, 0-100: how good he is vs the best left, × 0.6 if he'd only reach your bench, × less if his price is past your stretch / walk-away", "num"],
   ["price", "$", "pay up to: the record bar's recommended max for you right now", "num"],
 ];
@@ -83,21 +83,21 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                   {r.eligibility_source === "none" && <span className="badge none" title="eligibility not set — edit in the sidebar">elig?</span>}
                 </div>
                 <div className="player-sub">
-                  age {r.age ?? "?"} · {r.games_played} GP · last yr {r.last_fpts.toFixed(1)}{r.proj_fpts == null && <span className="badge" title="Sleeper has no projection; last season only">no proj</span>}
+                  <span className="sub-team">{r.team_abbr || "FA"} · </span>age {r.age ?? "?"} · {r.games_played} GP · last yr {r.last_fpts.toFixed(1)}{r.proj_fpts == null && <span className="badge" title="Sleeper has no projection; last season only">no proj</span>}
                   {r.stack_if_added > 1 && <span className="badge" title="players from this NBA team you would have">{r.team_abbr} ×{r.stack_if_added}</span>}
                 </div>
                 </div>
                 </div>
               </td>
-              <td className="muted">{r.team_abbr || "FA"}</td>
+              <td className="muted col-narrow-hide">{r.team_abbr || "FA"}</td>
               <td><PosList list={r.eligibility} />{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className={`pos-rank ${posClass(posFilter ? r.pos_ranks[posFilter] : r.pos_rank)}`} title={posFilter ? `rank among every ${posFilter}-eligible player by Sleeper ADP` : "Sleeper's positional rank (by Sleeper ADP within his main position)"}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
               </td>
-              <td className="num">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
+              <td className="num col-narrow-hide">{r.owned_pct != null ? `${Math.round(r.owned_pct)}%` : "—"}</td>
               <td className={`num ${r.availability < 0.7 ? "warn-text" : "muted"}`}>{Math.round(r.availability * 100)}%</td>
-              <td className={`num ${r.proj_min == null ? "muted" : ""}`}>{(r.proj_min ?? r.last_min)?.toFixed(1) ?? "-"}</td>
+              <td className={`num col-narrow-hide ${r.proj_min == null ? "muted" : ""}`}>{(r.proj_min ?? r.last_min)?.toFixed(1) ?? "-"}</td>
               <td className="num" title={[r.fit?.why, valueWhy(r)].filter(Boolean).join(" · ")}>
                 <strong className={`fit-num ${!r.fit ? "" : r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit ? r.fit.score : "—"}</strong>
               </td>
