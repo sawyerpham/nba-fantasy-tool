@@ -6,7 +6,7 @@ const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_te
 // Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
 const COLS = [
   ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
-  ["pos", "Pos", "fantasy positions (Sleeper); below: Sleeper's positional rank, e.g. SG2"],
+  ["pos", "Pos", "fantasy positions (Sleeper); below: Sleeper's positional rank, e.g. #2 SG"],
   ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num"],
   ["availability", "Avail", "weeks with a game / season weeks", "num"],
   ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
