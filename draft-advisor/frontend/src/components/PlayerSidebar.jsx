@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { PosList, PosTag } from "./Pos.jsx";
+import { PosList, PosTag, posClass } from "./Pos.jsx";
+import { tierHue } from "./RankingsTable.jsx";
 import { api, qs } from "../api.js";
 import { VerdictBadge } from "./SpendingGuide.jsx";
 import Headshot from "./Headshot.jsx";
@@ -60,7 +61,15 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
-        <span className="profile-tags">{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
+        <span className="profile-tags">
+          <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
+          {(row?.pos_rank || row?.tier != null) && (
+            <span className="profile-ranks">
+              {row.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} title="Sleeper positional rank (ADP within his main position)">{row.pos_rank}</span>}
+              {row.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} title={`tier ${row.tier}: ${row.tier_left} of ${row.tier_size} left`}>T{row.tier}</span>}
+            </span>
+          )}
+        </span>
         {rec_.sleeper_status && rec_.sleeper_status !== "ACT" && <span className="badge">{rec_.sleeper_status}</span>}
         {rec_.unsigned_per_sleeper && <span className="badge warn">unsigned per Sleeper</span>}
         {rec_.team_conflict && <span className="badge info">NBA.com {rec_.team_conflict.nba_api} / Sleeper {rec_.team_conflict.sleeper}</span>}
