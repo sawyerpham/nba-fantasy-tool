@@ -119,12 +119,28 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
     order = sorted(talent, key=lambda t: -talent[t])
     abbr = session.players[player_id].team_abbr
     roster = sorted(by_team.get(abbr, []), reverse=True)
+    # Card order: Sleeper's starting five PG -> C, then 'next up' by depth (all the #2s PG -> C, then #3s ...).
+    pos_order = ("PG", "SG", "SF", "PF", "C")
+
+    def depth(pid: int) -> tuple[int, int]:
+        f = session.players[pid].fantasy
+        if not f or not f.depth_chart_order or f.depth_chart_position not in pos_order:
+            return (99, 9)
+        return (f.depth_chart_order, pos_order.index(f.depth_chart_position))
+    by_depth = sorted((pid for _, pid in roster), key=lambda pid: (depth(pid), -dict((p, f) for f, p in roster)[pid]))
+    shown = by_depth[:ROTATION + 2]
+    if player_id not in shown:
+        shown.append(player_id)
+    fpg_of = {pid: f for f, pid in roster}
     team_ref = next((t for t in state.stats.list_teams() if t.abbreviation == abbr), None) if hasattr(state.stats, "list_teams") else None
 
     def mate(fpg: float, pid: int) -> dict:
         rec = session.players[pid]
         proj_min = (rec.projection or {}).get("sp")
+        f = rec.fantasy
         return {"player_id": pid, "name": rec.full_name, "sleeper_id": rec.sleeper_id, "fpg": round(fpg, 1),
+                "depth": f"{f.depth_chart_position}{f.depth_chart_order}" if f and f.depth_chart_order else None,
+                "starter": bool(f and f.depth_chart_order == 1),
                 "min": round(proj_min / 60, 1) if proj_min else None,
                 "pos": (session.overrides.get(pid).eligibility if session.overrides.get(pid) else []),
                 "drafted_by": names.get(drafted.get(pid)), "is_self": pid == player_id}
@@ -135,5 +151,5 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
         "talent_fpg": round(talent.get(abbr, 0.0), 1),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
-        "teammates": [mate(f, pid) for f, pid in roster[:ROTATION + 2]],
+        "teammates": [mate(fpg_of[pid], pid) for pid in shown],
     }

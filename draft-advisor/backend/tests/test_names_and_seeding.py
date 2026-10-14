@@ -68,7 +68,7 @@ def test_seed_always_takes_sleeper_and_keeps_the_users_notes():
     fa2 = FantasyAttributes(sleeper_id="2", fantasy_positions=["PG", "SG"], injury_status_raw=None)
     out = seed_overrides([record(1, fa1), record(2, fa2)], existing, now=LATER)
     # old manual values (from before manual editing was removed) are replaced by Sleeper's
-    assert out[1].eligibility == ["PF", "SF"] and out[1].eligibility_source == "sleeper"
+    assert out[1].eligibility == ["SF", "PF"] and out[1].eligibility_source == "sleeper"  # PG -> C order
     assert out[1].injury_status == "day_to_day" and out[1].injury_note == "Ankle" and out[1].notes == "keep me"
     assert out[2].eligibility == ["PG", "SG"] and out[2].eligibility_source == "sleeper"
     assert out[2].injury_status == "healthy" and out[2].injury_source == "sleeper" and out[2].injury_note == ""

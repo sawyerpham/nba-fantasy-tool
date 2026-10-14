@@ -143,14 +143,19 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             </div>
           </div>
           <div className="teammates">
-            {data.team.teammates.map((m, i) => (
-              <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
-                onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
-                title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
-                <span className="teammate-rank">{i + 1}</span>
-                <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
-                <span className="teammate-name">{m.name}</span>
-                <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>
+            {[["Starters", data.team.teammates.filter((m) => m.starter)], ["Next up", data.team.teammates.filter((m) => !m.starter)]].map(([label, list]) => (
+              <div key={label} className="teammate-col">
+                <div className="bid-label">{label}</div>
+                {list.map((m) => (
+                  <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
+                    onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
+                    title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
+                    <span className="teammate-rank">{m.depth || "—"}</span>
+                    <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
+                    <span className="teammate-name">{m.name}</span>
+                    <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

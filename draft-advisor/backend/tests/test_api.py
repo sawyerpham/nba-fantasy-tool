@@ -411,4 +411,8 @@ def test_player_detail_has_his_team_with_teammates_and_ranks(pulled):
     team = client.get(f"/api/players/{JOKIC}?league_id=lg-team&include_history=false").json()["team"]
     assert team["abbr"] == "DEN" and team["logo"].endswith("/den.png")
     assert team["player_rank"] == 1 and 1 <= team["talent_rank"] <= team["teams"]
-    assert team["teammates"][0]["is_self"] and all(m["fpg"] >= team["teammates"][-1]["fpg"] for m in team["teammates"])
+    assert any(m["is_self"] for m in team["teammates"])
+    starters = [m for m in team["teammates"] if m["starter"]]   # depth chart: starters first, PG -> C
+    assert team["teammates"][:len(starters)] == starters
+    order = ["PG", "SG", "SF", "PF", "C"]
+    assert [order.index(m["depth"][:-1]) for m in starters] == sorted(order.index(m["depth"][:-1]) for m in starters)
