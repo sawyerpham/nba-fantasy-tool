@@ -409,3 +409,6 @@ th.sorted { color: var(--primary); }
 .pos-PF { color: var(--pos-PF) !important; } .pos-C { color: var(--pos-C) !important; }
 .room-money { white-space: nowrap; gap: 10px; }
 .team-logo-sm { width: 30px; height: 30px; object-fit: contain; }
+.conf { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; vertical-align: 2px; }
+.conf-East { background: rgba(59, 130, 246, 0.18); color: #93c5fd; } .conf-West { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+[data-theme="light"] .conf-East { color: #1d4ed8; } [data-theme="light"] .conf-West { color: #b91c1c; }

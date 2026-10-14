@@ -151,8 +151,12 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
                 "pos": (session.overrides.get(pid).eligibility if session.overrides.get(pid) else []),
                 "drafted_by": names.get(drafted.get(pid)), "is_self": pid == player_id}
 
+    from .. import config
+
+    rel = config.standings_rel(session.league.stats_season)
+    conference = ((state.store.read_json(rel)["teams"] if state.store.exists(rel) else {}).get(abbr) or {}).get("conference")
     return {
-        "abbr": abbr, "name": team_ref.full_name if team_ref else abbr,
+        "abbr": abbr, "name": team_ref.full_name if team_ref else abbr, "conference": conference,
         "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
         "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
         "talent_fpg": round(talent.get(abbr, 0.0), 1),

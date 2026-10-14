@@ -302,5 +302,6 @@ def nba_teams(league_id: str, state: AppState = Depends(get_state)) -> list[dict
             "talent_fpg": round(fp, 1), "best": best.full_name if best else None, "best_sleeper_id": best.sleeper_id if best else None,
             "best_fpg": round(roster[0][0], 1) if roster else None, "best_id": best.player_id if best else None,
             "wins": st["wins"] if st else None, "losses": st["losses"] if st else None, "diff": st["diff"] if st else None,
+            "conference": st["conference"] if st else None,
         })
     return sorted(out, key=lambda t: (t["proj_wins"] is None, -(t["proj_wins"] or 0), -t["talent_fpg"]))
