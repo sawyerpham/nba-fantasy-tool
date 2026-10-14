@@ -69,7 +69,7 @@ def validate_bid(price: int, budget: ManagerBudget, min_bid: int) -> str | None:
         return f"bid ${price} is below the minimum bid ${min_bid}"
     if price > budget.max_bid:
         return (
-            f"bid ${price} exceeds max bid ${budget.max_bid}: ${budget.remaining} remaining minus "
+            f"bid ${price} exceeds the cap ${budget.max_bid}: ${budget.remaining} remaining minus "
             f"${budget.reserved} reserved for {budget.open_mandatory - 1} other mandatory slot(s)"
         )
     return None

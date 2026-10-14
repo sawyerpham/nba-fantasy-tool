@@ -55,7 +55,7 @@ def test_explicit_price_override_and_unaffordable_flag(session):
     [ev] = evaluate_keepers(session, [KeeperCandidate("m1", JOKIC, last_price=17, keeper_price=60)])
     assert ev.keeper_price == 60 and ev.computed_price == 20
     [too_much] = evaluate_keepers(session, [KeeperCandidate("m1", JOKIC, last_price=190)])
-    assert too_much.keeper_price == 228 and not too_much.affordable and "max bid" in too_much.note
+    assert too_much.keeper_price == 228 and not too_much.affordable and "cap" in too_much.note
 
 
 def test_unknown_player_is_a_draft_error(session):

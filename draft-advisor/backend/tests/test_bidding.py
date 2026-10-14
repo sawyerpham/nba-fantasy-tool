@@ -65,7 +65,7 @@ def test_pressure_is_normalized_by_number_of_other_managers():
     assert rec_few.competition_pressure == 2.0 and rec_many.competition_pressure == 11.0
     for rec in (rec_few, rec_many):  # everyone in, even pace -> exactly +15 % over fair value (before caps)
         assert rec.recommended_max == max(1, min(rec.my_max_bid, round(rec.fair_value * 1.15)))
-    assert any("Replacement level" in line for line in rec.rationale) and any("Recommended max" in line for line in rec.rationale)
+    assert any("Replacement level" in line for line in rec.rationale) and any("Market price" in line for line in rec.rationale)
 
 
 def test_recommendation_never_exceeds_max_bid_reservation():
@@ -76,7 +76,7 @@ def test_recommendation_never_exceeds_max_bid_reservation():
     assert rec.my_budget_remaining == 7 and rec.my_open_mandatory == 5 and rec.my_max_bid == 3
     assert rec.fair_value > 3
     assert rec.recommended_max == 3
-    assert "capped at your max bid $3" in rec.rationale[-1]
+    assert "limited to your cap $3" in rec.rationale[-1]
 
 
 def test_recommendation_is_at_least_min_bid_for_below_replacement_players():

@@ -65,7 +65,7 @@ def test_validate_bid_rejects_bids_that_would_strand_the_roster():
     b = manager_budget(lg, m, [])
     assert validate_bid(186, b, lg.min_bid) is None
     err = validate_bid(187, b, lg.min_bid)
-    assert err is not None and "exceeds max bid $186" in err and "14 other mandatory slot" in err
+    assert err is not None and "exceeds the cap $186" in err and "14 other mandatory slot" in err
     assert "below the minimum" in validate_bid(0, b, lg.min_bid)
 
 

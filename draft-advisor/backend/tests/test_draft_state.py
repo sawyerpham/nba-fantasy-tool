@@ -50,7 +50,7 @@ def test_keepers_disabled_rejects_keepers_and_keeper_cost_obeys_reservation():
     with pytest.raises(DraftError, match="disabled"):
         engine(keeper=KeeperSettings(enabled=False)).start([KeeperAssignment("m1", 1, 5)])
     e = engine()
-    with pytest.raises(DraftError, match="exceeds max bid"):
+    with pytest.raises(DraftError, match="exceeds the cap"):
         e.start([KeeperAssignment("m1", 1, 46)])  # 50 - 5 reserved = 45 max
     assert e.draft.status == "setup"
 
@@ -163,7 +163,7 @@ def test_pick_validations():
         e.pick(999, "m1", 5)
     with pytest.raises(DraftError, match="below the minimum"):
         e.pick(1, "m1", 0)
-    with pytest.raises(DraftError, match=r"exceeds max bid \$45.*5 other mandatory"):
+    with pytest.raises(DraftError, match=r"exceeds the cap \$45.*5 other mandatory"):
         e.pick(1, "m1", 46)
     e.pick(1, "m1", 45)
     with pytest.raises(DraftError, match="already drafted"):
@@ -291,7 +291,7 @@ def test_edit_pick_changes_price_and_slot_for_the_same_manager():
 
 def test_edit_pick_enforces_the_reservation_rule_for_the_new_manager():
     e = live_engine()
-    with pytest.raises(DraftError, match="exceeds max bid"):
+    with pytest.raises(DraftError, match="exceeds the cap"):
         e.edit_pick(2, manager_id="m3", price=37)   # m3: $40 left, 5 open slots after this pick -> max $36
     e.edit_pick(2, manager_id="m3", price=36)
     assert e.budget("m3").remaining == 4 and e.budget("m3").max_bid == 1

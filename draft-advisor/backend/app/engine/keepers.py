@@ -70,7 +70,7 @@ def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[Kee
         verdict = verdict_for(surplus, rec.fair_value)
         affordable = price <= rec.my_max_bid
         if not affordable:
-            note = f"${price} exceeds this manager's max bid ${rec.my_max_bid} (reservation rule)"
+            note = f"${price} exceeds this manager's cap ${rec.my_max_bid} (reservation rule)"
         elif verdict == "good":
             note = f"keep: ${price} is ${surplus:.0f} under the ${rec.fair_value:.0f} fair value"
         elif verdict == "bad":

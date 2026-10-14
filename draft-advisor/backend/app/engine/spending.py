@@ -10,13 +10,12 @@ plan            = per open starter slot (position slots first, then G/F, then UT
                   allowance; bench slots at min_bid each. A player appears at most once across the plan.
 room_ps         = (room remaining − room bench at min_bid) / room open starter slots: what the average
                   open starter slot in the room will be paid for from here on
-stretch(p)      = the price after which my money per remaining starter slot drops below 80 % of room_ps
-walk_away(p)    = the price after which it drops below 50 % of room_ps (stars-and-scrubs territory)
-call on p       = fair-only when no rival can pay fair value; go (at the market max) when few rivals can go
-                  past the market max; go with an overpay ceiling (≤ 25 % over the market max, ≤ stretch) when
-                  the player is top-tier, I am in the top third of the room by money and a bidding war is
-                  likely; fits when the market max ≤ stretch; stretch when ≤ walk_away; otherwise pass at
-                  walk_away. The text always says what is left per starter afterwards versus the room.
+stretch(p)      = "comfort limit": the price after which my money per open starter drops below 80 % of room_ps
+walk_away(p)    = "walk-away": the price after which it drops below 50 % of room_ps; never pay more
+call on p       = target = fair value when no rival can pay it, else the market price (+ up to 25 %, never past the
+                  comfort limit, for a top player when I'm in the top third by money and a bidding war is likely);
+                  buy when target <= comfort limit, star (only) when <= walk-away, else pricey with "your max" = walk-away.
+                  The same call and "your max" are shown everywhere (rankings, profile, live lot, Fit's price factor).
 """
 
 from __future__ import annotations
@@ -72,18 +71,18 @@ class TargetAdvice:
     slot: str | None                 # slot they would take on my roster
     tier: str                        # top | starter | bench
     fair_value: float
-    recommended: int                 # market max from the bid guide (fair × pressure, capped)
-    stretch: int                     # above this, my money per remaining starter falls under 80 % of the room's
-    walk_away: int                   # above this, under 50 %: only for a stars-and-scrubs build
-    all_in: int                      # my max bid
-    suggested: int                   # what to actually go to
+    recommended: int                 # "market price": fair value × competition pressure, capped at my cap
+    stretch: int                     # "comfort limit": above this, my money per open starter falls under 80 % of the room's
+    walk_away: int                   # "walk-away": above this, under 50 %; never pay more
+    all_in: int                      # my cap (the most I may legally bid)
+    suggested: int                   # "your max": the most to bid (never past the walk-away)
     rivals_at_fair: int              # other managers who can pay fair value and fit the player
     rivals_above_market: int         # other managers whose max bid reaches the market max
     left_after: int
     per_slot_after: float            # per remaining mandatory slot
     per_starter_after: float         # per remaining starter slot after bench at min_bid
     room_per_starter: float
-    verdict: str                     # go | fair-only | fits | stretch | pass | cannot
+    verdict: str                     # the call: buy | star (star only) | pricey (too pricey) | cannot
     text: str
 
 
@@ -116,6 +115,7 @@ class SpendingGuide:
     targets: list[TargetAdvice]
     advice: list[str] = field(default_factory=list)
     nominations: list[dict] = field(default_factory=list)
+    calls: dict[int, TargetAdvice] = field(default_factory=dict)   # call + your max for each of `call_ids`
 
 
 def ordinal(n: int) -> str:
@@ -156,6 +156,7 @@ def spending_guide(
     opening_dollars_per_var: float,
     focus_player_id: int | None = None,
     targets_n: int = DEFAULT_TARGETS,
+    call_ids: Iterable[int] = (),
 ) -> SpendingGuide:
     min_bid = league.min_bid
     money = [manager_money(league, m, picks) for m in managers]
@@ -253,7 +254,7 @@ def spending_guide(
         if not r.can_bid or slot is None:
             reason = r.rationale[-1] if r.rationale else "no open slot"
             return TargetAdvice(**base, stretch=0, walk_away=0, suggested=0, left_after=me.remaining, per_slot_after=me.per_slot,
-                                per_starter_after=0.0, verdict="cannot", text=f"You can't bid on {target.full_name}: {reason}")
+                                per_starter_after=0.0, verdict="cannot", text=f"CAN'T: you can't bid on {target.full_name}: {reason}")
 
         starter_slot = slot not in ("BN", "IR")
         starters_after = me.open_starters - 1 if starter_slot else me.open_starters
@@ -281,42 +282,28 @@ def spending_guide(
             return (f"you'd have ${left} for {slots} slot{'s' if slots != 1 else ''}: ${per_starter(x):.0f} per starter{share}, "
                     f"bench at ${min_bid}")
 
-        if not starter_slot:
-            suggested = min(market, me.max_bid)
-            verdict = "fits"
-            text = f"Bench slot: pay up to ${suggested} for {target.full_name} and no more; {tail(suggested)}."
-        elif rivals_at_fair == 0:
-            suggested = clamp(fair)
-            verdict = "fair-only"
-            text = (f"Nobody else can pay fair value (${fair}) for {target.full_name}. Bid to ${suggested} and stop; "
-                    f"there is no one to outbid, and {tail(suggested)}.")
-        elif rivals_above <= few_rivals:
-            suggested = min(market, me.max_bid)
-            verdict = "go"
-            text = (f"Go for {target.full_name}: pay up to ${suggested} (fair ${fair}). Only {rivals_above} rival"
-                    f"{'s' if rivals_above != 1 else ''} can go past that, so no need to overpay; {tail(suggested)}.")
-        elif market <= stretch:
-            if tier == "top" and rich:
-                suggested = min(stretch, int(round(market * 1.25)))
-                verdict = "go"
-                text = (f"Go for {target.full_name}: pay up to ${suggested} (market max ${market}, fair ${fair}). "
-                        f"{rivals_above} rivals can also reach ${market}, but you have the money: at ${suggested} {tail(suggested)}.")
-            else:
-                suggested = market
-                verdict = "fits"
-                text = (f"{target.full_name} at ${market} fits: {tail(market)}. {rivals_above} rival"
-                        f"{'s' if rivals_above != 1 else ''} can go higher; let them.")
-        elif market <= walk:
-            suggested = market
-            verdict = "stretch"
-            text = (f"{target.full_name} is worth the market max ${market} only as your star: {tail(market)}, so the rest "
-                    f"becomes ${min_bid} picks. {rivals_above} rival{'s' if rivals_above != 1 else ''} can go higher.")
+        # What you'd pay if it goes your way: fair value when nobody else can pay it, else the market price, with
+        # up to 25 % on top (never past the comfort limit) for a top player when you are rich and a war is likely.
+        if rivals_at_fair == 0:
+            target_price = clamp(fair)
+        elif tier == "top" and rich and rivals_above > few_rivals and market <= stretch:
+            target_price = max(market, min(stretch, int(round(market * 1.25))))
         else:
-            suggested = walk
-            verdict = "pass"
-            text = (f"Walk away from {target.full_name} at ${walk}: the market max is ${market}, but paying it leaves "
-                    f"${per_starter(market):.0f} per starter, under half the room's ${room_ps:.0f}, and {rivals_above} rival"
-                    f"{'s' if rivals_above != 1 else ''} can outbid you anyway.")
+            target_price = min(market, me.max_bid)
+        why = ("nobody else can pay fair value, so don't go past it" if rivals_at_fair == 0
+               else f"{rivals_above} rival{'s' if rivals_above != 1 else ''} can reach the market price")
+        if target_price <= stretch:
+            suggested, verdict = target_price, "buy"
+            text = (f"BUY: bid up to ${suggested} for {target.full_name} (market price ${market}, fair value ${fair}); "
+                    f"{why}. After that {tail(suggested)}.")
+        elif target_price <= walk:
+            suggested, verdict = target_price, "star"
+            text = (f"STAR ONLY: ${target_price} for {target.full_name} is past your comfort limit ${stretch}; pay it only if he's "
+                    f"your star. After that {tail(target_price)}, so the rest become cheap picks.")
+        else:
+            suggested, verdict = walk, "pricey"
+            text = (f"TOO PRICEY: {target.full_name}'s market price ${target_price} is past your walk-away ${walk}. Stop at ${walk}: "
+                    f"paying ${target_price} leaves ${per_starter(target_price):.0f} per open starter, under half the room's ${room_ps:.0f}.")
         left = me.remaining - suggested
         per_slot_after = round(left / (me.open_mandatory - 1), 1) if me.open_mandatory > 1 else 0.0
         return TargetAdvice(**base, stretch=stretch, walk_away=walk, suggested=suggested, left_after=left,
@@ -329,6 +316,9 @@ def spending_guide(
         if target is not None:
             focus = advise(target)
 
+    by_id = {p.player_id: p for p in available}
+    calls = {pid: advise(by_id[pid]) for pid in call_ids if pid in by_id}
+
     targets: list[TargetAdvice] = []
     if me.open_mandatory > 0:
         for p in candidates:
@@ -339,7 +329,7 @@ def spending_guide(
             targets.append(advise(p))
 
     # ---- nomination ideas
-    # drain: players the room will pay a lot for that you won't buy (no fitting slot, or priced past your stretch);
+    # drain: players the room will pay a lot for that you won't buy (no fitting slot, above your cap, or too pricey);
     # sneak: players you want that few rivals can afford right now, so they may go near fair value.
     # ponytail: scans the top NOMINATION_SCAN available; widen if late-draft suggestions run dry.
     nominations: list[dict] = []
@@ -351,13 +341,13 @@ def spending_guide(
             rivals = sum(1 for x in others if x.open_mandatory > 0 and x.max_bid >= market)
             if not p.rosterable or market > me.max_bid:
                 if rivals >= 2:
-                    drain.append((market * rivals, p, market, rivals, "you have no slot for him" if not p.rosterable else "above your max bid"))
+                    drain.append((market * rivals, p, market, rivals, "you have no slot for him" if not p.rosterable else "above your cap"))
                 continue
             a = advise(p)
-            if a.verdict == "pass":   # past your walk-away; a mere stretch may still be your star
+            if a.verdict == "pricey":   # past your walk-away; a star-only player may still be your star
                 if rivals >= 2:
                     drain.append((market * rivals, p, market, rivals, "too pricey for your build"))
-            elif a.verdict in ("go", "fits", "fair-only") and r.can_bid and rivals <= few_rivals:
+            elif a.verdict == "buy" and r.can_bid and rivals <= few_rivals:
                 sneak.append((-p.value, p, a.suggested, rivals, ""))
         for _, p, market, rivals, why in sorted(drain, key=lambda t: -t[0])[:3]:
             nominations.append({"kind": "drain", "player_id": p.player_id, "name": p.full_name, "price": market, "rivals": rivals,
@@ -377,11 +367,11 @@ def spending_guide(
         )
     if opening_dollars_per_var > 0 and rate.dollars_per_var > 0:
         if inflation >= 1.05:
-            advice.append(f"Prices are running {inflation:.2f}× the opening rate: more money than talent is left, stars will go over fair value.")
+            advice.append(f"Price level {inflation:.2f}×: more money than talent is left, stars will go over fair value.")
         elif inflation <= 0.95:
-            advice.append(f"Prices are {inflation:.2f}× the opening rate: talent is outlasting money, bargains ahead.")
+            advice.append(f"Price level {inflation:.2f}×: talent is outlasting money, bargains ahead.")
         else:
-            advice.append("Prices are near the opening rate.")
+            advice.append("Price level near 1.00×: prices as at the start.")
     if me.open_mandatory > 0 and me.open_starters == 0:
         advice.append(f"Only bench slots left: ${me.discretionary} above the ${min_bid} minimums.")
     elif me.open_starters > 0:
@@ -395,9 +385,9 @@ def spending_guide(
     if me.open_mandatory > 0:
         if can_outbid:
             names = ", ".join(f"{x.name} ${x.max_bid}" for x in can_outbid[:3]) + (" …" if len(can_outbid) > 3 else "")
-            advice.append(f"{len(can_outbid)} manager{'s' if len(can_outbid) != 1 else ''} can outbid your max of ${me.max_bid}: {names}.")
+            advice.append(f"{len(can_outbid)} manager{'s have' if len(can_outbid) != 1 else ' has'} a higher cap than your ${me.max_bid}: {names}.")
         else:
-            advice.append(f"Nobody can outbid your max of ${me.max_bid}.")
+            advice.append(f"Nobody has a higher cap than your ${me.max_bid}.")
 
     return SpendingGuide(
         manager_id=me.manager_id,
@@ -427,4 +417,5 @@ def spending_guide(
         targets=targets,
         advice=advice,
         nominations=nominations,
+        calls=calls,
     )

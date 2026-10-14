@@ -162,15 +162,16 @@ def rankings(
     tier = tiers(session.pool_values())
     left = Counter(tier.get(pid) for pid in session.available_ids())
     size = Counter(tier.values())
-    prices = _prices(session, rows, manager_id) if session.draft.status == "live" else {}
+    # The call (buy / star / pricey / cannot), your max and the market price: the same numbers as the spending guide.
+    calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in rows]).calls if session.draft.status == "live" else {}
     # Why FP/G moved vs last season: data/fpg_reasons.json, written by hand / an LLM pass (optional).
     reasons = state.store.read_json("fpg_reasons.json").get("players", {}) if state.store.exists("fpg_reasons.json") else {}
     from ..engine.fit import fit_scores
 
-    fits = fit_scores(session, manager_id or session.user_manager_id(), rows, prices)
+    fits = fit_scores(session, manager_id or session.user_manager_id(), rows, calls)
     pos_rank, pos_ranks = _sleeper_pos_ranks(session)
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
-             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
+             **_call_fields(calls.get(r.player_id)), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
              "pos_rank": pos_rank.get(r.player_id), "pos_ranks": pos_ranks.get(r.player_id, {})}
             for r in rows]
 
@@ -197,20 +198,12 @@ def _sleeper_pos_ranks(session) -> tuple[dict[int, str], dict[int, dict[str, str
     return main, every
 
 
-def _prices(session, rows, manager_id: str | None) -> dict[int, int]:
-    """'Pay up to' for each listed player (the record bar's number), sharing one market rate across rows."""
-    from ..engine.bidding import market_rate, recommend_bid
-
-    manager = manager_id or session.user_manager_id()
-    available = session.rank(session.engine.picks_for(manager), session.available_ids())
-    pool = session.pool_values()
-    rate = market_rate(session.league, session.managers, session.draft.picks, (p.value for p in available), pool)
-    progress = session.engine.progress()
-    out = {}
-    for r in rows:
-        rec = recommend_bid(session.league, session.managers, session.draft.picks, manager, r, available, pool, progress, rate=rate)
-        out[r.player_id] = rec.recommended_max if rec.can_bid else round(rec.fair_value)
-    return out
+def _call_fields(c) -> dict:
+    """price = your max (None when you can't bid), market = market price, call = buy | star | pricey | cannot."""
+    if c is None:
+        return {"price": None, "market": None, "call": None}
+    can = c.verdict != "cannot"
+    return {"price": c.suggested if can else None, "market": c.recommended if can else round(c.fair_value), "call": c.verdict}
 
 
 @router.get("/spending")
