@@ -183,7 +183,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <strong>{val.avg_fpts} FP/G</strong> over {val.games_played} games · weekly-best avg <strong>{val.weekly_best_avg}</strong> · best game {val.best_game_fpts} · top-25% avg {val.top_quarter_avg} · total {Math.round(val.total_fpts)} FP
           </div>
           <div>{val.weeks_played} of {val.season_weeks} fantasy weeks with a game ({Math.round(val.availability * 100)}%) · {val.minutes_avg} min · teams {val.teams_played_for.join(", ") || "-"}</div>
-          <details><summary className="small">Per-game FP (last 15)</summary><div className="muted">{val.per_game_fpts.slice(-15).join(", ")}</div></details>
         </div>
       ) : <p className="muted small">No game logs for the stats season.</p>}
 
