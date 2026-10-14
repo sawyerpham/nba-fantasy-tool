@@ -210,6 +210,8 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
     assert [p["pos"] for p in b["positions"]] == ["PG", "SG", "SF", "PF", "C"]
     per_team = next(x.count for x in s.league.roster_slots if x.slot == "C")
     assert c["need"] == 12 * per_team - 1 and c["my_open"] == per_team and c["status"] in {"scarce", "tight", "plenty"}
+    room_starters = sum(n for m in s.managers for sl, n in __import__("app.engine.roster", fromlist=["x"]).open_slots(s.league, s.engine.picks_for(m.manager_id)).items() if sl not in ("BN", "IR"))
+    assert sum(p["left"] for p in b["positions"]) <= room_starters   # each player counted once, where he is needed most
     assert c["cliff"]["left"] >= 1 and all(ch["name"] != s.managers[0].name for ch in c["chasers"])
     sale = b["sales"][0]
     assert sale["player_id"] == JOKIC and sale["price"] == 80 and sale["diff"] == 80 - sale["fair"] and sale["fair"] > 1

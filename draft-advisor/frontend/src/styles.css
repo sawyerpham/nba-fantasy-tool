@@ -519,3 +519,6 @@ th.sorted { color: var(--primary); }
 .sale-diff { text-align: right; font-weight: 700; color: var(--muted); } .sale-diff.over { color: var(--danger); } .sale-diff.under { color: var(--ok); }
 .sale-row:hover .clip:first-child { color: var(--primary); }
 @media (max-height: 1100px) { .market-pane { display: none; } }
+
+.role-tag { font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--badge); color: var(--badge-text); white-space: nowrap; }
+.role-tag.star { background: var(--even); color: var(--even-t); }

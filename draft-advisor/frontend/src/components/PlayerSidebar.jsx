@@ -63,10 +63,16 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
-          {(row?.pos_rank || row?.tier != null) && (
+          {(row?.pos_rank || row?.tier != null || data.team?.role) && (
             <span className="profile-ranks">
-              {row.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{row.pos_rank}</span>}
-              {row.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={`Tier ${row.tier}: ${row.tier_left} of ${row.tier_size} still available. ${TERMS.tier[1]}`}>T{row.tier}</span>}
+              {data.team?.role && (() => {
+                const r = data.team.role;
+                return <span className={`role-tag ${r.star ? "star" : ""}`} data-testid="team-role"
+                  data-tip={`${r.label} on ${data.team.abbr}: ${r.fpg} projected FP/G, #${r.rank} on the team, ${Math.round(r.share * 100)}% of the top 8's production${r.vs ? `; ${r.star ? "next best" : "the #1 is"} ${r.vs.name} at ${r.vs.fpg}` : ""}. Based on Sleeper's projection, which includes usage and minutes.`}>
+                  {r.star ? "★ " : ""}{r.label}</span>;
+              })()}
+              {row?.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{row.pos_rank}</span>}
+              {row?.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={`Tier ${row.tier}: ${row.tier_left} of ${row.tier_size} still available. ${TERMS.tier[1]}`}>T{row.tier}</span>}
             </span>
           )}
         </span>

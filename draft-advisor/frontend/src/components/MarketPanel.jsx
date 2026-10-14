@@ -28,7 +28,7 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
               <tr key={p.pos} className={p.my_open ? "you-need" : ""}>
                 <td><PosTag text={p.pos} />{p.my_open > 0 && <span className="need-dot" data-tip={`You have ${p.my_open} open ${p.pos} spot${p.my_open > 1 ? "s" : ""}.`} />}</td>
                 <td className="num">{p.need}</td>
-                <td className="num">{p.left}</td>
+                <td className="num" data-tip={`${p.left} starter-quality players counted at ${p.pos}${p.also ? `; ${p.also} more can also play ${p.pos} but were counted at a position that needs them more` : ""}.`}>{p.left}</td>
                 <td><span className={`verdict ${cls}`}>{word}</span></td>
                 <td className="clip" data-tip={c ? `${c.names.join(", ")}${c.left > c.names.length ? " …" : ""} left in T${c.tier}.${c.drop != null ? ` The next tier's best (T${c.next_tier}) is ${c.drop} value points lower.` : ""}` : ""}>
                   {c ? <>T{c.tier} ×{c.left}{c.drop != null && <span className="muted"> · −{c.drop}</span>}</> : "—"}

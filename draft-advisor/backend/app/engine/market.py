@@ -2,9 +2,11 @@
 
 per position (PG SG SF PF C):
   need     = open starting spots of that position across the room
-  left     = available players eligible there among the top N by value, N = open starting spots in the room;
-             a multi-position player is split evenly across his positions (a PG/SG adds 0.5 to each), so the
-             positions' "left" add up to N
+  left     = starter-quality players (the top N available by value, N = open starting spots in the room)
+             counted where they will be used: single-position players at their position, then each
+             multi-position player, best first, at whichever of his positions has the most need still
+             unfilled (a PF/C goes to C while C is the shorter one). "left" adds up to N.
+  also     = multi-position players counted at another position who could also play here
   status   = scarce when left < need, tight when left < 1.3 × need, else plenty
   tier     = best tier left there, how many of it are left (names) and the value drop to the next tier's best
   chasers  = rivals with an open spot there whose cap reaches the fair value of the best player left there
@@ -43,10 +45,26 @@ def market_board(session, manager_id: str) -> dict:
     calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in best_by_pos.values() if r]).calls
     caps = {m.manager_id: session.engine.budget(m.manager_id).max_bid for m in session.managers}
 
+    needs = {pos: sum(o.get(pos, 0) for o in opens.values()) for pos in POSITIONS}
+    counted = {pos: 0 for pos in POSITIONS}
+    also = {pos: 0 for pos in POSITIONS}
+    multi = []
+    for r in top:
+        ps = [pos for pos in POSITIONS if pos in elig[r.player_id]]
+        if len(ps) == 1:
+            counted[ps[0]] += 1
+        elif ps:
+            multi.append(ps)
+    for ps in multi:   # already best-first
+        home = max(ps, key=lambda pos: needs[pos] - counted[pos])
+        counted[home] += 1
+        for pos in ps:
+            if pos != home:
+                also[pos] += 1
+
     positions = []
     for pos in POSITIONS:
-        need = sum(o.get(pos, 0) for o in opens.values())
-        left = round(sum(1 / len(elig[r.player_id] & set(POSITIONS)) for r in top if pos in elig[r.player_id]))
+        need, left = needs[pos], counted[pos]
         status = "scarce" if left < need else "tight" if left < 1.3 * need else "plenty"
         at_pos = [r for r in rows if pos in elig[r.player_id]]
         cliff = None
@@ -61,7 +79,7 @@ def market_board(session, manager_id: str) -> dict:
         fair = round(calls[best.player_id].fair_value) if best and best.player_id in calls else None
         chasers = [{"name": m.name, "cap": caps[m.manager_id]} for m in session.managers
                    if m.manager_id != manager_id and opens[m.manager_id].get(pos, 0) > 0 and fair is not None and caps[m.manager_id] >= fair]
-        positions.append({"pos": pos, "need": need, "left": left, "status": status, "cliff": cliff,
+        positions.append({"pos": pos, "need": need, "left": left, "also": also[pos], "status": status, "cliff": cliff,
                           "best": best.full_name if best else None, "best_fair": fair,
                           "chasers": sorted(chasers, key=lambda c: -c["cap"]), "my_open": opens[manager_id].get(pos, 0)})
 
