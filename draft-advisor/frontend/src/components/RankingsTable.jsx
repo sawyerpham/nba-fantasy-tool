@@ -6,7 +6,7 @@ const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_te
 // Column order matters to e2e/mock-draft.mjs: [3] is eligibility, [5] is rostered %.
 const COLS = [
   ["rank", "#", "tier and overall rank (best to worst)", "num"], ["full_name", "Player", "team · age · games played"], ["team_abbr", "Tm", ""],
-  ["pos", "Pos", "fantasy positions (Sleeper, editable)"],
+  ["pos", "Pos", "fantasy positions (Sleeper); below: Sleeper's positional rank, e.g. SG2"],
   ["avg_fpts", "Proj FP/G", "projected fantasy points per game this season (Sleeper); arrows = change vs last season", "num"], ["owned_pct", "Rost%", "% of Sleeper leagues with him on a roster", "num"],
   ["availability", "Avail", "weeks with a game / season weeks", "num"],
   ["min", "Min", "projected minutes per game (Sleeper); grey = last season's, no projection", "num"],
@@ -89,7 +89,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 </div>
               </td>
               <td className="muted">{r.team_abbr || "FA"}</td>
-              <td>{r.eligibility.join("/")}</td>
+              <td>{r.eligibility.join("/")}{r.pos_rank && <div className="pos-rank" title="Sleeper's positional rank (by Sleeper ADP within his main position)">{r.pos_rank}</div>}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}

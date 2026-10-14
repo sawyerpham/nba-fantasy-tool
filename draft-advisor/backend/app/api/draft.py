@@ -168,9 +168,23 @@ def rankings(
     from ..engine.fit import fit_scores
 
     fits = fit_scores(session, manager_id or session.user_manager_id(), rows, prices)
+    pos_rank = _sleeper_pos_ranks(session)
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
-             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id)}
+             "price": prices.get(r.player_id), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
+             "pos_rank": pos_rank.get(r.player_id)}
             for r in rows]
+
+
+def _sleeper_pos_ranks(session) -> dict[int, str]:
+    """Sleeper's positional rank ("SG2"): order by Sleeper's standard ADP within each player's main Sleeper
+    position, over the whole pool (drafted players keep their pre-draft rank, as in Sleeper)."""
+    by_pos: dict[str, list[tuple[float, int]]] = {}
+    for pid, rec in session.players.items():
+        adp = (rec.projection or {}).get("adp_std")
+        pos = rec.fantasy.position if rec.fantasy else None
+        if adp and pos:
+            by_pos.setdefault(pos, []).append((adp, pid))
+    return {pid: f"{pos}{i}" for pos, lst in by_pos.items() for i, (_, pid) in enumerate(sorted(lst), 1)}
 
 
 def _prices(session, rows, manager_id: str | None) -> dict[int, int]:

@@ -109,6 +109,7 @@ def fantasy_attributes_from_entry(entry: dict[str, Any]) -> FantasyAttributes:
     return FantasyAttributes(
         sleeper_id=str(entry["player_id"]),
         fantasy_positions=_positions(entry.get("fantasy_positions")),
+        position=entry.get("position") or None,
         fantasy_positions_alt=alt or None,
         injury_status_raw=entry.get("injury_status") or None,
         injury_body_part=entry.get("injury_body_part") or None,

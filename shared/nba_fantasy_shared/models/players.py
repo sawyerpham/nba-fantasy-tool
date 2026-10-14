@@ -80,6 +80,7 @@ class FantasyAttributes(BaseModel):
 
     sleeper_id: str
     fantasy_positions: list[Position] = Field(default_factory=list)
+    position: str | None = None          # Sleeper's main position (what its positional ranks use)
     fantasy_positions_alt: list[Position] | None = None
     injury_status_raw: str | None = None
     injury_body_part: str | None = None
