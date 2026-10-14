@@ -42,3 +42,24 @@ def test_transactions_name_the_manager_and_skip_failed_waivers():
     assert out["tx-1"]["who"] == "A" and out["tx-1"]["text"] == "added P7 and dropped P8 (waiver, $20 FAAB)"
     assert "tx-2" not in out
     assert out["tx-3"]["text"] == "Trade: A gets P5 · B gets P7"
+
+
+def test_mock_draft_picks_are_matched_by_seat():
+    from types import SimpleNamespace
+
+    from app.services.sleeper_league import sync_picks
+
+    me = SimpleNamespace(manager_id="m4", name="me", sleeper_user_id="u4", sleeper_roster_id=4)
+    other = SimpleNamespace(manager_id="m6", name="six", sleeper_user_id="u6x", sleeper_roster_id=6)
+    luka = SimpleNamespace(player_id=10, sleeper_id="1970", full_name="Luka")
+    ant = SimpleNamespace(player_id=11, sleeper_id="2133", full_name="Ant")
+    recorded = []
+    engine = SimpleNamespace(drafted_ids=lambda: set(), pick=lambda pid, mid, price, slot: recorded.append((pid, mid, price)))
+    session = SimpleNamespace(players={10: luka, 11: ant}, managers=[me, other], league=SimpleNamespace(min_bid=1),
+                              draft=SimpleNamespace(status="live"), engine=engine, invalidate=lambda: None)
+    draft = {"status": "drafting", "draft_order": {"u4": 4}, "slot_to_roster_id": {"4": 4, "6": 6}}
+    picks = [{"pick_no": 1, "player_id": "1970", "picked_by": "", "roster_id": None, "draft_slot": 4, "metadata": {"amount": "58"}},
+             {"pick_no": 2, "player_id": "2133", "picked_by": "", "roster_id": None, "draft_slot": 6, "metadata": {"amount": "27"}}]
+    platform = SimpleNamespace(get_json=lambda path: picks if path.endswith("/picks") else draft)
+    out = sync_picks(platform, session, "D")
+    assert out["errors"] == [] and recorded == [(10, "m4", 58), (11, "m6", 27)]
