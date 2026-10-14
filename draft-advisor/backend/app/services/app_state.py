@@ -11,6 +11,7 @@ from nba_fantasy_shared.models.export import DraftExport
 from nba_fantasy_shared.models.league import LeagueSettings, Manager
 from nba_fantasy_shared.models.players import PlayerOverrides, PlayerRecord, PlayerValuation
 from nba_fantasy_shared.models.scoring import ScoringSettings
+from nba_fantasy_shared.scoring import blend_availability
 from nba_fantasy_shared.providers.base import FantasyPlatformProvider, StatsProvider
 from nba_fantasy_shared.providers.sleeper_provider import PLAYERS_CACHE_REL
 from nba_fantasy_shared.storage import JsonStore
@@ -81,7 +82,26 @@ class AppState:
         service = ValuationService(self.store, stats_season or self.stats_season)
         if not self.store.exists(config.game_logs_rel(service.stats_season)):
             return {}
-        return service.compute(scoring)
+        return self._blend_availability(service.compute(scoring), service.stats_season)
+
+    def _blend_availability(self, valuations: dict[int, PlayerValuation], stats_season: str) -> dict[int, PlayerValuation]:
+        """availability = last season and the two before it, 50/30/20 (seasons before his NBA career skipped)."""
+        if not self.store.exists(config.AVAILABILITY_HISTORY_REL):
+            return valuations
+        history = self.store.read_json(config.AVAILABILITY_HISTORY_REL).get("seasons", {})
+        seasons = config.prior_seasons(stats_season)
+        out = {}
+        for pid, v in valuations.items():
+            rec = self.players.get(pid)
+            exp = rec.bio.years_exp if rec and rec.bio else None
+            shares: list[float | None] = [v.availability]
+            for k, season in enumerate(seasons, start=2):   # k = seasons back from the roster season
+                share = history.get(season, {}).get(str(pid))
+                in_league = exp >= k if exp is not None else share is not None
+                shares.append((share or 0.0) if in_league else None)
+            per_season = {stats_season: v.availability, **{s: x for s, x in zip(seasons, shares[1:]) if x is not None}}
+            out[pid] = v.model_copy(update={"availability": blend_availability(shares), "availability_seasons": per_season})
+        return out
 
     def data_status(self) -> dict:
         def age(rel: str) -> float | None:

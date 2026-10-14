@@ -181,6 +181,7 @@ class PullService:
             nba_bios = self._pull_nba_pool()
             self._pull_schedule()
             self._pull_standings()
+            self._pull_availability_history()
             sleeper_all, fantasy = self._pull_sleeper(sources, force_sleeper)
             self._pull_projections(sources)
             self._pull_sleeper_leagues(sources)
@@ -239,6 +240,23 @@ class PullService:
         if standings:
             self.store.write_json(config.standings_rel(self.stats_season),
                                   {"pulled_at": utcnow().isoformat(), "teams": standings}, indent=None)
+
+    def _pull_availability_history(self) -> None:
+        """Share of fantasy weeks played in the two seasons before the stats season (for 3-season availability)."""
+        if not hasattr(self.stats, "fetch_game_dates"):
+            return
+        self._phase("availability_history")
+        from nba_fantasy_shared.scoring import season_week_shares
+
+        seasons: dict[str, dict[str, float]] = {}
+        for season in config.prior_seasons(self.stats_season):
+            try:
+                shares = season_week_shares(self.stats.fetch_game_dates(season))
+            except (CallFailed, ValueError, KeyError) as exc:
+                log.warning("game dates for %s unavailable (%s); keeping the previous cache", season, exc)
+                return
+            seasons[season] = {str(pid): v for pid, v in shares.items()}
+        self.store.write_json(config.AVAILABILITY_HISTORY_REL, {"pulled_at": utcnow().isoformat(), "seasons": seasons}, indent=None)
 
     def _pull_schedule(self) -> None:
         if not hasattr(self.stats, "fetch_schedule"):

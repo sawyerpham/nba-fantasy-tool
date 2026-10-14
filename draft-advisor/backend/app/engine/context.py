@@ -153,7 +153,7 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
 
     w("\n## How to read this")
     w("- FP/G = expected fantasy points per game (Sleeper projection). wk-best = expected best game of a week (what Lock-In scores). "
-      "avail = share of fantasy weeks he played last season. value = my tool's ranking score in FP. "
+      "avail = share of fantasy weeks he played, last 3 seasons weighted 50/30/20. value = my tool's ranking score in FP. "
       "market = the price he'll likely go for in this room. your max = the most I should bid. "
       "call: BUY (market price within my comfort limit), STAR ONLY (between my comfort limit and walk-away: only worth it as my star), "
       "TOO PRICEY (past my walk-away; my max is the walk-away), CAN'T (no slot or above my cap). "

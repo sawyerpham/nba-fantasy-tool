@@ -349,6 +349,21 @@ class NbaApiProvider:
         return {abbr[r["TeamID"]]: {"wins": r["WINS"], "losses": r["LOSSES"], "conference": r["Conference"],
                                     "diff": r["DiffPointsPG"]} for r in rows if r.get("TeamID") in abbr}
 
+    def fetch_game_dates(self, season: str) -> dict[int, list[str]]:
+        """Every player's regular-season game dates (ISO) for one season, league-wide in one call."""
+        from nba_api.stats.endpoints import playergamelogs
+
+        rows = self._normalized(
+            f"PlayerGameLogs({season}) dates",
+            lambda: playergamelogs.PlayerGameLogs(season_nullable=season, season_type_nullable=REGULAR_SEASON,
+                                                  timeout=max(self._timeout(), 60)),
+        ).get("PlayerGameLogs") or []
+        out: dict[int, list[str]] = {}
+        for r in rows:
+            if r.get("PLAYER_ID") and r.get("GAME_DATE"):
+                out.setdefault(int(r["PLAYER_ID"]), []).append(str(r["GAME_DATE"])[:10])
+        return out
+
     def fetch_schedule(self, roster_season: str) -> dict[str, dict[str, int]]:
         """Games per team per NBA week for the season (see games_per_week)."""
         from nba_api.stats.endpoints import scheduleleaguev2

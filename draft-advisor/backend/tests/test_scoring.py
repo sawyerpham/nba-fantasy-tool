@@ -237,3 +237,31 @@ def test_traded_player_has_two_teams_in_history(fixtures_dir):
     rows = [r for r in load(fixtures_dir, "nba/playergamelogs_2025-26.json") if r["PLAYER_ID"] == 1630631]  # Jose Alvarado
     v = valuate(1630631, "2025-26", [game_line_from_row(r) for r in rows], DEFAULT)
     assert len(v.teams_played_for) == 2
+
+
+def test_three_season_availability_forgives_one_injured_season_but_not_chronic_ones():
+    from types import SimpleNamespace
+
+    from app.services.app_state import AppState
+    from nba_fantasy_shared.models.players import PlayerValuation
+    from nba_fantasy_shared.scoring import blend_availability, season_week_shares
+
+    # two players over a 4-week season: one plays every week, one only in week 1
+    shares = season_week_shares({1: ["2024-10-21", "2024-10-29", "2024-11-05", "2024-11-12"], 2: ["2024-10-22"]})
+    assert shares == {1: 1.0, 2: 0.25}
+    assert blend_availability([0.32, 0.96, 1.0]) == 0.648          # one bad year: 50/30/20
+    assert blend_availability([0.5, None, None]) == 0.5            # rookie-ish: only seasons in the league count
+    assert blend_availability([0.8, 0.6, None]) == round((0.5 * 0.8 + 0.3 * 0.6) / 0.8, 3)
+
+    class Store:
+        def exists(self, rel): return True
+        def read_json(self, rel): return {"seasons": {"2024-25": {"7": 0.96, "9": 0.4}, "2023-24": {"7": 1.0}}}
+
+    bio = lambda exp: SimpleNamespace(bio=SimpleNamespace(years_exp=exp))
+    fake = SimpleNamespace(store=Store(), players={7: bio(10), 8: bio(1), 9: bio(5)})
+    val = lambda pid, a: PlayerValuation(player_id=pid, stats_season="2025-26", games_played=19, per_game_fpts=[], avg_fpts=0,
+                                         best_game_fpts=0, availability=a, bonus_counts={}, minutes_avg=0, teams_played_for=[])
+    out = AppState._blend_availability(fake, {7: val(7, 0.32), 8: val(8, 0.9), 9: val(9, 0.3)}, "2025-26")
+    assert out[7].availability == 0.648 and out[7].availability_seasons == {"2025-26": 0.32, "2024-25": 0.96, "2023-24": 1.0}
+    assert out[8].availability == 0.9                                   # second-year player: last season only
+    assert out[9].availability == round(0.5 * 0.3 + 0.3 * 0.4 + 0.2 * 0.0, 3)   # in the league but missed 2023-24 entirely

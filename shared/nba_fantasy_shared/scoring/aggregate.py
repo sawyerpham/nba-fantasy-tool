@@ -144,3 +144,25 @@ def blended_value(valuation: PlayerValuation, ranking: RankingSettings) -> float
     Injury, age and eligibility modifiers are applied on top of this by the draft engine's ranker."""
     raw = ranking.weight_avg * valuation.avg_fpts + ranking.weight_ceiling * ceiling_value(valuation, ranking)
     return raw * confidence_factor(valuation.games_played, ranking.min_games_full_confidence) * availability_factor(valuation, ranking)
+
+
+# Availability over three seasons, most recent first: one injured season no longer prices a player like a
+# chronically injured one, while a player who misses time every year stays penalized.
+AVAILABILITY_SEASON_WEIGHTS = (0.5, 0.3, 0.2)
+
+
+def season_week_shares(game_dates: dict[int, list[str]]) -> dict[int, float]:
+    """Share of the season's fantasy weeks (Mon-Sun) in which each player played at least one game."""
+    all_dates = [date.fromisoformat(d) for ds in game_dates.values() for d in ds]
+    if not all_dates:
+        return {}
+    start = monday_of(min(all_dates))
+    weeks = week_index(max(all_dates), start) + 1
+    return {pid: round(len({week_index(date.fromisoformat(d), start) for d in ds}) / weeks, 3) for pid, ds in game_dates.items()}
+
+
+def blend_availability(shares: list[float | None]) -> float:
+    """Weighted mean of the seasons that count (None = before his NBA career / unknown), weights renormalized."""
+    pairs = [(w, s) for w, s in zip(AVAILABILITY_SEASON_WEIGHTS, shares) if s is not None]
+    total = sum(w for w, _ in pairs)
+    return round(sum(w * s for w, s in pairs) / total, 3) if total else 0.0
