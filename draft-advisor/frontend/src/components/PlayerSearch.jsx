@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { PosList } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 
 // Autocomplete over the player pool. onSelect(player) receives the API's brief row.
@@ -48,7 +49,7 @@ export default function PlayerSearch({ leagueId, onSelect, placeholder = "Search
         <div className="dropdown" onMouseLeave={() => setOpen(false)}>
           {hits.map((p) => (
             <div key={p.player_id} onClick={() => choose(p)} data-testid={`search-result-${p.player_id}`}>
-              {p.full_name} <span className="muted">{p.team_abbr || "FA"} · {p.eligibility.join("/") || "no elig"}</span>
+              {p.full_name} <span className="muted">{p.team_abbr || "FA"} · {p.eligibility.length ? <PosList list={p.eligibility} /> : "no position"}</span>
               {p.drafted_by && <span className="badge">drafted: {p.drafted_by}</span>}
               {!p.has_stats && <span className="badge warn">no stats</span>}
             </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { PosList, posClass } from "./Pos.jsx";
 import Headshot from "./Headshot.jsx";
 
 const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_term: "OUT-LT", out_season: "SEASON" };
@@ -89,7 +90,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
                 </div>
               </td>
               <td className="muted">{r.team_abbr || "FA"}</td>
-              <td>{r.eligibility.join("/")}{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className="pos-rank" title={posFilter ? `rank among every ${posFilter}-eligible player by Sleeper ADP` : "Sleeper's positional rank (by Sleeper ADP within his main position)"}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
+              <td><PosList list={r.eligibility} />{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className={`pos-rank ${posClass(posFilter ? r.pos_ranks[posFilter] : r.pos_rank)}`} title={posFilter ? `rank among every ${posFilter}-eligible player by Sleeper ADP` : "Sleeper's positional rank (by Sleeper ADP within his main position)"}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
               <td className="num" title={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 {(({ dir, n, diff }) => <span className={`trend ${dir}`} title={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { PosTag } from "./Pos.jsx";
 import { api } from "../api.js";
 
 const VERDICTS = {
@@ -95,7 +96,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect }) 
                 <tbody>
                   {g.plan.map((p, i) => (
                     <tr key={i}>
-                      <td>{p.slot}</td>
+                      <td><PosTag text={p.slot} /></td>
                       <td>{p.best_name ? `${p.best_name} $${p.best_price}` : "—"}</td>
                       <td>{p.fit_name ? `${p.fit_name} $${p.fit_price}` : "nobody"}</td>
                     </tr>
