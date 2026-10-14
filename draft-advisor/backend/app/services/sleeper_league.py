@@ -352,12 +352,18 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
                 errors.append(f"pick {p.get('pick_no')}: {name} {'is not in the player pool (record it by hand)' if rec is None else 'went to a Sleeper team not linked to a manager'}")
                 continue
             try:
+                fair = round(session.recommend(rec.player_id, manager.manager_id).fair_value)   # before he is gone
+            except Exception:  # noqa: BLE001 - the price check is a nice-to-have; never block the pick
+                fair = None
+            try:
                 session.engine.pick(rec.player_id, manager.manager_id, max(min_bid, _amount(p)), None)
             except DraftError as exc:
                 errors.append(f"pick {p.get('pick_no')}: {name} to {manager.name}: {exc}")
                 continue
             drafted.add(rec.player_id)
-            added.append({"player": name, "manager": manager.name, "price": max(min_bid, _amount(p))})
+            added.append({"player": name, "player_id": rec.player_id, "manager": manager.name, "manager_id": manager.manager_id,
+                          "price": max(min_bid, _amount(p)), "fair": fair,
+                          "left": session.engine.budget(manager.manager_id).remaining})
         if added:
             session.invalidate()
     last_picked = draft.get("last_picked")
