@@ -428,8 +428,11 @@ th.sorted { color: var(--primary); }
 .live-lot-who { flex: 1; min-width: 0; }
 .live-lot-name { font-size: 22px; font-weight: 800; cursor: pointer; } .live-lot-name:hover { color: var(--primary); }
 .live-lot-who .tier-tag { margin-left: 8px; }
-.live-lot-bid { text-align: right; padding: 6px 14px; border-radius: 12px; background: var(--panel-2); min-width: 140px; }
-.live-lot-bid.good { background: var(--good); } .live-lot-bid.even { background: var(--even); } .live-lot-bid.bad { background: var(--bad); }
+/* the high bid: always a white card with dark text, so it's the brightest thing on the page */
+.live-lot-bid { text-align: right; padding: 6px 14px; border-radius: 12px; background: #fff; color: #0b0d10; min-width: 140px; text-shadow: none; }
+.live-lot-bid .bid-label { color: #374151; }
+.live-lot-bid.flash { animation: bid-flash 0.9s ease-out; }
+@keyframes bid-flash { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); transform: scale(1.06); } 100% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); transform: scale(1); } }
 .live-lot-price { font-size: 34px; font-weight: 800; line-height: 1.05; }
 .live-lot-bid .live-clock { font-size: 18px; }
 /* big cards in the live block's head: the call (one word), his Worth, then the high bid */
@@ -440,7 +443,9 @@ th.sorted { color: var(--primary); }
 .live-big-word { font-size: 34px; font-weight: 900; letter-spacing: 0.04em; line-height: 1.05; }
 .live-big-sub { font-size: 12px; font-weight: 600; opacity: 0.85; line-height: 1.25; }
 .live-big .bid-label { color: inherit; opacity: 0.8; }
-.rec-dot { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; vertical-align: 1px; animation: live-pulse 1s infinite; }
+.rec-dot { display: inline-block; width: 15px; height: 15px; margin-right: 7px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; vertical-align: -2px; animation: live-pulse 1s infinite; }
+.live-lot-bid.flash .rec-dot { animation: rec-blink 0.15s steps(1) 6; }
+@keyframes rec-blink { 50% { opacity: 0; } }
 .live-lot-limits { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .live-lot-limits .lim { display: inline-flex; align-items: baseline; gap: 6px; font-size: 16px; }
 .live-lot-tips div { margin-top: 2px; }
@@ -562,6 +567,8 @@ table.small th, .plan-table th, .money-table th, .market-table th { background: 
 /* the sharp wallpaper behind small pills and inputs: give them a darker backing so their colours stay legible */
 :root:not([data-theme="light"]) :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: inset 0 0 0 999px rgba(10, 12, 16, 0.45); }
 .tip, .dropdown, .modal, .toast, input, select, textarea { text-shadow: none; }
+/* the white high-bid card: dark text needs no outline */
+:root .live-lot-bid, :root .live-lot-bid * { text-shadow: none !important; }
 /* small coloured text (positions, ranks, sub-lines) gets a tighter outline so it holds up on the white sketch */
 :root:not([data-theme="light"]) :is(.pos-c, .pos-rank, .teammate-rank, .room-slot-pos, .player-sub, .trend, .fit-num, .bid-label, .muted) {
   text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
