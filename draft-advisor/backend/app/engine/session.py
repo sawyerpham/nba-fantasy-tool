@@ -146,6 +146,26 @@ class DraftSession:
             ).dollars_per_var
         return self._opening_rate
 
+    def keeper_start_rate(self):
+        """MarketRate at the first nomination: keepers (in the draft once live, else this season's keeper rows) are
+        off the board and their cost is out of their managers' budgets. Nobody else's bidding moves it."""
+        from nba_fantasy_shared.models.draft import Pick
+
+        keepers = [p for p in self.draft.picks if p.is_keeper]
+        if self.draft.status == "setup":
+            season = self.league.roster_season
+            keepers = [Pick(pick_number=i, player_id=r.player_id, manager_id=r.manager_id, price=r.cost.amount or 0,
+                            slot="BN", is_keeper=True, timestamp=utcnow())
+                       for i, r in enumerate((r for r in self.keeper_history.records if r.season == season), 1)]
+        kept = {p.player_id for p in keepers}
+        pool = self.pool_values()
+        return market_rate(self.league, self.managers, keepers, (v for pid, v in pool.items() if pid not in kept), pool)
+
+    def start_worth(self, value: float) -> int:
+        """Worth at the first nomination: $1 + value above replacement × the post-keeper $ per point."""
+        rate = self.keeper_start_rate()
+        return round(min(self.league.min_bid + max(0.0, value - rate.replacement) * rate.dollars_per_var, rate.market_cap))
+
     def spending_guide(self, manager_id: str | None = None, player_id: int | None = None, call_ids=()) -> SpendingGuide:
         manager_id = manager_id or self.user_manager_id()
         rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),

@@ -114,6 +114,13 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         );
       })()}
 
+      {!live && row?.worth != null && (
+        <div className="small" data-testid="pre-worth">
+          <span className="bid-label"><Term k="worth" /></span> <strong style={{ fontSize: "1.3em" }}>${row.worth}</strong>
+          <span className="muted"> at the first nomination, after keepers. Max and your call show once the draft is live.</span>
+        </div>
+      )}
+
       {rec && (
         <div data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
