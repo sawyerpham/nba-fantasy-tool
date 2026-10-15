@@ -72,11 +72,11 @@ def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[Kee
         if not affordable:
             note = f"${price} exceeds this manager's cap ${rec.my_max_bid} (reservation rule)"
         elif verdict == "good":
-            note = f"keep: ${price} is ${surplus:.0f} under the ${rec.fair_value:.0f} fair value"
+            note = f"keep: ${price} is ${surplus:.0f} under his ${rec.fair_value:.0f} worth at draft start"
         elif verdict == "bad":
-            note = f"let go: ${price} is ${-surplus:.0f} over the ${rec.fair_value:.0f} fair value; you could buy similar value cheaper"
+            note = f"let go: ${price} is ${-surplus:.0f} over his ${rec.fair_value:.0f} worth at draft start; you could buy similar players cheaper"
         else:
-            note = f"even: ${price} is about the ${rec.fair_value:.0f} fair value"
+            note = f"even: ${price} is about his ${rec.fair_value:.0f} worth at draft start"
         out.append(KeeperEvaluation(
             manager_id=c.manager_id, player_id=c.player_id, full_name=record.full_name, team_abbr=record.team_abbr,
             last_price=c.last_price, keeper_price=price, computed_price=computed, fair_value=rec.fair_value,

@@ -21,10 +21,10 @@ def _money(m) -> str:
 
 def _call_cells(c, label) -> str:
     if c is None:
-        return "- | - | -"
+        return "- | -"
     if c.verdict == "cannot":
-        return f"${round(c.fair_value)} | - | CAN'T"
-    return f"${c.recommended} | ${c.suggested} | {label[c.verdict]}"
+        return "- | CAN'T"
+    return f"${c.suggested} | {label[c.verdict]}"
 
 
 def draft_context(session, manager_id: str, focus_player_id: int | None = None, top: int = 60) -> str:
@@ -125,8 +125,8 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
     calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in rows[:top]]).calls if d.status == "live" else {}
     label = {"buy": "BUY", "star": "STAR ONLY", "pricey": "TOO PRICEY", "cannot": "CAN'T"}
     w(f"\n## Best available (top {min(top, len(rows))} by value; my slot = where he'd go on my roster)")
-    w("| # | tier | player | team | pos | FP/G | wk-best | avail | age | value | market | your max | call | my slot | notes |")
-    w("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    w("| # | tier | player | team | pos | FP/G | wk-best | avail | age | value | price | call | my slot | notes |")
+    w("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in rows[:top]:
         notes = [INJURY[r.injury_status]] if r.injury_status in INJURY else []
         if r.proj_fpts is not None and r.last_fpts and abs(r.proj_fpts - r.last_fpts) >= 1:
@@ -154,9 +154,9 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
     w("\n## How to read this")
     w("- FP/G = expected fantasy points per game (Sleeper projection). wk-best = expected best game of a week (what Lock-In scores). "
       "avail = share of fantasy weeks he played, last 3 seasons weighted 50/30/20. value = my tool's ranking score in FP. "
-      "market = the price he'll likely go for in this room. your max = the most I should bid. "
-      "call: BUY (market price within my comfort limit), STAR ONLY (between my comfort limit and walk-away: only worth it as my star), "
-      "TOO PRICEY (past my walk-away; my max is the walk-away), CAN'T (no slot or above my cap). "
+      "price = the most I should spend on him now (what he'll likely go for in this room, never past my walk-away). "
+      "call: BUY (his going rate is within my comfort limit), STAR ONLY (between my comfort limit and walk-away: only worth it as my star), "
+      "TOO PRICEY (past my walk-away; my price is the walk-away), CAN'T (no slot or above my cap). "
       "Comfort limit = paying more leaves under 80% of the room's average per open starter; walk-away = under 50%. "
       "Cap = the most a manager may legally bid. Fit = 0-100 match for my team (quality vs best left × role × price call).")
     return "\n".join(out)

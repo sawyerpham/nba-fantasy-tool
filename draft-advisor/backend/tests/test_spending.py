@@ -105,8 +105,7 @@ def test_buy_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
     f = g.focus
     assert f.player_id == 1 and f.slot == "C" and f.tier == "top" and f.rivals_at_fair == 2 and f.rivals_above_market == 2
     assert f.verdict == "buy" and f.recommended < f.suggested == min(f.stretch, round(f.recommended * 1.25))
-    assert f.text.startswith(f"BUY: bid up to ${f.suggested} for Ace Center (market price ${f.recommended}, fair value ${round(f.fair_value)}); "
-                             "2 rivals can reach the market price")
+    assert f.text.startswith(f"BUY: bid up to ${f.suggested} for Ace Center; 2 rivals can pay that much")
     assert f.left_after == 50 - f.suggested and f.per_starter_after == pytest.approx((50 - f.suggested - 2) / 3, abs=0.1)
 
 
@@ -127,7 +126,7 @@ def test_fair_only_when_nobody_else_can_pay_fair_value():
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
     assert f.rivals_at_fair == 0 and f.suggested == min(round(f.fair_value), f.walk_away) <= f.recommended
-    assert f.verdict != "buy" or "nobody else can pay fair value, so don't go past it" in f.text
+    assert f.verdict != "buy" or "nobody else can afford him" in f.text
     assert not g.can_outbid_me and g.advice[-1] == "Nobody has a higher cap than your $45."
 
 
@@ -137,7 +136,7 @@ def test_too_pricey_when_the_market_price_would_gut_the_other_starter_slots():
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
     assert f.verdict == "pricey" and f.suggested == f.walk_away < f.recommended
-    assert f.text.startswith(f"TOO PRICEY: Ace Center's market price ${f.recommended} is past your walk-away ${f.walk_away}. Stop at ${f.walk_away}: paying")
+    assert f.text.startswith(f"TOO PRICEY: Ace Center will likely go for ${f.recommended}, past your walk-away ${f.walk_away}. Stop at ${f.walk_away}: paying")
     assert "under half the room's" in f.text
 
 

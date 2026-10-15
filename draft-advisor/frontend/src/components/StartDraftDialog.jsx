@@ -14,7 +14,7 @@ function Verdict({ ev }) {
   const v = VERDICT[ev.verdict] || VERDICT.even;
   return (
     <span className={`verdict ${v.cls}`} data-testid="keeper-verdict" data-tip={ev.note}>
-      {v.label}: ${ev.keeper_price} vs fair value ${ev.fair_value.toFixed(0)} ({ev.surplus >= 0 ? "+" : "−"}${Math.abs(ev.surplus).toFixed(0)})
+      {v.label}: ${ev.keeper_price} vs worth ${ev.fair_value.toFixed(0)} ({ev.surplus >= 0 ? "+" : "−"}${Math.abs(ev.surplus).toFixed(0)})
       {ev.rank ? ` · rank #${ev.rank}` : ""}{!ev.affordable ? " · over his cap!" : ""}
     </span>
   );

@@ -553,3 +553,4 @@ table.small th, .plan-table th, .money-table th, .market-table th { background: 
 :root:not([data-theme="light"]) :is(.pos-c, .pos-rank, .teammate-rank, .room-slot-pos, .player-sub, .trend, .fit-num, .bid-label, .muted) {
   text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
 }
+.bid-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
