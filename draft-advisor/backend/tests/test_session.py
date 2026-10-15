@@ -217,7 +217,8 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
     assert sale["player_id"] == JOKIC and sale["price"] == 80 and sale["diff"] == 80 - sale["fair"] and sale["fair"] > 1
     from app.engine.room import room_board
     jokic = next(p for m in room_board(s, "m1") for p in m["picks"] if p["player_id"] == JOKIC)
-    assert jokic["worth"] == sale["fair"]   # the Managers page colours his price with the same Worth-at-sale
+    assert jokic["worth"] == sale["fair"]
+    assert b["sold"] == 1 and b["good_left"] >= 1 and b["spots_left"] == 12 * s.league.mandatory_slot_count() - 1   # the Managers page colours his price with the same Worth-at-sale
 
 
 def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(fixture_world):

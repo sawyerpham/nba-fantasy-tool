@@ -11,7 +11,8 @@ per position (PG SG SF PF C):
   tier     = best tier left there, how many of it are left (names) and the value drop to the next tier's best
   chasers  = rivals with an open spot there whose cap reaches the fair value of the best player left there
 room trend:
-  sales    = the last sales (keepers skipped) vs fair value at the moment of the sale, replayed from the picks
+  sales    = every sale, newest first (keepers skipped), vs his Worth at the moment of the sale, replayed from the picks
+sold tracker: sales so far, roster spots still open in the room, available players still worth GOOD_WORTH+
 
 ponytail: flex slots (G/F/UTIL) are not split across positions; count them per position if a league uses them.
 """
@@ -23,7 +24,7 @@ from .bidding import market_rate
 from .ranking import tiers
 
 POSITIONS = roster.POSITION_SLOTS
-RECENT_SALES = 4
+GOOD_WORTH = 10   # the sold tracker counts available players still worth at least this
 
 
 def _fair(rate, value: float, min_bid: int) -> float:
@@ -104,7 +105,12 @@ def market_board(session, manager_id: str) -> dict:
             fair, rec = worths[p.pick_number], session.players.get(p.player_id)
             sales.append({"player_id": p.player_id, "player": rec.full_name if rec else str(p.player_id),
                           "manager": names.get(p.manager_id, p.manager_id), "price": p.price, "fair": fair, "diff": p.price - fair})
-    recent = sales[-RECENT_SALES:][::-1]
     window = sales[-10:]
-    return {"positions": positions, "sales": recent,
+    # Sold tracker: auction sales so far, roster spots still open in the room, and how many available players are
+    # still worth GOOD_WORTH+ right now (who the money left is for).
+    rate = market_rate(lg, session.managers, session.draft.picks, (r.value for r in rows), pool)
+    good_left = sum(1 for r in rows if _fair(rate, r.value, lg.min_bid) >= GOOD_WORTH)
+    spots_left = sum(session.engine.budget(m.manager_id).open_mandatory for m in session.managers)
+    return {"positions": positions, "sales": sales[::-1], "sold": len(sales), "spots_left": spots_left,
+            "starters_left": room_starters, "good_left": good_left, "good_worth": GOOD_WORTH,
             "recent_diff": round(sum(s["diff"] for s in window) / len(window), 1) if window else None}
