@@ -3,16 +3,14 @@ import React, { useEffect, useState } from "react";
 // The site's vocabulary: one word, one meaning, everywhere. Wrap a term in <Term k="..."> (dotted underline)
 // and hovering it shows the definition. Any element with data-tip gets the same tooltip.
 export const TERMS = {
-  your_max: ["Your max", "The most you should bid on him right now. It's his market price when that fits your budget (fair value when nobody else can afford him), and never more than your walk-away."],
-  market: ["Market price", "What he'll likely sell for in this room: fair value plus a premium for each rival who can afford him and has a spot for him."],
-  fair: ["Fair value", "What he's worth at the room's current price of talent: $1 + his value above replacement × the room's $ per point. The same for every manager."],
+  price: ["Price", "The most you should spend on him right now. It's what he'll likely go for in this room (his worth at the room's current price of talent, plus a premium for each rival who can afford him), never more than your walk-away. Moves during the draft as money and talent leave the room."],
   comfort: ["Comfort limit", "Pay up to this and you still have at least 80% of the room's average $ per open starting spot for the rest of your team."],
   walk: ["Walk-away", "Never pay more. Past this you'd have under half the room's average $ per open starting spot for the rest of your team."],
   cap: ["Cap", "The most a manager is allowed to bid: money left minus $1 for each of their other open roster spots."],
-  call: ["Call", "The price verdict on a player: BUY, STAR ONLY, TOO PRICEY or CAN'T. It compares his market price with your comfort limit and walk-away."],
-  buy: ["BUY", "His market price is within your comfort limit: bid up to your max."],
-  star: ["STAR ONLY", "His market price is between your comfort limit and your walk-away: worth it only if he's the star you build around."],
-  pricey: ["TOO PRICEY", "His market price is past your walk-away. Your max is your walk-away: stop there and let someone else overpay."],
+  call: ["Call", "How comfortable his Price is for your budget: BUY, STAR ONLY, TOO PRICEY or CAN'T. It compares what he'll likely go for with your comfort limit and walk-away."],
+  buy: ["BUY", "What he'll likely go for is within your comfort limit: bid up to his Price."],
+  star: ["STAR ONLY", "What he'll likely go for is between your comfort limit and your walk-away: pay his Price only if he's the star you build around."],
+  pricey: ["TOO PRICEY", "He'll likely go for more than your walk-away, so his Price stops at your walk-away: bid to there and let someone else overpay."],
   cannot: ["CAN'T", "You can't bid on him: no open roster spot he fits, or not enough money (cap)."],
   fit: ["Fit", "0-100, how much he helps your team: his value as a % of the best value left × role (starter 1, bench only 0.6, no spot 0) × call (BUY 1, STAR ONLY 0.85, TOO PRICEY 0.4, CAN'T 0). 70+ strong, 45-69 decent, under 45 weak."],
   value: ["Value", "The tool's ranking score in fantasy points: projected FP/G blended with his expected best game of the week (Lock-In), adjusted for games played, availability, injury, age and schedule, plus position scarcity."],
@@ -29,7 +27,7 @@ export const TERMS = {
   room: ["Room", "The average $ per open roster spot across every manager."],
   price_level: ["Price level", "The room's current $ per point of value ÷ the rate at the start of the draft. Above 1.00× money is outlasting talent and prices run high; below 1.00× bargains are coming."],
   even_split: ["Even split", "Your money spread evenly over your open starting spots, with bench spots at $1."],
-  ideal: ["Ideal team", "For each open starting spot: the best player left who fits it (at his market price), and the best one within your even split. Nobody appears twice."],
+  ideal: ["Ideal team", "For each open starting spot: the best player left who fits it, and the best one within your even split. Nobody appears twice."],
   best_fits: ["Best fits", "The available players with the highest Fit for your team right now."],
   drain: ["DRAIN", "Nominate him to drain rivals' money: several can pay a lot for him and you won't (no spot, over your cap, or TOO PRICEY)."],
   sneak: ["SNEAK", "Nominate him to buy cheap: a BUY for you that few rivals can afford right now."],
@@ -40,12 +38,12 @@ export const TERMS = {
   supply: ["Left", "Starter-quality players left who can play it: available players among the top N by value, N = open starting spots in the room. Each player counts once, where he'll be used: a PF/C counts at whichever of PF or C has more unfilled spots."],
   pos_status: ["Market", "Scarce: fewer starter-quality players left than open spots, so prices will rise: buy early. Tight: under 1.3 per spot. Plenty: more than enough, wait for value."],
   tier_cliff: ["Top tier", "The best tier left at this position, how many players are left in it, and how much lower in value (fantasy points) the next tier's best player is. Last one in a tier = buy now or drop a level."],
-  chasing: ["Chasing", "Rivals with an open spot here whose cap reaches the fair value of the best player left here. More chasers = bidding wars."],
-  room_trend: ["Room trend", "How the room is spending: the price level after each sale (dashed line = draft-start prices) and the last sales vs fair value at that moment."],
-  keeper_outlook: ["Keeper next year", "If you buy him now at about his market price, next year's keeper price (league rule: +$1 per full $5) vs what he'd be worth next year if healthy (this year's projection, current injury removed, a year older, at draft-start prices). GOOD keep / EVEN / BAD keep use the same thresholds as the keeper menu. Never part of Fit: winning this season comes first."],
+  chasing: ["Chasing", "Rivals with an open spot here who can afford the best player left here. More chasers = bidding wars."],
+  room_trend: ["Room trend", "How the room is spending: the price level after each sale (dashed line = draft-start prices) and the last sales: + means the buyer paid more than he was expected to go for at that point, − less."],
+  keeper_outlook: ["Keeper next year", "If you buy him now at his Price, next year's keeper price (league rule: +$1 per full $5) vs what he'd be worth next year if healthy (this year's projection, current injury removed, a year older, at draft-start prices). GOOD keep / EVEN / BAD keep use the same thresholds as the keeper menu. Never part of Fit: winning this season comes first."],
   stash: ["STASH", "Out now, so he helps little this season, but at this price he'd be a GOOD keep next year. Only worth it with money and a roster spot to spare."],
-  overpaid: ["Overpaid / bargain", "Sold price vs fair value. Within $2 counts as a fair price."],
-  keep_call: ["Keep call", "GOOD keep: this year's keeper price is under fair value by at least $2 and 10%. BAD keep: over it by that much. EVEN: in between."],
+  overpaid: ["Overpaid / bargain", "What he sold for vs what he was expected to go for at that point. Within $2 counts as about right."],
+  keep_call: ["Keep call", "GOOD keep: this year's keeper price is under his worth at draft start by at least $2 and 10%. BAD keep: over it by that much. EVEN: in between."],
 };
 
 export function Term({ k, children, className = "" }) {
@@ -63,8 +61,8 @@ export function CallBadge({ call }) {
 // Where Sleeper's live high bid sits against your numbers for this player (c = the spending guide's call).
 export function liveCall(bid, c) {
   if (!c || c.verdict === "cannot") return { cls: "bad", text: "CAN'T: you can't bid on him" };
-  if (bid < c.suggested) return { cls: "good", text: `Keep bidding: $${bid} is under your max $${c.suggested}` };
-  if (bid < c.walk_away) return { cls: "even", text: `At or past your max $${c.suggested}: only keep going if he's your star (walk-away $${c.walk_away})` };
+  if (bid < c.suggested) return { cls: "good", text: `Keep bidding: $${bid} is under his Price $${c.suggested}` };
+  if (bid < c.walk_away) return { cls: "even", text: `At or past his Price $${c.suggested}: only keep going if he's your star (walk-away $${c.walk_away})` };
   return { cls: "bad", text: `Stop: $${bid} is at or past your walk-away $${c.walk_away}` };
 }
 

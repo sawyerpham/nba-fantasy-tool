@@ -62,7 +62,7 @@ def _score(r, best: float, call) -> tuple[int, str, str, str]:
     else:
         price_f = PRICE_FIT[call.verdict]
         detail = ("you can't bid on him" if call.verdict == "cannot" else
-                  f"market price ${call.recommended}, comfort limit ${call.stretch}, walk-away ${call.walk_away}")
+                  f"price ${call.suggested}, comfort limit ${call.stretch}, walk-away ${call.walk_away}")
         price_line = f"Price: call {CALL_LABEL[call.verdict]} ({detail}) (×{price_f})."
     return round(pct * role_f * price_f), quality, role, price_line
 
@@ -136,7 +136,7 @@ def team_fit(session, manager_id: str, player_id: int) -> TeamFit:
         from .keepers import keeper_outlook
 
         if call and call.verdict != "cannot":
-            buy = call.recommended
+            buy = call.suggested   # his Price
         else:   # before the draft, or no slot for him: his market price from the bid guide, else fair value
             rec = session.recommend(player_id, manager_id)
             buy = rec.recommended_max if rec.can_bid else max(session.league.min_bid, round(rec.fair_value))

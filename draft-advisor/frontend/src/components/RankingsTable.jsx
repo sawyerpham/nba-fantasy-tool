@@ -10,7 +10,7 @@ const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_te
 const COLS = [
   ["rank", "rank", "num"], ["full_name", "Player"], ["team_abbr", "Tm", "col-narrow-hide"], ["pos", "pos_rank"],
   ["avg_fpts", "fpg", "num"], ["owned_pct", "rost", "num col-narrow-hide"], ["availability", "avail", "num"],
-  ["min", "min", "num col-narrow-hide"], ["fit", "fit", "num"], ["price", "your_max", "num"],
+  ["min", "min", "num col-narrow-hide"], ["fit", "fit", "num"], ["price", "price", "num"],
 ];
 const HEAD = { rank: "#", pos_rank: "Pos" };
 
@@ -100,7 +100,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               <td className="num" data-tip={[r.fit?.why, valueWhy(r) && `Value: ${valueWhy(r)}`].filter(Boolean).join(" ")}>
                 <strong className={`fit-num ${!r.fit ? "" : r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit ? r.fit.score : "—"}</strong>
               </td>
-              <td className="num" data-tip={r.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}${r.market != null ? ` Market price $${r.market}.` : ""}` : "Your max shows once the draft is live."}>
+              <td className="num" data-tip={r.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}` : "His Price shows once the draft is live."}>
                 {r.price != null ? <strong className={`call-${r.call}`} data-testid="your-max">${r.price}</strong> : <span className="muted">{r.call === "cannot" ? "CAN'T" : "—"}</span>}
               </td>
             </tr>

@@ -6,7 +6,7 @@ import { tierHue } from "./RankingsTable.jsx";
 import { CallBadge, Term, TERMS, liveCall } from "./Terms.jsx";
 
 // Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now, his numbers, the
-// live high bid against your numbers (your max, comfort limit, walk-away), and the tips (tier, rivals with history).
+// live high bid against his Price (and your comfort limit / walk-away), and the tips (tier, rivals with history).
 export default function LiveLot({ leagueId, lot, row, managers, onOpen }) {
   const [spend, setSpend] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -21,9 +21,7 @@ export default function LiveLot({ leagueId, lot, row, managers, onOpen }) {
   const left = lot.timer_end_at ? Math.max(0, Math.ceil((Date.parse(lot.timer_end_at) - now) / 1000)) : null;
   const bid = lot.high_bid ?? 0;
   const can = spend && spend.verdict !== "cannot";
-  const fair = spend?.fair_value != null ? Math.round(spend.fair_value) : null;
   const band = spend ? liveCall(bid, spend) : null;   // where the live bid sits against your numbers
-  const overFair = fair != null ? bid - fair : null;
   const interest = managers.filter((m) => !m.is_user && m.tendency).map((m) => {
     const before = m.tendency.drafted_before?.[String(lot.player_id)];
     const fan = lot.team_abbr && m.tendency.favorite_teams?.includes(lot.team_abbr);
@@ -52,14 +50,12 @@ export default function LiveLot({ leagueId, lot, row, managers, onOpen }) {
         </div>
       </div>
       <div className="live-lot-limits">
-        <span className="lim"><span className="bid-label"><Term k="your_max" /></span> <strong>{can ? `$${spend.suggested}` : "—"}</strong></span>
-        {can && <span className="lim"><span className="bid-label"><Term k="market" /></span> <strong>${spend.recommended}</strong></span>}
-        <span className="lim"><span className="bid-label"><Term k="fair" /></span> <strong>{fair != null ? `$${fair}` : "—"}</strong></span>
+        <span className="lim"><span className="bid-label"><Term k="price" /></span> <strong>{can ? `$${spend.suggested}` : "—"}</strong></span>
         {can && <span className="lim"><span className="bid-label"><Term k="comfort" /> / <Term k="walk" /></span> <strong>${spend.stretch} / ${spend.walk_away}</strong></span>}
         {row?.fit && <span className="lim"><span className="bid-label"><Term k="fit" /></span> <strong className={`fit-num ${row.fit.score >= 70 ? "hi" : row.fit.score >= 45 ? "mid" : "lo"}`}>{row.fit.score}</strong></span>}
         {spend && <CallBadge call={spend.verdict} />}
       </div>
-      {band && <div className={`live-lot-call ${band.cls}`} data-testid="live-call">{band.text}{overFair != null && overFair > 0 ? ` · the bid is $${overFair} over fair value` : ""}</div>}
+      {band && <div className={`live-lot-call ${band.cls}`} data-testid="live-call">{band.text}</div>}
       <div className="small muted live-lot-tips">
         {interest.length > 0 && <div>Watch out: {interest.join(" · ")}</div>}
         {leaderCanGo != null && <div>{lot.leader}'s <Term k="cap">cap</Term> is ${leaderCanGo}.</div>}

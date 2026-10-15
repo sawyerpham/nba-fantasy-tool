@@ -291,7 +291,7 @@ export default function DraftPage({ leagueId }) {
               <div key={t.key} className={`toast ${over == null ? "" : over > 2 ? "over" : over < -2 ? "under" : ""}`}
                 onClick={() => goToManager(t.manager_id)}>
                 <strong>{t.manager}</strong> drafted <strong>{t.player}</strong> for <strong>${t.price}</strong>
-                {over != null && <span className="toast-tag" data-tip={`Sold price vs his fair value ($${t.fair}). Within $2 counts as a fair price.`}>{over > 2 ? `overpaid $${over}` : over < -2 ? `bargain, $${-over} under` : "fair price"}</span>}
+                {over != null && <span className="toast-tag" data-tip={`He was expected to go for about $${t.fair} at that point. Within $2 counts as about right.`}>{over > 2 ? `overpaid $${over}` : over < -2 ? `bargain, $${-over} under` : "about right"}</span>}
                 <span className="muted"> · ${t.left} left</span>
                 {toasts.length > 1 && <span className="muted"> · +{toasts.length - 1} more</span>}
               </div>

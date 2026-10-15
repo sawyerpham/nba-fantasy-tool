@@ -155,7 +155,7 @@ def recommend_bid(
         f"League has ${free_dollars} discretionary dollars for {open_total} open mandatory slots "
         f"(${dollars_per_var:.2f} per point of value above replacement)."
     )
-    rationale.append(f"Fair value: ${min_bid} + {var:.2f} × ${dollars_per_var:.2f} = ${uncapped_fair_value:.2f}.")
+    rationale.append(f"Worth: ${min_bid} + {var:.2f} × ${dollars_per_var:.2f} = ${uncapped_fair_value:.2f}.")
     if fair_value < uncapped_fair_value:
         rationale.append(f"Capped at ${fair_value:.0f}: the most any manager can legally bid right now.")
 
@@ -172,11 +172,11 @@ def recommend_bid(
     pressure = round(sum(c.weight for c in competitors), 2)
     if competitors:
         rationale.append(
-            f"{len(competitors)} other manager(s) can afford fair value and have a fitting slot "
+            f"{len(competitors)} other manager(s) can afford his worth and have a fitting slot "
             f"(pressure {pressure:.2f}): " + ", ".join(f"{c.name} ≤${c.max_bid}×{c.weight}" for c in competitors) + "."
         )
     else:
-        rationale.append("No other manager can both afford fair value and fit this player; bid near the minimum.")
+        rationale.append("No other manager can both afford his worth and fit this player; bid near the minimum.")
 
     if not target.rosterable:
         rationale.append("You have no open slot this player fits.")
@@ -203,7 +203,7 @@ def recommend_bid(
     recommended = int(round(adjusted))
     recommended = max(min_bid, min(recommended, me.max_bid))
     rationale.append(
-        f"Market price ${recommended} = ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
+        f"Likely goes for ${recommended} = ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
         f"limited to your cap ${me.max_bid} (${me.remaining} remaining − ${me.reserved} reserved for "
         f"{max(0, me.open_mandatory - 1)} other mandatory slot(s))."
     )
