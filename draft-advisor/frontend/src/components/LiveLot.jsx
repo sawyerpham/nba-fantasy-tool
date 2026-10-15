@@ -6,7 +6,7 @@ import { tierHue } from "./RankingsTable.jsx";
 import { CallBadge, Term, TERMS, liveCall } from "./Terms.jsx";
 
 // Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now, his numbers, the
-// live high bid against his Price (and your comfort limit / walk-away), and the tips (tier, rivals with history).
+// live high bid against his Worth and Max (and your walk-away), and the tips (tier, rivals with history).
 export default function LiveLot({ leagueId, lot, row, managers, onOpen }) {
   const [spend, setSpend] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -50,7 +50,8 @@ export default function LiveLot({ leagueId, lot, row, managers, onOpen }) {
         </div>
       </div>
       <div className="live-lot-limits">
-        <span className="lim"><span className="bid-label"><Term k="price" /></span> <strong>{can ? `$${spend.suggested}` : "—"}</strong></span>
+        <span className="lim"><span className="bid-label"><Term k="worth" /></span> <strong>{spend ? `$${Math.round(spend.fair_value)}` : "—"}</strong></span>
+        <span className="lim"><span className="bid-label"><Term k="max" /></span> <strong>{can ? `$${spend.recommended}` : "—"}</strong></span>
         {can && <span className="lim"><span className="bid-label"><Term k="comfort" /> / <Term k="walk" /></span> <strong>${spend.stretch} / ${spend.walk_away}</strong></span>}
         {row?.fit && <span className="lim"><span className="bid-label"><Term k="fit" /></span> <strong className={`fit-num ${row.fit.score >= 70 ? "hi" : row.fit.score >= 45 ? "mid" : "lo"}`}>{row.fit.score}</strong></span>}
         {spend && <CallBadge call={spend.verdict} />}

@@ -203,7 +203,7 @@ def recommend_bid(
     recommended = int(round(adjusted))
     recommended = max(min_bid, min(recommended, me.max_bid))
     rationale.append(
-        f"Likely goes for ${recommended} = ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
+        f"Max ${recommended} = worth ${fair_value:.2f} × (1 + {PRESSURE_SCALE:.2f} × {pressure:.2f}/{others}) "
         f"limited to your cap ${me.max_bid} (${me.remaining} remaining − ${me.reserved} reserved for "
         f"{max(0, me.open_mandatory - 1)} other mandatory slot(s))."
     )

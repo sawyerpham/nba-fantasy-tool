@@ -72,22 +72,22 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
             </div>
           )}
           {g.plan.length > 0 && (() => {
-            // One row per open starting spot: the best player left for it (his Fit, his Price coloured by the call)
-            // and the best one within your even split. Totals use his Price where the rankings have it.
+            // One row per open starting spot: the best player left for it (his Fit, his Max coloured by the call)
+            // and the best one within your even split. Totals use his Max where the rankings have it.
             const row = (id) => (rankings || []).find((r) => r.player_id === id);
             const lines = g.plan.map((p) => ({ p, r: row(p.best_id) }));
-            const total = lines.reduce((t, { p, r }) => t + (r?.price ?? p.best_price), 0) + g.bench_total;
+            const total = lines.reduce((t, { p, r }) => t + (r?.max ?? p.best_price), 0) + g.bench_total;
             const spare = me.remaining - total;
             return (
               <table className="small plan-table" data-testid="ideal-team">
-                <thead><tr><th></th><th><Term k="ideal">Best</Term></th><th className="num"><Term k="fit" /></th><th className="num"><Term k="price" /></th><th><Term k="even_split">≤ ${g.allowance}</Term></th></tr></thead>
+                <thead><tr><th></th><th><Term k="ideal">Best</Term></th><th className="num"><Term k="fit" /></th><th className="num"><Term k="max" /></th><th><Term k="even_split">≤ ${g.allowance}</Term></th></tr></thead>
                 <tbody>
                   {lines.map(({ p, r }, i) => (
                     <tr key={i}>
                       <td><PosTag text={p.slot} /></td>
                       <td className="clip clickable" onClick={() => p.best_id && onSelect?.(p.best_id)} data-testid={p.best_id ? `best-fit-${p.best_id}` : undefined}>{p.best_name || "—"}</td>
                       <td className="num">{r?.fit ? <strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong> : ""}</td>
-                      <td className="num">{p.best_name ? <strong className={r?.call ? `call-${r.call}` : ""} data-tip={r?.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}` : "what he'll likely go for"}>${r?.price ?? p.best_price}</strong> : ""}</td>
+                      <td className="num">{p.best_name ? <strong className={r?.call ? `call-${r.call}` : ""} data-tip={r?.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}` : "what he'll likely go for"}>${r?.max ?? p.best_price}</strong> : ""}</td>
                       <td className="clip clickable muted" onClick={() => p.fit_id && onSelect?.(p.fit_id)}>{p.fit_name ? `${p.fit_name} $${p.fit_price}` : "nobody"}</td>
                     </tr>
                   ))}

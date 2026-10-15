@@ -62,7 +62,7 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
           {nominatedBy && <span className="small muted">by {nominatedBy}</span>}
           {tier && tier.tier_size > 1 && <span className={`tier-tag ${tier.tier_left <= 2 ? "last" : ""}`} style={tierHue(tier.tier)} data-tip={TERMS.tier[1]}>T{tier.tier} · {tier.tier_left - 1 === 0 ? "last one in his tier" : `${tier.tier_left - 1} more like him left`}</span>}
           {live && <LiveBid live={live} />}
-          {rec && <span className="small muted">likely goes for <strong data-testid="pick-recommended">${rec.recommended_max}</strong>{tier?.price != null && <> · <Term k="price">his Price</Term> for you <strong>${tier.price}</strong></>}</span>}
+          {rec && <span className="small muted"><Term k="worth">worth</Term> <strong>${Math.round(rec.fair_value)}</strong> · <Term k="max">max</Term> <strong data-testid="pick-recommended">${rec.recommended_max}</strong></span>}
           <span className="spacer" />
           {search}
           <button type="button" className="small ghost" onClick={onCancel} title="close (Esc)" data-testid="pick-cancel">Cancel</button>
