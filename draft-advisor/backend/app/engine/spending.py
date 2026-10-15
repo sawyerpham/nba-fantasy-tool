@@ -290,18 +290,19 @@ def spending_guide(
             target_price = max(market, min(stretch, int(round(market * 1.25))))
         else:
             target_price = min(market, me.max_bid)
-        why = ("nobody else can afford him, so there's no one to outbid" if rivals_at_fair == 0
-               else f"{rivals_above} rival{'s' if rivals_above != 1 else ''} can pay that much")
+        why = ("nobody else can afford him" if rivals_at_fair == 0
+               else f"{rivals_above} rival{'s' if rivals_above != 1 else ''} can pay up to his max ${market}")
         if target_price <= stretch:
             suggested, verdict = target_price, "buy"
-            text = f"BUY: bid up to ${suggested} for {target.full_name}; {why}. After that {tail(suggested)}."
+            text = (f"BUY: {target.full_name} is worth ${fair}; {why}, and either fits your budget. "
+                    f"After ${target_price} {tail(target_price)}.")
         elif target_price <= walk:
             suggested, verdict = target_price, "star"
-            text = (f"STAR ONLY: ${target_price} for {target.full_name} is past your comfort limit ${stretch}; pay it only if he's "
-                    f"your star. After that {tail(target_price)}, so the rest become cheap picks.")
+            text = (f"STAR ONLY: {target.full_name} is worth ${fair}, but bidding likely reaches ${target_price}, past your comfort "
+                    f"limit ${stretch}. Pay that only if he's your star: after it {tail(target_price)}, so the rest become cheap picks.")
         else:
             suggested, verdict = walk, "pricey"
-            text = (f"TOO PRICEY: {target.full_name} will likely go for ${target_price}, past your walk-away ${walk}. Stop at ${walk}: "
+            text = (f"TOO PRICEY: {target.full_name} is worth ${fair}, but bidding likely reaches ${target_price}, past your walk-away ${walk}. Stop at ${walk}: "
                     f"paying ${target_price} leaves ${per_starter(target_price):.0f} per open starter, under half the room's ${room_ps:.0f}.")
         left = me.remaining - suggested
         per_slot_after = round(left / (me.open_mandatory - 1), 1) if me.open_mandatory > 1 else 0.0

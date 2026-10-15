@@ -199,11 +199,11 @@ def _sleeper_pos_ranks(session) -> tuple[dict[int, str], dict[int, dict[str, str
 
 
 def _call_fields(c) -> dict:
-    """price = your max (None when you can't bid), market = market price, call = buy | star | pricey | cannot."""
+    """worth = what he's worth in this room (same for every manager); max = worth + the competition premium, i.e. where
+    bidding likely ends (None when you can't bid); call = buy | star | pricey | cannot (max vs your comfort / walk-away)."""
     if c is None:
-        return {"price": None, "market": None, "call": None}
-    can = c.verdict != "cannot"
-    return {"price": c.suggested if can else None, "market": c.recommended if can else round(c.fair_value), "call": c.verdict}
+        return {"worth": None, "max": None, "call": None}
+    return {"worth": round(c.fair_value), "max": c.recommended if c.verdict != "cannot" else None, "call": c.verdict}
 
 
 @router.get("/spending")

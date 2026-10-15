@@ -88,8 +88,8 @@ def test_everyone_equal_at_the_start_a_star_is_star_only_and_a_mid_player_is_a_b
     assert (f.stretch, f.walk_away, f.all_in) == (19, 30, 45)
     assert f.rivals_above_market == 2 and f.stretch < f.recommended <= f.walk_away
     assert f.verdict == "star" and f.suggested == f.recommended
-    assert f.text.startswith(f"STAR ONLY: ${f.recommended} for Ace Center is past your comfort limit $19; pay it only if he's your star. "
-                             f"After that you'd have ${50 - f.recommended} for 5 slots")
+    assert f.text.startswith(f"STAR ONLY: Ace Center is worth ${round(f.fair_value)}, but bidding likely reaches ${f.recommended}, past your "
+                             f"comfort limit $19. Pay that only if he's your star: after it you'd have ${50 - f.recommended} for 5 slots")
     assert f.per_starter_after == pytest.approx((50 - f.recommended - 2) / 3, abs=0.1)
     dee = next(t for t in g.targets if t.name == "Dee Point")
     assert dee.verdict == "buy" and dee.suggested == dee.recommended <= 19
@@ -105,7 +105,7 @@ def test_buy_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
     f = g.focus
     assert f.player_id == 1 and f.slot == "C" and f.tier == "top" and f.rivals_at_fair == 2 and f.rivals_above_market == 2
     assert f.verdict == "buy" and f.recommended < f.suggested == min(f.stretch, round(f.recommended * 1.25))
-    assert f.text.startswith(f"BUY: bid up to ${f.suggested} for Ace Center; 2 rivals can pay that much")
+    assert f.text.startswith(f"BUY: Ace Center is worth ${round(f.fair_value)}; 2 rivals can pay up to his max ${f.recommended}")
     assert f.left_after == 50 - f.suggested and f.per_starter_after == pytest.approx((50 - f.suggested - 2) / 3, abs=0.1)
 
 
@@ -136,7 +136,7 @@ def test_too_pricey_when_the_market_price_would_gut_the_other_starter_slots():
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
     f = g.focus
     assert f.verdict == "pricey" and f.suggested == f.walk_away < f.recommended
-    assert f.text.startswith(f"TOO PRICEY: Ace Center will likely go for ${f.recommended}, past your walk-away ${f.walk_away}. Stop at ${f.walk_away}: paying")
+    assert f.text.startswith(f"TOO PRICEY: Ace Center is worth ${round(f.fair_value)}, but bidding likely reaches ${f.recommended}, past your walk-away ${f.walk_away}. Stop at ${f.walk_away}: paying")
     assert "under half the room's" in f.text
 
 
@@ -147,7 +147,7 @@ def test_bench_slot_is_capped_at_the_market_price():
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=4)
     f = g.focus
     assert f.slot == "BN" and f.verdict == "buy" and f.suggested == min(f.recommended, g.me.max_bid)
-    assert f.text.startswith("BUY: bid up to $")
+    assert f.text.startswith("BUY: ") and " is worth $" in f.text
     assert g.advice[2].startswith("Only bench slots left: $")
 
 

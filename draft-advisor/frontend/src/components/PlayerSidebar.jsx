@@ -34,7 +34,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (!playerId) return <div className="panel muted">Select a player to see his profile, his Fit for your team and his Price.</div>;
+  if (!playerId) return <div className="panel muted">Select a player to see his profile, his Fit for your team, his Worth and his Max.</div>;
   if (!data) return <div className="panel">{error || "Loading…"}</div>;
 
   const rec_ = data.record;
@@ -107,7 +107,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <span className="bid-label"><Term k="keeper_outlook" /></span>{" "}
             <span className={`verdict ${cls}`} data-tip={TERMS.keep_call[1]}>{k.verdict.toUpperCase()} keep</span>
             {k.stash && <> <Term k="stash" className="verdict even" /></>}
-            <span className="muted"> at his Price ${k.buy_price} → keep at <strong style={{ color: "var(--text)" }}>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
+            <span className="muted"> at his Max ${k.buy_price} → keep at <strong style={{ color: "var(--text)" }}>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
             {k.good_up_to != null && <div className="muted">GOOD keep if you get him for <strong style={{ color: "var(--text)" }}>≤ ${k.good_up_to}</strong></div>}
             {k.young && <span className="muted" data-tip="23 or younger: young players usually improve, which this estimate doesn't model."> · young, may improve</span>}
           </div>
@@ -117,10 +117,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       {rec && (
         <div data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
-          <div className="bid-grid two">
+          <div className="bid-grid">
             <div className="bid-cell primary">
-              <div className="bid-label"><Term k="price" /></div>
-              <div className="bid-num" data-testid="rec-max">{spend && spend.verdict !== "cannot" ? `$${spend.suggested}` : "—"}</div>
+              <div className="bid-label"><Term k="worth" /></div>
+              <div className="bid-num" data-testid="rec-worth">${Math.round(rec.fair_value)}</div>
+            </div>
+            <div className="bid-cell">
+              <div className="bid-label"><Term k="max" /></div>
+              <div className="bid-num" data-testid="rec-max">{rec.can_bid ? `$${rec.recommended_max}` : "—"}</div>
             </div>
             <div className="bid-cell">
               <div className="bid-label"><Term k="cap">Your cap</Term></div>

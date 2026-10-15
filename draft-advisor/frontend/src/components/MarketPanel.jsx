@@ -33,7 +33,7 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
                 <td className="clip" data-tip={c ? `${c.names.join(", ")}${c.left > c.names.length ? " …" : ""} left in T${c.tier}.${c.drop != null ? ` The next tier's best (T${c.next_tier}) is ${c.drop} value points lower.` : ""}` : ""}>
                   {c ? <>T{c.tier} ×{c.left}{c.drop != null && <span className="muted"> · −{c.drop}</span>}</> : "—"}
                 </td>
-                <td className="num" data-tip={p.chasers.length ? `Can afford ${p.best} (about $${p.best_fair}): ${p.chasers.map((x) => `${x.name} (cap $${x.cap})`).join(", ")}` : `No rival with an open ${p.pos} spot can pay $${p.best_fair ?? "?"} for ${p.best || "the best left"}.`}>
+                <td className="num" data-tip={p.chasers.length ? `Can afford ${p.best} (worth $${p.best_fair}): ${p.chasers.map((x) => `${x.name} (cap $${x.cap})`).join(", ")}` : `No rival with an open ${p.pos} spot can pay $${p.best_fair ?? "?"} for ${p.best || "the best left"}.`}>
                   <strong>{p.chasers.length}</strong>
                 </td>
               </tr>
@@ -46,8 +46,8 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
         <span className="bid-label"><Term k="room_trend" /></span>
         {m.levels.length > 1 && <Spark values={m.levels} />}
         {m.recent_diff != null && (
-          <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Last 10 sales on average: how much more (+) or less (−) than expected the buyers paid.">
-            {m.recent_diff > 0 ? "+" : ""}${m.recent_diff} vs expected lately
+          <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Last 10 sales on average: how much more (+) or less (−) than his Worth the buyers paid.">
+            {m.recent_diff > 0 ? "+" : ""}${m.recent_diff} vs worth lately
           </span>
         )}
       </div>
@@ -56,7 +56,7 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
         <div key={`${s.player_id}-${s.price}`} className="sale-row clickable" onClick={() => onSelect?.(s.player_id)}>
           <span className="clip">{s.player}</span>
           <strong>${s.price}</strong>
-          <span className={`sale-diff ${s.diff > 2 ? "over" : s.diff < -2 ? "under" : ""}`} data-tip={`Expected to go for about $${s.fair} at that point; ${s.manager} paid $${s.price}.`}>
+          <span className={`sale-diff ${s.diff > 2 ? "over" : s.diff < -2 ? "under" : ""}`} data-tip={`Worth $${s.fair} at that point; ${s.manager} paid $${s.price}.`}>
             {s.diff > 0 ? "+" : ""}{s.diff}
           </span>
           <span className="muted clip sale-mgr">{s.manager}</span>
