@@ -63,7 +63,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
                 <div key={`${n.kind}-${n.player_id}`} className="nom-row clickable" onClick={() => onSelect?.(n.player_id)} data-tip={n.reason}>
                   <Term k={n.kind} className={`verdict ${n.kind === "drain" ? "even" : "good"}`} />
                   <strong>{n.name}</strong> <span className="small">~${n.price}</span>
-                  <span className="small muted clip nom-who">
+                  <span className="small muted nom-who">
                     {n.kind === "drain"
                       ? <>drains {n.who.slice(0, 3).map((w) => `${w.name} ($${w.cap})`).join(", ")}{n.who.length > 3 ? ` +${n.who.length - 3}` : ""}{n.why ? ` · ${n.why}` : ""}</>
                       : n.who.length ? <>only {n.who.map((w) => w.name).join(", ")} can match</> : "no rival can match"}

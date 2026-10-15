@@ -494,7 +494,8 @@ th.sorted { color: var(--primary); }
 [data-testid="spending-guide"] .bid-cell { padding: 6px 9px; }
 [data-testid="spending-guide"] .bid-cell .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-testid="spending-guide"] .nom-ideas { margin: 8px 0; padding: 6px 10px; }
-[data-testid="spending-guide"] .nom-row { padding: 2px 0; flex-wrap: nowrap; }
+[data-testid="spending-guide"] .nom-row { padding: 3px 0; flex-wrap: wrap; row-gap: 0; }
+[data-testid="spending-guide"] .nom-row .nom-who { flex-basis: 100%; white-space: normal; padding-left: 2px; }
 /* shorter screens: tighter rows so the guide still fits without scrolling */
 @media (max-height: 950px) {
   [data-testid="spending-guide"] table.plan-table td, [data-testid="spending-guide"] table.plan-table th,
