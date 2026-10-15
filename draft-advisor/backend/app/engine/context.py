@@ -115,7 +115,7 @@ def draft_context(session, manager_id: str, focus_player_id: int | None = None, 
         g = session.spending_guide(manager_id)
         w("\n## My money vs the room")
         w(f"- Me: ${g.me.remaining} for {g.me.open_mandatory} slots (${g.me.per_slot}/slot), {g.money_rank} of {g.num_managers} in money. "
-          f"Room: ${g.room_remaining} for {g.room_open_mandatory} slots. Price level: {g.inflation:.2f}×.")
+          f"Room: ${g.room_remaining} for {g.room_open_mandatory} slots.")
 
     # ---- best available
     rows = session.rank(session.engine.picks_for(manager_id), session.available_ids())

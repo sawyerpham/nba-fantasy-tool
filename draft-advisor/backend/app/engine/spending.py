@@ -365,13 +365,6 @@ def spending_guide(
             f"${me.remaining} for {me.open_mandatory} slot{'s' if me.open_mandatory != 1 else ''} "
             f"(${me.per_slot:.0f}/slot): {ordinal(money_rank)} most money of {n}, {ordinal(per_slot_rank)} per open slot."
         )
-    if opening_dollars_per_var > 0 and rate.dollars_per_var > 0:
-        if inflation >= 1.05:
-            advice.append(f"Price level {inflation:.2f}×: more money than talent is left, stars will go over fair value.")
-        elif inflation <= 0.95:
-            advice.append(f"Price level {inflation:.2f}×: talent is outlasting money, bargains ahead.")
-        else:
-            advice.append("Price level near 1.00×: prices as at the start.")
     if me.open_mandatory > 0 and me.open_starters == 0:
         advice.append(f"Only bench slots left: ${me.discretionary} above the ${min_bid} minimums.")
     elif me.open_starters > 0:

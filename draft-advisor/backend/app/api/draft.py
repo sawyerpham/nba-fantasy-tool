@@ -250,7 +250,7 @@ def fit(league_id: str, player_id: int, manager_id: str | None = Query(None), st
 
 @router.get("/market")
 def market(league_id: str, manager_id: str | None = Query(None), state: AppState = Depends(get_state)) -> dict:
-    """Per-position supply vs demand, tier cliffs and who's chasing; recent sales vs fair value and the price level."""
+    """Per-position supply vs demand, tier cliffs and who's chasing; recent sales vs their Worth."""
     from ..engine.market import market_board
 
     session = _session(state, league_id)

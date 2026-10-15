@@ -49,7 +49,6 @@ def test_opening_picture_at_draft_start():
     assert g.allowance == 12  # ($50 - 2 bench at $1) / 4 starter slots
     assert not g.can_outbid_me
     assert g.advice[0] == "$50 for 6 slots ($8/slot): 1st most money of 3, 1st per open slot."
-    assert g.advice[1] == "Price level near 1.00×: prices as at the start."
     assert g.advice[-1] == "Nobody has a higher cap than your $45."
     assert [m.manager_id for m in g.managers] == ["m1", "m2", "m3"]
 
@@ -148,14 +147,13 @@ def test_bench_slot_is_capped_at_the_market_price():
     f = g.focus
     assert f.slot == "BN" and f.verdict == "buy" and f.suggested == min(f.recommended, g.me.max_bid)
     assert f.text.startswith("BUY: ") and " is worth $" in f.text
-    assert g.advice[2].startswith("Only bench slots left: $")
+    assert g.advice[1].startswith("Only bench slots left: $")
 
 
 def test_cheap_keeper_inflates_prices():
     lg, mgrs, e, players, overrides, valuations = setup([KeeperAssignment("m2", 1, 1)])  # Ace Center kept for $1
     g = guide(lg, mgrs, e, players, overrides, valuations)
     assert g.inflation > 1.05 and g.current_dollars_per_var > g.opening_dollars_per_var
-    assert g.advice[1].startswith(f"Price level {g.inflation:.2f}×: more money than talent")
     assert all(t.player_id != 1 for t in g.targets) and all(pl.best_id != 1 for pl in g.plan)
 
 

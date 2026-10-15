@@ -188,7 +188,7 @@ try {
   assert((await page.locator(".tip").textContent()).startsWith("0-100, how much he helps your team"), "hovering Fit shows its definition");
   await page.mouse.move(0, 0);
   const spending = await page.getByTestId("spending-guide").textContent();
-  assert(spending.includes("for Sawyer") && spending.includes("Room") && spending.includes("Price level"), "spending guide shows you vs the room");
+  assert(spending.includes("for Sawyer") && spending.includes("Room") && !spending.includes("Price level"), "spending guide shows you vs the room");
   assert((await page.locator('[data-testid^="best-fit-"]').count()) >= 1, "spending guide lists your best fits");
   log("spending guide:", spending.replace(/\s+/g, " ").slice(0, 160));
   await page.getByTestId("rank-sort").click();             // first column: tier and overall rank side by side ("T2 1")
