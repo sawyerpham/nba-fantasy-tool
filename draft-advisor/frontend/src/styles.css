@@ -429,15 +429,17 @@ th.sorted { color: var(--primary); }
 .live-lot-name { font-size: 22px; font-weight: 800; cursor: pointer; } .live-lot-name:hover { color: var(--primary); }
 .live-lot-who .tier-tag { margin-left: 8px; }
 /* the high bid: always a white card with dark text, so it's the brightest thing on the page */
-.live-lot-bid { text-align: right; padding: 6px 14px; border-radius: 12px; background: #fff; color: #0b0d10; min-width: 140px; text-shadow: none; }
+.live-lot-bid { text-align: right; padding: 6px 14px; border-radius: 12px; background: #fff; color: #0b0d10; min-width: 120px; max-width: 160px; text-shadow: none; }
+.live-bid-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #374151; }
+.live-lot-bid .live-bid-foot .live-clock { font-size: 18px; color: #0b0d10; } .live-lot-bid .live-bid-foot .live-clock.low { color: #dc2626; }
 .live-lot-bid .bid-label { color: #374151; }
 .live-lot-bid.flash { animation: bid-flash 0.9s ease-out; }
 @keyframes bid-flash { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); transform: scale(1.06); } 100% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); transform: scale(1); } }
 .live-lot-price { font-size: 34px; font-weight: 800; line-height: 1.05; }
 .live-lot-bid .live-clock { font-size: 18px; }
 /* big cards in the live block's head: the call (one word), his Worth, then the high bid */
-.live-big { text-align: center; padding: 6px 14px; border-radius: 12px; background: var(--panel-2); min-width: 120px; }
-.live-big.call { min-width: 170px; max-width: 230px; }
+.live-big { text-align: center; padding: 6px 12px; border-radius: 12px; background: var(--panel-2); min-width: 100px; }
+.live-big.call { min-width: 140px; max-width: 190px; }
 .live-big.good { background: var(--good); color: var(--good-t); } .live-big.even { background: var(--even); color: var(--even-t); }
 .live-big.bad { background: var(--bad); color: var(--bad-t); } .live-big.lead { background: var(--primary-soft); color: var(--primary); }
 .live-big-word { font-size: 34px; font-weight: 900; letter-spacing: 0.04em; line-height: 1.05; }
@@ -574,3 +576,25 @@ table.small th, .plan-table th, .money-table th, .market-table th { background: 
   text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .bid-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ---------- live block split: [live lot | bid history] | my team ---------- */
+.live-split { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; align-items: start; }
+.live-split-main { min-width: 0; }
+.live-lot-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; align-items: start; }
+.bid-history { padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border-top: 3px solid #fb923c; display: flex; flex-direction: column; gap: 3px; max-height: 330px; overflow: hidden; }
+.bid-history .live-card-title { color: #fb923c; }
+.bid-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 14px; padding: 2px 0; }
+.bid-row.top { font-size: 15.5px; }
+.bid-row:not(.top) { opacity: 0.75; }
+.bid-row.mine span { color: var(--primary); font-weight: 700; }
+.bid-row-cap { font-size: 12px; }
+.my-team { padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border-top: 3px solid var(--primary); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.my-team-head { display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; }
+.my-team-slots { display: flex; flex-direction: column; gap: 1px; }
+.my-team-slot { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 13px; }
+.my-team-slot.open { opacity: 0.6; }
+.room-weekly { align-self: flex-end; margin-top: auto; font-size: 13px; }
+.room-weekly strong { font-size: 16px; }
+/* sale price vs Worth when sold: steal blue, fair green, over red, way over dark red */
+.tone-steal, .tone-fair, .tone-over, .tone-way { padding: 0 6px; border-radius: 6px; color: #fff; text-shadow: none !important; }
+.tone-steal { background: #2563eb; } .tone-fair { background: #15803d; } .tone-over { background: #dc2626; } .tone-way { background: #7f1d1d; }

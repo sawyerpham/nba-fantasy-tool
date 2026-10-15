@@ -7,8 +7,8 @@ import { CallBadge, Term, TERMS, liveCall } from "./Terms.jsx";
 import { bidSound, nominationSound } from "./sounds.js";
 
 // Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now, his numbers, the
-// live high bid against his Worth and Max (and your walk-away) as a one-word call, and below it: who has bid so
-// far, what winning him leaves you, the next best players for that spot, his Lock-In numbers, next year's keeper call, team role and injury.
+// live high bid against his Worth and Max (and your walk-away) as a one-word call, the bid history down the right
+// (each bidder's cap), and below it: what winning him leaves you, the next best players for that spot, his Lock-In numbers, next year's keeper call, team role and injury.
 export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen }) {
   const [spend, setSpend] = useState(null);
   const [extra, setExtra] = useState({});   // team role (player endpoint) and keeper outlook (fit endpoint)
@@ -53,7 +53,6 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
     const fan = lot.team_abbr && m.tendency.favorite_teams?.includes(lot.team_abbr);
     return before || fan ? `${m.name} (${[before && "drafted him before", fan && `${lot.team_abbr} fan`].filter(Boolean).join(", ")})` : null;
   }).filter(Boolean);
-  const leaderCanGo = managers.find((m) => m.name === lot.leader)?.budget.max_bid;
 
   // If you win: the next bid up (you already lead: the current one).
   const me = managers.find((m) => m.is_user);
@@ -76,6 +75,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
   const k = extra.keeper;
 
   return (
+    <div className="live-lot-wrap">
     <div className="live-lot" data-testid="live-lot">
       <div className="live-lot-head">
         <Headshot sleeperId={lot.sleeper_id} name={lot.full_name} size={56} />
@@ -104,9 +104,9 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           <div className="live-big-sub">Max {can ? `$${spend.recommended}` : "—"}</div>
         </div>
         <div key={flash} className={`live-lot-bid ${flash ? "flash" : ""}`} data-testid="live-bid-card" data-tip="Sleeper's current high bid and who holds it; the clock ticks down to the sale.">
-          <div className="bid-label"><span className="rec-dot" />High bid{lot.leader ? ` · ${lot.leader}` : ""}</div>
+          <div className="bid-label"><span className="rec-dot" />High bid</div>
           <div className="live-lot-price" data-testid="live-bid">${bid}</div>
-          {left != null && <div className={`live-clock ${left <= 3 ? "low" : ""}`}>{left}s</div>}
+          <div className="live-bid-foot"><span className="clip">{lot.leader || "no bids"}</span>{left != null && <span className={`live-clock ${left <= 3 ? "low" : ""}`}>{left}s</span>}</div>
         </div>
       </div>
       <div className="live-lot-limits">
@@ -128,12 +128,6 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           {next.length ? next.map((r) => <div key={r.player_id} className="clip">{r.full_name} <span className="muted">{r.eligibility.join("/")}</span> <strong>{r.worth != null ? `$${r.worth}` : ""}</strong>{r.fit && <> · <Term k="fit">Fit</Term> <strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong></>}</div>)
             : <div className="muted">Nobody else left for that spot.</div>}
         </div>
-        <div className="live-card bids" data-testid="live-bids">
-          <div className="live-card-title">Bids so far</div>
-          {bids.current.list.length ? <div className="clip">{bids.current.list.slice(-6).map((b) => `${b.who} $${b.bid}`).join(" → ")}</div>
-            : <div className="muted">No bids yet.</div>}
-          {leaderCanGo != null && <div className="muted">{lot.leader}'s <Term k="cap">cap</Term> is ${leaderCanGo}.</div>}
-        </div>
         <div className="live-card lockin" data-testid="live-lockin">
           <div className="live-card-title">Lock-In</div>
           {row ? <div><strong>{row.avg_fpts.toFixed(1)}</strong> <Term k="fpg">proj FP/G</Term> · <strong>{bestGame.toFixed(1)}</strong> <span data-tip={row.weekly_best_avg ? "His average best game of the week last season: what Lock-In lets you keep." : "No games last season: estimated from his projection with the league-wide best-game ratio."}>avg best game{row.weekly_best_avg ? "" : " (est.)"}</span></div> : <div className="muted">—</div>}
@@ -151,6 +145,21 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           {!row && <div>Not in your rankings (unrosterable for you or outside the top list).</div>}
         </div>
       )}
+    </div>
+    <div className="bid-history" data-testid="live-bids">
+      <div className="live-card-title">Bid history</div>
+      {bids.current.list.length ? bids.current.list.slice().reverse().slice(0, 12).map((b, i) => {
+        const mine = me && b.who === me.name;
+        const cap = mine ? null : managers.find((m) => m.name === b.who)?.budget.max_bid;
+        return (
+          <div key={`${b.who}-${b.bid}`} className={`bid-row ${i === 0 ? "top" : ""} ${mine ? "mine" : ""}`}>
+            <strong className="bid-row-price">${b.bid}</strong>
+            <span className="clip">{mine ? "You" : b.who}</span>
+            {cap != null && <span className="muted bid-row-cap" data-tip={TERMS.cap[1]}>cap ${cap}</span>}
+          </div>
+        );
+      }) : <div className="muted small">No bids yet.</div>}
+    </div>
     </div>
   );
 }

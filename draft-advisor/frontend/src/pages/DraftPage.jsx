@@ -5,6 +5,7 @@ import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import RoomBoard from "../components/RoomBoard.jsx";
 import LiveLot from "../components/LiveLot.jsx";
+import MyTeam from "../components/MyTeam.jsx";
 import { bidSound, nominationSound } from "../components/sounds.js";
 import TeamsTable from "../components/TeamsTable.jsx";
 import NbaTeamsTable from "../components/NbaTeamsTable.jsx";
@@ -314,13 +315,16 @@ export default function DraftPage({ leagueId }) {
         </section>
         <section className="dg-rank">
           {live && sync && !pick && (
-            <div className="block-bar live-bar">
-              {liveLot ? (
-                <LiveLot leagueId={leagueId} lot={liveLot} managers={view.managers} rankings={rankings}
-                  row={rankings.find((r) => r.player_id === liveLot.player_id)} onOpen={() => setSelected(liveLot.player_id)} />
-              ) : (
-                <><span className="live-dot" /><span className="muted">Sleeper sync on: waiting for the next nomination…</span><span className="spacer" />{markDrafted}</>
-              )}
+            <div className="block-bar live-bar live-split">
+              <div className="live-split-main">
+                {liveLot ? (
+                  <LiveLot leagueId={leagueId} lot={liveLot} managers={view.managers} rankings={rankings}
+                    row={rankings.find((r) => r.player_id === liveLot.player_id)} onOpen={() => setSelected(liveLot.player_id)} />
+                ) : (
+                  <div className="row"><span className="live-dot" /><span className="muted">Sleeper sync on: waiting for the next nomination…</span><span className="spacer" />{markDrafted}</div>
+                )}
+              </div>
+              <MyTeam leagueId={leagueId} rosterSlots={settings?.roster_slots} refreshKey={`${refreshKey}-${view.picks.length}`} />
             </div>
           )}
           {live && !(sync && !pick) && (

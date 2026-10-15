@@ -30,6 +30,19 @@ def _fair(rate, value: float, min_bid: int) -> float:
     return min(min_bid + max(0.0, value - rate.replacement) * rate.dollars_per_var, float(rate.market_cap))
 
 
+def sale_worths(session) -> dict[int, int]:
+    """Each auction sale's Worth at the moment it sold (pick_number -> $), replayed from the picks; keepers skipped."""
+    lg, pool, picks = session.league, session.pool_values(), session.draft.picks
+    taken: set[int] = set()
+    out: dict[int, int] = {}
+    for i, p in enumerate(picks):
+        if not p.is_keeper:
+            rate = market_rate(lg, session.managers, picks[:i], (v for pid, v in pool.items() if pid not in taken), pool)
+            out[p.pick_number] = round(_fair(rate, pool.get(p.player_id, 0.0), lg.min_bid))
+        taken.add(p.player_id)
+    return out
+
+
 def market_board(session, manager_id: str) -> dict:
     lg = session.league
     pool = session.pool_values()
@@ -82,19 +95,15 @@ def market_board(session, manager_id: str) -> dict:
                           "best": best.full_name if best else None, "best_fair": fair,
                           "chasers": sorted(chasers, key=lambda c: -c["cap"]), "my_open": opens[manager_id].get(pos, 0)})
 
-    # Room trend: replay the picks to price each sale at its own moment.
-    picks = session.draft.picks
+    # Room trend: each sale against his Worth at its own moment.
     names = {m.manager_id: m.name for m in session.managers}
-    taken: set[int] = set()
+    worths = sale_worths(session)
     sales = []
-    for i, p in enumerate(picks):
-        if not p.is_keeper:
-            rate = market_rate(lg, session.managers, picks[:i], (v for pid, v in pool.items() if pid not in taken), pool)
-            fair = round(_fair(rate, pool.get(p.player_id, 0.0), lg.min_bid))
-            rec = session.players.get(p.player_id)
+    for p in session.draft.picks:
+        if p.pick_number in worths:
+            fair, rec = worths[p.pick_number], session.players.get(p.player_id)
             sales.append({"player_id": p.player_id, "player": rec.full_name if rec else str(p.player_id),
                           "manager": names.get(p.manager_id, p.manager_id), "price": p.price, "fair": fair, "diff": p.price - fair})
-        taken.add(p.player_id)
     recent = sales[-RECENT_SALES:][::-1]
     window = sales[-10:]
     return {"positions": positions, "sales": recent,

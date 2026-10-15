@@ -14,12 +14,14 @@ from __future__ import annotations
 from nba_fantasy_shared.scoring.aggregate import NO_GAMES_AVAILABILITY
 
 from .bidding import market_rate
+from .market import sale_worths
 from .ranking import expected_fpts
 
 
 def room_board(session, my_manager_id: str) -> list[dict]:
     lg = session.league
     schedule = session.schedule()
+    worths = sale_worths(session)   # each sale's Worth when it sold, for the over / fair / steal colours
 
     def stats(pid: int) -> tuple[float, float, float | None]:
         """(projected FP/G, expected weekly-best FP, availability last season or None with no games)."""
@@ -32,7 +34,7 @@ def room_board(session, my_manager_id: str) -> list[dict]:
         rec = session.players.get(pick["player_id"])
         avg, _, avail = stats(rec.player_id) if rec else (None, None, None)
         ov = session.overrides.get(pick["player_id"])
-        return {**pick, "sleeper_id": rec.sleeper_id if rec else None, "fpg": round(avg, 1) if avg is not None else None,
+        return {**pick, "worth": worths.get(pick["pick_number"]), "sleeper_id": rec.sleeper_id if rec else None, "fpg": round(avg, 1) if avg is not None else None,
                 "avail": avail, "pos": ov.eligibility if ov else [], "age": int(rec.bio.age) if rec and rec.bio.age else None}
 
     # Replacement level: the weekly-best of the player ranked just past every team's starters.

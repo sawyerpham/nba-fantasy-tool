@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { PosList, PosTag } from "./Pos.jsx";
 import { api } from "../api.js";
 import Headshot from "./Headshot.jsx";
-import { Term, TERMS } from "./Terms.jsx";
+import { Term, TERMS, priceTone } from "./Terms.jsx";
 
 // Page 2 of the draft: one card per manager with money, roster by spot, needs and habits.
 // Click a player for his profile; ✎ edits the pick; drag it onto another card to move it.
@@ -64,7 +64,7 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                           <span className="room-slot-sub">{p.team_abbr || "FA"} · <PosList list={p.pos} />{p.age ? ` · ${p.age}` : ""} · <span className={p.avail != null && p.avail < 0.75 ? "warn-text" : ""} data-tip={TERMS.avail[1]}>{p.avail != null ? `${Math.round(p.avail * 100)}% avail` : "new"}</span>{p.is_keeper ? " · keeper" : ""}</span>
                         </span>
                         <span className="room-slot-fpg" data-tip={TERMS.fpg[1]}>{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
-                        <strong className="room-slot-price">${p.price}</strong>
+                        {(() => { const t = priceTone(p.price, p.worth, p.is_keeper); return <strong className={`room-slot-price ${t.cls}`} data-tip={t.tip}>${p.price}</strong>; })()}
                         {onEditPick && <button type="button" className="pick-edit" title="edit or remove this pick"
                           onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`}>✎</button>}
                       </span>
@@ -74,6 +74,9 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
               }))}
             </div>
             <div className="small muted">Needs: {needs ? needs.split(" ").map((n, i) => <React.Fragment key={i}>{i > 0 && " "}<PosTag text={n} /></React.Fragment>) : "bench only"}</div>
+            <div className="room-weekly" data-testid={`weekly-${m.manager_id}`} data-tip={`${TERMS.win_score[1]} Lineup now: ${m.fp_gen} projected FP/G from the players in starting spots.`}>
+              <span className="muted">est weekly</span> <strong>{Math.round(m.win_score)}</strong> <span className="muted">FP</span>
+            </div>
             {(t.top_buys?.length > 0 || t.favorite_teams?.length > 0 || t.lean) && (
               <div className="small muted room-habits">
                 {t.top_buys?.length > 0 && <>Last year: {t.top_buys.map((x) => `${x.name.split(" ").slice(-1)[0]} $${x.price}`).join(", ")}</>}
