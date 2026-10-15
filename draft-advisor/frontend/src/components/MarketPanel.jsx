@@ -6,7 +6,7 @@ import { Term } from "./Terms.jsx";
 const STATUS = { scarce: ["bad", "scarce"], tight: ["even", "tight"], plenty: ["good", "plenty"] };
 
 // Under the spending guide: per position, demand vs supply, the tier cliff and which rivals are chasing it;
-// then the room trend (price level over the draft, recent sales vs what they were expected to go for). See backend engine/market.py.
+// then the room trend (recent sales vs their Worth at the time). See backend engine/market.py.
 export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
   const [m, setM] = useState(null);
   useEffect(() => {
@@ -44,14 +44,13 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
 
       <div className="trend-head">
         <span className="bid-label"><Term k="room_trend" /></span>
-        {m.levels.length > 1 && <Spark values={m.levels} />}
         {m.recent_diff != null && (
           <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Last 10 sales on average: how much more (+) or less (−) than his Worth the buyers paid.">
             {m.recent_diff > 0 ? "+" : ""}${m.recent_diff} vs worth lately
           </span>
         )}
       </div>
-      {m.levels.length <= 1 && <div className="small muted">No sales yet (keepers don't count): fills in as players are bought.</div>}
+      {!m.sales.length && <div className="small muted">No sales yet (keepers don't count): fills in as players are bought.</div>}
       {m.sales.map((s) => (
         <div key={`${s.player_id}-${s.price}`} className="sale-row clickable" onClick={() => onSelect?.(s.player_id)}>
           <span className="clip">{s.player}</span>
@@ -63,19 +62,5 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
         </div>
       ))}
     </div>
-  );
-}
-
-// Price level after each sale; the dashed line is 1.00× (draft-start prices).
-function Spark({ values }) {
-  const W = 120, H = 26, lo = Math.min(0.8, ...values), hi = Math.max(1.2, ...values);
-  const y = (v) => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
-  const x = (i) => (i / (values.length - 1)) * W;
-  const last = values[values.length - 1];
-  return (
-    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" data-tip={`Price level after each sale: now ${last.toFixed(2)}×, started at 1.00× (dashed).`}>
-      <line x1="0" x2={W} y1={y(1)} y2={y(1)} className="spark-base" />
-      <polyline points={values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} className={`spark-line ${last > 1.05 ? "hot" : last < 0.95 ? "cold" : ""}`} />
-    </svg>
   );
 }

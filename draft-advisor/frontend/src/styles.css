@@ -509,11 +509,7 @@ th.sorted { color: var(--primary); }
 .market-table .verdict { font-size: 11px; padding: 1px 6px; }
 .market-table td.clip, .sale-row .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .need-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-left: 3px; vertical-align: middle; }
-.spark { flex: 1; min-width: 60px; height: 26px; display: block; }
 .trend-head { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; white-space: nowrap; }
-.spark-base { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.spark-line { fill: none; stroke: var(--primary); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.spark-line.hot { stroke: var(--danger); } .spark-line.cold { stroke: var(--ok); }
 .sale-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px 34px minmax(0, 0.8fr); gap: 6px; align-items: baseline; font-size: 13px; padding: 1px 0; }
 .sale-row strong { text-align: right; }
 .sale-diff { text-align: right; font-weight: 700; color: var(--muted); } .sale-diff.over { color: var(--danger); } .sale-diff.under { color: var(--ok); }

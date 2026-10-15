@@ -31,7 +31,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
     <div className="panel" data-testid="spending-guide">
       <div className="row">
         <h3 style={{ margin: 0 }}>Spending guide <span className="badge info">for {g.name}</span></h3>
-        {!open && <span className="small muted">${me.remaining} · {me.open_mandatory} open · price level {g.inflation.toFixed(2)}×</span>}
+        {!open && <span className="small muted">${me.remaining} · {me.open_mandatory} open</span>}
         <button className="small ghost" onClick={toggle} data-testid="toggle-spending" style={{ marginLeft: "auto" }}>{open ? "▾ hide" : "▸ show"}</button>
       </div>
       {open && (
@@ -45,7 +45,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
               </div>
             );
           })()}
-          <div className="bid-grid">
+          <div className="bid-grid two">
             <div className="bid-cell primary">
               <div className="bid-label"><Term k="left">You</Term></div>
               <div className="bid-num">${me.remaining}</div>
@@ -54,10 +54,6 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
             <div className="bid-cell">
               <div className="bid-label"><Term k="room" /></div>
               <div className="bid-num">${g.room_per_slot}<span className="small muted">/slot</span></div>
-            </div>
-            <div className="bid-cell">
-              <div className="bid-label"><Term k="price_level" /></div>
-              <div className="bid-num">{g.inflation.toFixed(2)}×</div>
             </div>
           </div>
           {g.nominations?.length > 0 && (

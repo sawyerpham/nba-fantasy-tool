@@ -12,7 +12,6 @@ per position (PG SG SF PF C):
   chasers  = rivals with an open spot there whose cap reaches the fair value of the best player left there
 room trend:
   sales    = the last sales (keepers skipped) vs fair value at the moment of the sale, replayed from the picks
-  levels   = price level after each sale (that moment's $ per point of value ÷ the draft-start rate)
 
 ponytail: flex slots (G/F/UTIL) are not split across positions; count them per position if a league uses them.
 """
@@ -86,9 +85,8 @@ def market_board(session, manager_id: str) -> dict:
     # Room trend: replay the picks to price each sale at its own moment.
     picks = session.draft.picks
     names = {m.manager_id: m.name for m in session.managers}
-    opening = session.opening_rate()
     taken: set[int] = set()
-    sales, levels = [], [1.0]
+    sales = []
     for i, p in enumerate(picks):
         if not p.is_keeper:
             rate = market_rate(lg, session.managers, picks[:i], (v for pid, v in pool.items() if pid not in taken), pool)
@@ -97,10 +95,7 @@ def market_board(session, manager_id: str) -> dict:
             sales.append({"player_id": p.player_id, "player": rec.full_name if rec else str(p.player_id),
                           "manager": names.get(p.manager_id, p.manager_id), "price": p.price, "fair": fair, "diff": p.price - fair})
         taken.add(p.player_id)
-        if not p.is_keeper and opening > 0:
-            after = market_rate(lg, session.managers, picks[: i + 1], (v for pid, v in pool.items() if pid not in taken), pool)
-            levels.append(round(after.dollars_per_var / opening, 3))
     recent = sales[-RECENT_SALES:][::-1]
     window = sales[-10:]
-    return {"positions": positions, "sales": recent, "levels": levels,
+    return {"positions": positions, "sales": recent,
             "recent_diff": round(sum(s["diff"] for s in window) / len(window), 1) if window else None}
