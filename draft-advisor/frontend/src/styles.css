@@ -439,6 +439,9 @@ th.sorted { color: var(--primary); }
 .live-lot-call.even { background: var(--even); color: var(--even-t); }
 .live-lot-call.bad { background: var(--bad); color: var(--bad-t); }
 .live-lot-tips div { margin-top: 2px; }
+.live-lot-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
+.live-card { padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.live-card .bid-label { margin-bottom: 2px; }
 
 /* pick notifications */
 .toasts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(820px, 60vw); }
