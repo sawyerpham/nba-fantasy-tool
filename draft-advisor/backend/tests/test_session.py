@@ -216,3 +216,23 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
     sale = b["sales"][0]
     assert sale["player_id"] == JOKIC and sale["price"] == 80 and sale["diff"] == 80 - sale["fair"] and sale["fair"] > 1
     assert b["levels"][0] == 1.0 and len(b["levels"]) == 2
+
+
+def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(fixture_world):
+    from app.engine.fit import team_fit
+    from app.engine.keepers import keeper_outlook
+
+    s = make_session(fixture_world)
+    s.start([])
+    k = team_fit(s, "m1", JOKIC).keeper
+    assert k["next_price"] == s.league.keeper.escalation.price(k["buy_price"]) and k["surplus"] == k["next_worth"] - k["next_price"]
+    assert k["verdict"] in {"good", "even", "bad"} and not k["stash"]
+    row = next(r for r in s.rankings("m1", 40) if r.player_id == JOKIC)
+    cheap = keeper_outlook(s, row, 1)
+    assert cheap["verdict"] == "good" and cheap["next_price"] == 1
+    assert k["good_up_to"] is not None and (k["verdict"] == "good") == (k["buy_price"] <= k["good_up_to"])
+    s.overrides[JOKIC] = s.overrides[JOKIC].model_copy(update={"injury_status": "out_season"})
+    s.invalidate()
+    hurt = keeper_outlook(s, row, 1)
+    # an injury now barely moves next year's worth (only the pool around him shifts)
+    assert hurt["stash"] and hurt["next_worth"] >= 0.8 * cheap["next_worth"]

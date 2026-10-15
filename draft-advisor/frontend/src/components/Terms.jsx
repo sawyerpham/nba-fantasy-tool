@@ -42,6 +42,8 @@ export const TERMS = {
   tier_cliff: ["Top tier", "The best tier left at this position, how many players are left in it, and how much lower in value (fantasy points) the next tier's best player is. Last one in a tier = buy now or drop a level."],
   chasing: ["Chasing", "Rivals with an open spot here whose cap reaches the fair value of the best player left here. More chasers = bidding wars."],
   room_trend: ["Room trend", "How the room is spending: the price level after each sale (dashed line = draft-start prices) and the last sales vs fair value at that moment."],
+  keeper_outlook: ["Keeper next year", "If you buy him now at about his market price, next year's keeper price (league rule: +$1 per full $5) vs what he'd be worth next year if healthy (this year's projection, current injury removed, a year older, at draft-start prices). GOOD keep / EVEN / BAD keep use the same thresholds as the keeper menu. Never part of Fit: winning this season comes first."],
+  stash: ["STASH", "Out now, so he helps little this season, but at this price he'd be a GOOD keep next year. Only worth it with money and a roster spot to spare."],
   overpaid: ["Overpaid / bargain", "Sold price vs fair value. Within $2 counts as a fair price."],
   keep_call: ["Keep call", "GOOD keep: this year's keeper price is under fair value by at least $2 and 10%. BAD keep: over it by that much. EVEN: in between."],
 };

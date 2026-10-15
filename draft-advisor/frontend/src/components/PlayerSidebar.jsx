@@ -100,6 +100,20 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </div>
       )}
 
+      {fit?.keeper && fit.player_id === shownId && (() => {
+        const k = fit.keeper, cls = { good: "good", even: "even", bad: "bad" }[k.verdict];
+        return (
+          <div className="small keeper-line" data-testid="keeper-outlook">
+            <span className="bid-label"><Term k="keeper_outlook" /></span>{" "}
+            <span className={`verdict ${cls}`} data-tip={TERMS.keep_call[1]}>{k.verdict.toUpperCase()} keep</span>
+            {k.stash && <> <Term k="stash" className="verdict even" /></>}
+            <span className="muted"> buy ~${k.buy_price} → keep at <strong style={{ color: "var(--text)" }}>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
+            {k.good_up_to != null && <div className="muted">GOOD keep if you get him for <strong style={{ color: "var(--text)" }}>≤ ${k.good_up_to}</strong></div>}
+            {k.young && <span className="muted" data-tip="23 or younger: young players usually improve, which this estimate doesn't model."> · young, may improve</span>}
+          </div>
+        );
+      })()}
+
       {rec && (
         <div data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
