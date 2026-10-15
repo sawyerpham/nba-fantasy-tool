@@ -441,7 +441,14 @@ th.sorted { color: var(--primary); }
 .live-lot-tips div { margin-top: 2px; }
 .live-lot-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
 .live-card { padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.live-card .bid-label { margin-bottom: 2px; }
+/* each card's title in its own colour, with a matching bar on top, so you find the one you want at a glance */
+.live-card { border-top: 3px solid var(--card-c); }
+.live-card-title { font-size: 13.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.07em; color: var(--card-c); margin-bottom: 3px; }
+.live-card-title .term { color: inherit; }
+.live-card.win { --card-c: #34d399; } .live-card.pass { --card-c: #60a5fa; } .live-card.bids { --card-c: #fb923c; }
+.live-card.lockin { --card-c: #c084fc; } .live-card.keeper { --card-c: #facc15; }
+[data-theme="light"] .live-card.win { --card-c: #059669; } [data-theme="light"] .live-card.pass { --card-c: #2563eb; }
+[data-theme="light"] .live-card.bids { --card-c: #ea580c; } [data-theme="light"] .live-card.lockin { --card-c: #9333ea; } [data-theme="light"] .live-card.keeper { --card-c: #b45309; }
 
 /* pick notifications */
 .toasts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(820px, 60vw); }
