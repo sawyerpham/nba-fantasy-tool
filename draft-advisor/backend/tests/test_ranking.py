@@ -113,3 +113,6 @@ def test_no_games_last_season_is_not_treated_as_never_available():
     r = RankingSettings(availability_weight=0.3)
     missed_all = valuation(1, 0.0, 0.0, gp=0, weeks=0)
     assert availability_factor(missed_all, r) == 1 - 0.3 * (1 - NO_GAMES_AVAILABILITY)
+    # a veteran who missed last season keeps his 3-season blend (0.5 × 0 + 0.3 × 0.7 + 0.2 × 0.85 = 0.38)
+    vet = missed_all.model_copy(update={"availability": 0.38, "availability_seasons": {"2025-26": 0.0, "2024-25": 0.7, "2023-24": 0.85}})
+    assert availability_factor(vet, r) == pytest.approx(1 - 0.3 * (1 - 0.38))
