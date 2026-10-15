@@ -5,6 +5,7 @@ import RankingsTable from "../components/RankingsTable.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import RoomBoard from "../components/RoomBoard.jsx";
 import LiveLot from "../components/LiveLot.jsx";
+import { bidSound, nominationSound } from "../components/sounds.js";
 import TeamsTable from "../components/TeamsTable.jsx";
 import NbaTeamsTable from "../components/NbaTeamsTable.jsx";
 import PickBar from "../components/PickBar.jsx";
@@ -247,6 +248,8 @@ export default function DraftPage({ leagueId }) {
           <button className={`small ${showOrder ? "" : "ghost"}`} onClick={() => setOrderOpen(!showOrder)} data-testid="btn-order"
             title="change the nomination order or who nominates next">{showOrder ? "▾ Order" : "▸ Order"}</button>
           <span className="spacer" />
+          <button className="small ghost" onClick={() => { nominationSound(); setTimeout(bidSound, 1100); }} data-testid="test-sounds"
+            data-tip="Plays the new-nomination sound, then the new-bid sound. Also lets the browser play them during the draft.">🔊 Test sounds</button>
           {live && (
             <span className="sync-box" data-testid="sync-box">
               <label className="inline small" data-tip="Checks the Sleeper draft every second: records picks, shows the live nomination and bid.">
