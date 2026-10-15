@@ -135,7 +135,10 @@ def availability_factor(valuation: PlayerValuation, ranking: RankingSettings) ->
     w = max(0.0, min(1.0, ranking.availability_weight))
     if w == 0 or valuation.season_weeks == 0:
         return 1.0
-    availability = NO_GAMES_AVAILABILITY if valuation.games_played == 0 else valuation.availability
+    # No games last season: a veteran's 3-season blend (missed season = 0) still applies; only a player with no
+    # earlier NBA seasons (rookie) falls back to the typical availability.
+    no_history = valuation.games_played == 0 and len(valuation.availability_seasons) <= 1
+    availability = NO_GAMES_AVAILABILITY if no_history else valuation.availability
     return 1.0 - w * (1.0 - availability)
 
 
