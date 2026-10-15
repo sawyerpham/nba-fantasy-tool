@@ -313,7 +313,7 @@ export default function DraftPage({ leagueId }) {
           {live && sync && !pick && (
             <div className="block-bar live-bar">
               {liveLot ? (
-                <LiveLot leagueId={leagueId} lot={liveLot} managers={view.managers}
+                <LiveLot leagueId={leagueId} lot={liveLot} managers={view.managers} rankings={rankings}
                   row={rankings.find((r) => r.player_id === liveLot.player_id)} onOpen={() => setSelected(liveLot.player_id)} />
               ) : (
                 <><span className="live-dot" /><span className="muted">Sleeper sync on: waiting for the next nomination…</span><span className="spacer" />{markDrafted}</>
