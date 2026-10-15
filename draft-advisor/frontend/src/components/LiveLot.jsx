@@ -8,12 +8,39 @@ import { CallBadge, Term, TERMS, liveCall } from "./Terms.jsx";
 // Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now, his numbers, the
 // live high bid against his Worth and Max (and your walk-away) as a one-word call, and below it: who has bid so
 // far, what winning him leaves you, the next best players for that spot, his Lock-In numbers, next year's keeper call, team role and injury.
+// Short two-note chime for a new high bid (Web Audio, no sound file). Browsers allow it once you've clicked the page.
+let audio = null;
+function chime() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime;
+    [[880, 0], [1320, 0.09]].forEach(([hz, at]) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(0.25, t + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.18);
+      o.connect(g).connect(audio.destination); o.start(t + at); o.stop(t + at + 0.2);
+    });
+  } catch { /* no audio: the blink still shows it */ }
+}
+
 export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen }) {
   const [spend, setSpend] = useState(null);
   const [extra, setExtra] = useState({});   // team role (player endpoint) and keeper outlook (fit endpoint)
   const [now, setNow] = useState(Date.now());
   const bids = useRef({ id: null, list: [] });   // every new high bid seen for this lot, from the sync polls
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
+  // A new high bid on the same player: blink the high-bid card and chime.
+  const [flash, setFlash] = useState(0);
+  const seen = useRef({ id: lot.player_id, bid: lot.high_bid });
+  useEffect(() => {
+    const prev = seen.current;
+    seen.current = { id: lot.player_id, bid: lot.high_bid };
+    if (prev.id !== lot.player_id || lot.high_bid == null || prev.bid === lot.high_bid) return undefined;
+    chime();
+    setFlash((n) => n + 1);
+    const t = setTimeout(() => setFlash(0), 900);
+    return () => clearTimeout(t);
+  }, [lot.player_id, lot.high_bid]);
   useEffect(() => {
     let off = false;
     setSpend(null); setExtra({});
@@ -89,7 +116,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           <div className="live-lot-price" data-testid="live-worth">{spend ? `$${Math.round(spend.fair_value)}` : "—"}</div>
           <div className="live-big-sub">Max {can ? `$${spend.recommended}` : "—"}</div>
         </div>
-        <div className={`live-lot-bid ${band?.cls || ""}`} data-tip="Sleeper's current high bid and who holds it; the clock ticks down to the sale.">
+        <div key={flash} className={`live-lot-bid ${flash ? "flash" : ""}`} data-testid="live-bid-card" data-tip="Sleeper's current high bid and who holds it; the clock ticks down to the sale.">
           <div className="bid-label"><span className="rec-dot" />High bid{lot.leader ? ` · ${lot.leader}` : ""}</div>
           <div className="live-lot-price" data-testid="live-bid">${bid}</div>
           {left != null && <div className={`live-clock ${left <= 3 ? "low" : ""}`}>{left}s</div>}
