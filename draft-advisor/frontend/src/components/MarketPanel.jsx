@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { PosTag } from "./Pos.jsx";
-import { Term } from "./Terms.jsx";
+import { Term, priceTone } from "./Terms.jsx";
 
 const STATUS = { scarce: ["bad", "scarce"], tight: ["even", "tight"], plenty: ["good", "plenty"] };
 
@@ -9,6 +9,7 @@ const STATUS = { scarce: ["bad", "scarce"], tight: ["even", "tight"], plenty: ["
 // then the room trend (recent sales vs their Worth at the time). See backend engine/market.py.
 export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
   const [m, setM] = useState(null);
+  const [allSales, setAllSales] = useState(false);
   useEffect(() => {
     if (!live) { setM(null); return; }
     api.get(`/leagues/${leagueId}/market`).then(setM).catch(() => setM(null));
@@ -42,25 +43,39 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
         </tbody>
       </table>
 
+      <div className="sold-tracker" data-testid="sold-tracker">
+        <span data-tip="Players bought at auction so far (keepers don't count)."><span className="bid-label">Sold</span> <strong>{m.sold}</strong></span>
+        <span data-tip={`Roster spots still open across the room, bench included (${m.starters_left} of them starting spots).`}><strong>{m.spots_left}</strong> <span className="muted">spots left</span></span>
+        <span data-tip={`Available players whose Worth right now is $${m.good_worth} or more: who the room's money is still for. When this runs low, the rest go for $1-3.`}>
+          <strong className={m.good_left <= 10 ? "warn-text" : ""}>{m.good_left}</strong> <span className="muted">left worth ${m.good_worth}+</span>
+        </span>
+      </div>
       <div className="trend-head">
         <span className="bid-label"><Term k="room_trend" /></span>
         {m.recent_diff != null && (
           <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Last 10 sales on average: how much more (+) or less (−) than his Worth the buyers paid.">
-            {m.recent_diff > 0 ? "+" : ""}${m.recent_diff} vs worth lately
+            {m.recent_diff > 0 ? "+" : m.recent_diff < 0 ? "−" : ""}${Math.abs(m.recent_diff)} vs worth lately
           </span>
         )}
       </div>
       {!m.sales.length && <div className="small muted">No sales yet (keepers don't count): fills in as players are bought.</div>}
-      {m.sales.map((s) => (
+      <div className={allSales ? "sales-all" : ""}>
+      {(allSales ? m.sales : m.sales.slice(0, 4)).map((s) => (
         <div key={`${s.player_id}-${s.price}`} className="sale-row clickable" onClick={() => onSelect?.(s.player_id)}>
           <span className="clip">{s.player}</span>
-          <strong>${s.price}</strong>
+          {(() => { const t = priceTone(s.price, s.fair); return <strong><span className={t.cls} data-tip={t.tip}>${s.price}</span></strong>; })()}
           <span className={`sale-diff ${s.diff > 2 ? "over" : s.diff < -2 ? "under" : ""}`} data-tip={`Worth $${s.fair} at that point; ${s.manager} paid $${s.price}.`}>
             {s.diff > 0 ? "+" : ""}{s.diff}
           </span>
           <span className="muted clip sale-mgr">{s.manager}</span>
         </div>
       ))}
+      </div>
+      {m.sales.length > 4 && (
+        <button className="small ghost" onClick={() => setAllSales(!allSales)} data-testid="toggle-sales">
+          {allSales ? "▾ last 4 only" : `▸ show all ${m.sales.length} sold`}
+        </button>
+      )}
     </div>
   );
 }

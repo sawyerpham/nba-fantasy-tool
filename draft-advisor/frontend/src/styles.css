@@ -598,3 +598,8 @@ table.small th, .plan-table th, .money-table th, .market-table th { background: 
 /* sale price vs Worth when sold: steal blue, fair green, over red, way over dark red */
 .tone-steal, .tone-fair, .tone-over, .tone-way { padding: 0 6px; border-radius: 6px; color: #fff; text-shadow: none !important; }
 .tone-steal { background: #2563eb; } .tone-fair { background: #15803d; } .tone-over { background: #dc2626; } .tone-way { background: #7f1d1d; }
+
+/* sold tracker above the room trend; the full sold list scrolls inside the panel */
+.sold-tracker { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: 10px 0 2px; font-size: 13.5px; }
+.sold-tracker strong { font-size: 16px; }
+.sales-all { max-height: 340px; overflow-y: auto; }
