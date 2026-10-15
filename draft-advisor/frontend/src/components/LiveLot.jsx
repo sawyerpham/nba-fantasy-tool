@@ -62,13 +62,10 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
 
   return (
     <div className="live-lot" data-testid="live-lot">
-      <div className="live-lot-banner">
-        <span className="live-lot-pulse" /> ON THE BLOCK <span className="live-lot-banner-sub">LIVE IN SLEEPER</span>
-        <span className="live-lot-banner-by">nominated by {lot.nominated_by || "?"}</span>
-      </div>
       <div className="live-lot-head">
         <Headshot sleeperId={lot.sleeper_id} name={lot.full_name} size={56} />
         <div className="live-lot-who">
+          <div className="small muted"><span className="live-dot" /> LIVE IN SLEEPER · nominated by {lot.nominated_by || "?"}</div>
           <div className="live-lot-name" onClick={onOpen} data-tip="Open his full profile on the right." data-testid="on-the-block">
             {lot.full_name} <span className="muted">{lot.team_abbr}</span>
           </div>
