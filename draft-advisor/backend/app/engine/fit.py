@@ -35,6 +35,7 @@ class TeamFit:
     score_lines: list[str] = field(default_factory=list)   # the three parts of the score
     notes: list[str] = field(default_factory=list)          # context, not in the score
     reasons: list[str] = field(default_factory=list)        # score_lines + notes (for Copy for Claude)
+    keeper: dict | None = None                              # next year's keep call if bought now (never in the score)
 
 
 def _ordinal(n: int) -> str:
@@ -130,5 +131,15 @@ def team_fit(session, manager_id: str, player_id: int) -> TeamFit:
     if mates:
         notes.append(f"Same NBA team as your {', '.join(mates)}.")
 
+    keeper = None
+    if session.league.keeper.enabled:
+        from .keepers import keeper_outlook
+
+        if call and call.verdict != "cannot":
+            buy = call.recommended
+        else:   # before the draft, or no slot for him: his market price from the bid guide, else fair value
+            rec = session.recommend(player_id, manager_id)
+            buy = rec.recommended_max if rec.can_bid else max(session.league.min_bid, round(rec.fair_value))
+        keeper = keeper_outlook(session, p, buy)
     lines = [quality, role, price_line]
-    return TeamFit(player_id, score, verdict, headline, lines, notes, lines + notes)
+    return TeamFit(player_id, score, verdict, headline, lines, notes, lines + notes, keeper)
