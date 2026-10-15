@@ -524,3 +524,22 @@ th.sorted { color: var(--primary); }
 .role-tag.star { background: var(--even); color: var(--even-t); }
 .keeper-line { margin: 8px 0 2px; line-height: 1.6; }
 .keeper-line .verdict { font-size: 11.5px; padding: 1px 7px; }
+
+/* ---------- glass over the wallpaper (public/wallpaper.jpg) ----------
+   Panels are translucent with a background blur; things that sit on top of other content (sticky table
+   headers, dropdowns, modals, tooltips, toasts) use the near-opaque --panel-solid so text stays readable. */
+:root {
+  --panel: rgba(18, 22, 28, 0.58); --panel-2: rgba(255, 255, 255, 0.05); --border: rgba(255, 255, 255, 0.09);
+  --header: rgba(10, 12, 16, 0.55); --input-bg: rgba(10, 12, 16, 0.55); --panel-solid: rgba(16, 20, 26, 0.94);
+  --glass: blur(16px) saturate(1.15);
+}
+[data-theme="light"] {
+  --panel: rgba(255, 255, 255, 0.66); --panel-2: rgba(255, 255, 255, 0.5); --border: rgba(255, 255, 255, 0.6);
+  --header: rgba(255, 255, 255, 0.6); --input-bg: rgba(255, 255, 255, 0.78); --panel-solid: rgba(255, 255, 255, 0.96);
+}
+body { background: #0b0d10 url("/wallpaper.jpg") center / cover no-repeat fixed; }
+.panel, .room-card, .block-bar, .sticky-bar, .sticky-block, header.top { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
+th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
+table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
+/* light theme: wash the dark wallpaper so dark text that sits directly on it stays readable */
+[data-theme="light"] body { background: linear-gradient(rgba(246, 247, 251, 0.74), rgba(246, 247, 251, 0.74)), #f6f7fb url("/wallpaper.jpg") center / cover no-repeat fixed; }
