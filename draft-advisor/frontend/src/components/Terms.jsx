@@ -69,6 +69,17 @@ export function liveCall(bid, c) {
   return { cls: "bad", word: "STOP", text: bid >= c.walk_away ? `at or past your walk-away $${c.walk_away}` : `at or past his Max $${max}` };
 }
 
+// A sale's price against his Worth when he sold (within $2 = about right, as everywhere on the site):
+// STEAL $3+ under (blue), FAIR (green), OVER $3-9 over (red), WAY OVER $10+ over (dark red). Keepers aren't sales.
+export function priceTone(price, worth, isKeeper) {
+  if (isKeeper || worth == null) return { cls: "", tip: isKeeper ? "keeper price" : "" };
+  const d = price - worth, tip = `Worth $${worth} when he sold: ${d > 0 ? `$${d} over` : d < 0 ? `$${-d} under` : "right on it"}.`;
+  if (d <= -3) return { cls: "tone-steal", tip: `Steal. ${tip}` };
+  if (d <= 2) return { cls: "tone-fair", tip: `Fair price. ${tip}` };
+  if (d <= 9) return { cls: "tone-over", tip: `Overpaid. ${tip}` };
+  return { cls: "tone-way", tip: `Way overpaid. ${tip}` };
+}
+
 // One tooltip for every [data-tip] on the page: instant, never clipped by a scrolling panel.
 export function TipLayer() {
   const [tip, setTip] = useState(null);
