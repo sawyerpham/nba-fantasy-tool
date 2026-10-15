@@ -35,6 +35,7 @@ STARTER_ORDER: tuple[str, ...] = roster.POSITION_SLOTS + roster.FLEX_SLOTS + ("U
 FIT_SCAN_LIMIT = 200  # candidates examined per slot when looking for one that fits the allowance
 DEFAULT_TARGETS = 5
 NOMINATION_SCAN = 40  # available players considered for nomination ideas
+NOMINATE_DRAIN, NOMINATE_SNEAK = 5, 3   # how many of each the guide lists
 
 
 @dataclass
@@ -338,23 +339,28 @@ def spending_guide(
         for p in sorted(available, key=lambda x: -x.value)[:NOMINATION_SCAN]:
             r = rec_for(p)
             market = price(p)
-            rivals = sum(1 for x in others if x.open_mandatory > 0 and x.max_bid >= market)
+            payers = sorted((x for x in others if x.open_mandatory > 0 and x.max_bid >= market), key=lambda x: -x.max_bid)
+            rivals = len(payers)
             if not p.rosterable or market > me.max_bid:
                 if rivals >= 2:
-                    drain.append((market * rivals, p, market, rivals, "you have no slot for him" if not p.rosterable else "above your cap"))
+                    drain.append((market * rivals, p, market, payers, "you have no slot for him" if not p.rosterable else "above your cap"))
                 continue
             a = advise(p)
             if a.verdict == "pricey":   # past your walk-away; a star-only player may still be your star
                 if rivals >= 2:
-                    drain.append((market * rivals, p, market, rivals, "too pricey for your build"))
+                    drain.append((market * rivals, p, market, payers, "too pricey for your build"))
             elif a.verdict == "buy" and r.can_bid and rivals <= few_rivals:
-                sneak.append((-p.value, p, a.suggested, rivals, ""))
-        for _, p, market, rivals, why in sorted(drain, key=lambda t: -t[0])[:3]:
-            nominations.append({"kind": "drain", "player_id": p.player_id, "name": p.full_name, "price": market, "rivals": rivals,
-                                "reason": f"{rivals} rivals can pay ~${market} and {why}: their money leaves the room"})
-        for _, p, suggested, rivals, _ in sorted(sneak, key=lambda t: t[0])[:3]:
-            nominations.append({"kind": "sneak", "player_id": p.player_id, "name": p.full_name, "price": suggested, "rivals": rivals,
-                                "reason": f"only {rivals} rival{'s' if rivals != 1 else ''} can reach ${suggested} right now"})
+                sneak.append((-p.value, p, a.suggested, payers, ""))
+        # who = the rivals who can pay that much and still need players, biggest cap first
+        who = lambda payers: [{"name": x.name, "cap": x.max_bid} for x in payers]
+        for _, p, market, payers, why in sorted(drain, key=lambda t: -t[0])[:NOMINATE_DRAIN]:
+            nominations.append({"kind": "drain", "player_id": p.player_id, "name": p.full_name, "price": market, "rivals": len(payers),
+                                "who": who(payers), "why": why,
+                                "reason": f"{len(payers)} rivals can pay ~${market} and {why}: their money leaves the room"})
+        for _, p, suggested, payers, _ in sorted(sneak, key=lambda t: t[0])[:NOMINATE_SNEAK]:
+            nominations.append({"kind": "sneak", "player_id": p.player_id, "name": p.full_name, "price": suggested, "rivals": len(payers),
+                                "who": who(payers), "why": "",
+                                "reason": f"only {len(payers)} rival{'s' if len(payers) != 1 else ''} can reach ${suggested} right now"})
 
     # ---- headline advice
     advice: list[str] = []

@@ -175,3 +175,14 @@ def test_roster_full():
     assert g.me.open_mandatory == 0 and g.per_slot_rank == 0 and g.me.per_slot == 0.0
     assert g.advice[0] == "Roster full: $44 unspent." and g.plan == [] and g.targets == []
     assert g.focus.verdict == "cannot" and g.focus.suggested == 0
+
+
+def test_drain_nominations_name_the_rivals_they_drain():
+    lg, mgrs, e, players, overrides, valuations = setup()
+    pick(e, 10, "m1", 40)   # I spend big: the stars are now above my cap
+    g = guide(lg, mgrs, e, players, overrides, valuations)
+    drains = [n for n in g.nominations if n["kind"] == "drain"]
+    assert drains and all(n["why"] for n in drains)
+    for n in drains:
+        assert n["rivals"] == len(n["who"]) >= 2 and all(w["cap"] >= n["price"] for w in n["who"])
+        assert [w["cap"] for w in n["who"]] == sorted((w["cap"] for w in n["who"]), reverse=True)

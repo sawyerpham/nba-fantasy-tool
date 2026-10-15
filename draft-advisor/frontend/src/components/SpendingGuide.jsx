@@ -59,21 +59,24 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
           {g.nominations?.length > 0 && (
             <div className="nom-ideas" data-testid="nominations">
               <span className="bid-label">Nominate</span>
-              {g.nominations.slice(0, 3).map((n) => (
-                <div key={`${n.kind}-${n.player_id}`} className="nom-row clickable" onClick={() => onSelect?.(n.player_id)}>
+              {g.nominations.map((n) => (
+                <div key={`${n.kind}-${n.player_id}`} className="nom-row clickable" onClick={() => onSelect?.(n.player_id)} data-tip={n.reason}>
                   <Term k={n.kind} className={`verdict ${n.kind === "drain" ? "even" : "good"}`} />
-                  <strong data-tip={n.reason}>{n.name}</strong>
+                  <strong>{n.name}</strong> <span className="small">~${n.price}</span>
+                  <span className="small muted clip nom-who">
+                    {n.kind === "drain"
+                      ? <>drains {n.who.slice(0, 3).map((w) => `${w.name} ($${w.cap})`).join(", ")}{n.who.length > 3 ? ` +${n.who.length - 3}` : ""}{n.why ? ` · ${n.why}` : ""}</>
+                      : n.who.length ? <>only {n.who.map((w) => w.name).join(", ")} can match</> : "no rival can match"}
+                  </span>
                 </div>
               ))}
             </div>
           )}
           {g.plan.length > 0 && (() => {
             // One row per open starting spot: the best player left for it (his Fit, his Max coloured by the call)
-            // and the best one within your even split. Totals use his Max where the rankings have it.
+            // and the best one within your even split.
             const row = (id) => (rankings || []).find((r) => r.player_id === id);
             const lines = g.plan.map((p) => ({ p, r: row(p.best_id) }));
-            const total = lines.reduce((t, { p, r }) => t + (r?.max ?? p.best_price), 0) + g.bench_total;
-            const spare = me.remaining - total;
             return (
               <table className="small plan-table" data-testid="ideal-team">
                 <thead><tr><th></th><th><Term k="ideal">Best</Term></th><th className="num"><Term k="fit" /></th><th className="num"><Term k="max" /></th><th><Term k="even_split">≤ ${g.allowance}</Term></th></tr></thead>
@@ -87,10 +90,6 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
                       <td className="clip clickable muted" onClick={() => p.fit_id && onSelect?.(p.fit_id)}>{p.fit_name ? `${p.fit_name} $${p.fit_price}` : "nobody"}</td>
                     </tr>
                   ))}
-                  <tr><td colSpan="5" className="plan-total">
-                    Best: <strong>${total}</strong> <span className={spare >= 0 ? "ok" : "warn-text"}>({spare >= 0 ? `$${spare} spare` : `$${-spare} short`})</span>
-                    {" · "}≤ ${g.allowance}: <strong>${g.plan_fit_total}</strong> <span className="muted">· incl. {me.open_bench} BN at $1</span>
-                  </td></tr>
                 </tbody>
               </table>
             );
