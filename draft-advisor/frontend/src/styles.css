@@ -432,12 +432,17 @@ th.sorted { color: var(--primary); }
 .live-lot-bid.good { background: var(--good); } .live-lot-bid.even { background: var(--even); } .live-lot-bid.bad { background: var(--bad); }
 .live-lot-price { font-size: 34px; font-weight: 800; line-height: 1.05; }
 .live-lot-bid .live-clock { font-size: 18px; }
+/* big cards in the live block's head: the call (one word), his Worth, then the high bid */
+.live-big { text-align: center; padding: 6px 14px; border-radius: 12px; background: var(--panel-2); min-width: 120px; }
+.live-big.call { min-width: 170px; max-width: 230px; }
+.live-big.good { background: var(--good); color: var(--good-t); } .live-big.even { background: var(--even); color: var(--even-t); }
+.live-big.bad { background: var(--bad); color: var(--bad-t); } .live-big.lead { background: var(--primary-soft); color: var(--primary); }
+.live-big-word { font-size: 34px; font-weight: 900; letter-spacing: 0.04em; line-height: 1.05; }
+.live-big-sub { font-size: 12px; font-weight: 600; opacity: 0.85; line-height: 1.25; }
+.live-big .bid-label { color: inherit; opacity: 0.8; }
+.rec-dot { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; vertical-align: 1px; animation: live-pulse 1s infinite; }
 .live-lot-limits { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .live-lot-limits .lim { display: inline-flex; align-items: baseline; gap: 6px; font-size: 16px; }
-.live-lot-call { font-weight: 700; padding: 6px 12px; border-radius: 10px; }
-.live-lot-call.good { background: var(--good); color: var(--good-t); }
-.live-lot-call.even { background: var(--even); color: var(--even-t); }
-.live-lot-call.bad { background: var(--bad); color: var(--bad-t); }
 .live-lot-tips div { margin-top: 2px; }
 .live-lot-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
 .live-card { padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
