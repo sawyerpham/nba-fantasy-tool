@@ -236,3 +236,15 @@ def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(
     hurt = keeper_outlook(s, row, 1)
     # an injury now barely moves next year's worth (only the pool around him shifts)
     assert hurt["stash"] and hurt["next_worth"] >= 0.8 * cheap["next_worth"]
+
+
+def test_pre_draft_worth_counts_keepers_and_matches_draft_start(fixture_world):
+    s = make_session(fixture_world, keeper=KeeperSettings(enabled=True))
+    luka = lambda: next(r for r in s.rank([], s.available_ids()) if r.player_id == DONCIC).value
+    no_keepers = s.keeper_start_rate().free_dollars
+    s.engine.start([KeeperAssignment("m2", JOKIC, 10)])
+    s.sync_keeper_history()
+    live = s.start_worth(luka())
+    s.engine.reset()
+    assert s.draft.status == "setup" and s.start_worth(luka()) == live   # same number before the draft, from the keeper rows
+    assert s.keeper_start_rate().free_dollars == no_keepers - 9   # his $10 is spent, $1 of it on a spot that no longer needs reserving

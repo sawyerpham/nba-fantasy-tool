@@ -99,7 +99,7 @@ OUT_NOW = ("out_short_term", "out_long_term", "out_season")
 
 
 def keeper_outlook(session, row, buy_price: int) -> dict:
-    from .bidding import market_rate, replacement_value
+    from .bidding import replacement_value
     from .ranking import age_multiplier, player_value
 
     lg = session.league
@@ -116,9 +116,7 @@ def keeper_outlook(session, row, buy_price: int) -> dict:
     bench = sum(s.count for s in lg.roster_slots if s.slot == "BN")
     priced = mandatory - bench + min(bench, lg.ranking.priced_bench_slots)
     replacement = replacement_value(pool.values(), priced * len(session.managers))
-    keepers = [p for p in session.draft.picks if p.is_keeper]
-    kept = {p.player_id for p in keepers}
-    rate = market_rate(lg, session.managers, keepers, (v for pid, v in pool.items() if pid not in kept), pool).dollars_per_var
+    rate = session.keeper_start_rate().dollars_per_var
     worth = round(lg.min_bid + max(0.0, value - replacement) * rate)
     rule = lg.keeper.escalation
     next_price = rule.price(buy_price)

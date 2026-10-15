@@ -163,7 +163,9 @@ def rankings(
     left = Counter(tier.get(pid) for pid in session.available_ids())
     size = Counter(tier.values())
     # The call (buy / star / pricey / cannot), your max and the market price: the same numbers as the spending guide.
-    calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in rows]).calls if session.draft.status == "live" else {}
+    # Before the draft: Worth at the first nomination (after keepers); Max and the call need the live room.
+    live = session.draft.status == "live"
+    calls = session.spending_guide(manager_id, call_ids=[r.player_id for r in rows]).calls if live else {}
     # Why FP/G moved vs last season: data/fpg_reasons.json, written by hand / an LLM pass (optional).
     reasons = state.store.read_json("fpg_reasons.json").get("players", {}) if state.store.exists("fpg_reasons.json") else {}
     from ..engine.fit import fit_scores
@@ -171,7 +173,8 @@ def rankings(
     fits = fit_scores(session, manager_id or session.user_manager_id(), rows, calls)
     pos_rank, pos_ranks = _sleeper_pos_ranks(session)
     return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
-             **_call_fields(calls.get(r.player_id)), "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
+             **(_call_fields(calls.get(r.player_id)) if live else {"worth": session.start_worth(r.value), "max": None, "call": None}),
+             "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
              "pos_rank": pos_rank.get(r.player_id), "pos_ranks": pos_ranks.get(r.player_id, {})}
             for r in rows]
 
