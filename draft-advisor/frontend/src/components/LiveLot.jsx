@@ -92,30 +92,30 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
       {band && <div className={`live-lot-call ${band.cls}`} data-testid="live-call">{band.text}</div>}
 
       <div className="live-lot-more">
-        <div className="live-card" data-testid="live-win">
-          <div className="bid-label">If you win at ${price}</div>
+        <div className="live-card win" data-testid="live-win">
+          <div className="live-card-title">If you win at ${price}</div>
           {!me ? "—" : price > me.budget.max_bid ? <div className="warn-text">Over your <Term k="cap">cap</Term> ${me.budget.max_bid}: you can't bid that.</div> : <>
             <div><strong>${afterMoney}</strong> left for {afterOpen} spot{afterOpen !== 1 ? "s" : ""}{afterOpen > 0 && <span className="muted"> · ${Math.round(afterMoney / afterOpen)}/slot</span>}</div>
             <div className="muted">{slot ? <>fills <PosTag text={slot} /></> : "no open spot"}{stillNeed.length > 0 && <> · still need {stillNeed.map(([s, n]) => `${s}${n > 1 ? `×${n}` : ""}`).join(" ")}</>}</div>
           </>}
         </div>
-        <div className="live-card" data-testid="live-pass">
-          <div className="bid-label">If you pass</div>
+        <div className="live-card pass" data-testid="live-pass">
+          <div className="live-card-title">If you pass</div>
           {next.length ? next.map((r) => <div key={r.player_id} className="clip">{r.full_name} <span className="muted">{r.eligibility.join("/")}</span> <strong>{r.worth != null ? `$${r.worth}` : ""}</strong>{r.fit && <span className="muted"> · Fit {r.fit.score}</span>}</div>)
             : <div className="muted">Nobody else left for that spot.</div>}
         </div>
-        <div className="live-card" data-testid="live-bids">
-          <div className="bid-label">Bids so far</div>
+        <div className="live-card bids" data-testid="live-bids">
+          <div className="live-card-title">Bids so far</div>
           {bids.current.list.length ? <div className="clip">{bids.current.list.slice(-6).map((b) => `${b.who} $${b.bid}`).join(" → ")}</div>
             : <div className="muted">No bids yet.</div>}
           {leaderCanGo != null && <div className="muted">{lot.leader}'s <Term k="cap">cap</Term> is ${leaderCanGo}.</div>}
         </div>
-        <div className="live-card" data-testid="live-lockin">
-          <div className="bid-label">Lock-In</div>
+        <div className="live-card lockin" data-testid="live-lockin">
+          <div className="live-card-title">Lock-In</div>
           {row ? <div><strong>{row.avg_fpts.toFixed(1)}</strong> <Term k="fpg">proj FP/G</Term> · <strong>{bestGame.toFixed(1)}</strong> <span data-tip={row.weekly_best_avg ? "His average best game of the week last season: what Lock-In lets you keep." : "No games last season: estimated from his projection with the league-wide best-game ratio."}>avg best game{row.weekly_best_avg ? "" : " (est.)"}</span></div> : <div className="muted">—</div>}
         </div>
-        <div className="live-card" data-testid="live-keeper">
-          <div className="bid-label"><Term k="keeper_outlook" /></div>
+        <div className="live-card keeper" data-testid="live-keeper">
+          <div className="live-card-title"><Term k="keeper_outlook" /></div>
           {k ? <div><span className="muted">at his Max ${k.buy_price}: </span><span className={`verdict ${k.verdict}`}>{k.verdict.toUpperCase()} keep</span>{k.stash && <> <Term k="stash" className="verdict even" /></>}{k.good_up_to != null ? <span className="muted"> · GOOD keep if ≤ <strong style={{ color: "var(--text)" }}>${k.good_up_to}</strong></span> : <span className="muted"> · not a good keep at any price</span>}</div>
             : <div className="muted">—</div>}
         </div>
