@@ -43,6 +43,7 @@ export const TERMS = {
   keeper_outlook: ["Keeper next year", "If you buy him now at his Max, next year's keeper price (league rule: +$1 per full $5) vs what he'd be worth next year if healthy (this year's projection, current injury removed, a year older, at draft-start prices). GOOD keep / EVEN / BAD keep use the same thresholds as the keeper menu. Never part of Fit: winning this season comes first."],
   stash: ["STASH", "Out now, so he helps little this season, but at this price he'd be a GOOD keep next year. Only worth it with money and a roster spot to spare."],
   overpaid: ["Overpaid / bargain", "What he sold for vs his Worth at that point. Within $2 counts as about right."],
+  live_call: ["Live call", "Where the high bid sits for you. BID: under his Worth, raise. STRETCH: past his Worth but under his Max and your walk-away, only if you need him. STOP: at or past his Max or your walk-away. CAN'T: you can't bid on him. LEADING: you hold the high bid."],
   keep_call: ["Keep call", "GOOD keep: this year's keeper price is under his worth at draft start by at least $2 and 10%. BAD keep: over it by that much. EVEN: in between."],
 };
 
@@ -58,13 +59,14 @@ export function CallBadge({ call }) {
   return <span className={`verdict ${CALLS[call] || ""}`} data-tip={TERMS[call]?.[1]} data-testid="spend-verdict-badge">{TERMS[call]?.[0] || call}</span>;
 }
 
-// Where Sleeper's live high bid sits against your numbers for this player (c = the spending guide's call).
+// Where Sleeper's live high bid sits against your numbers for this player (c = the spending guide's call):
+// one word (BID / STRETCH / STOP / CAN'T) and a short why.
 export function liveCall(bid, c) {
-  if (!c || c.verdict === "cannot") return { cls: "bad", text: "CAN'T: you can't bid on him" };
+  if (!c || c.verdict === "cannot") return { cls: "bad", word: "CAN'T", text: "no open spot he fits, or over your cap" };
   const worth = Math.round(c.fair_value), max = c.recommended, stop = Math.min(max, c.walk_away);
-  if (bid < Math.min(worth, stop)) return { cls: "good", text: `Keep bidding: $${bid} is under his Worth $${worth}` };
-  if (bid < stop) return { cls: "even", text: `Past his Worth $${worth}: only keep going if you need him (his Max $${max}${c.walk_away < max ? `, your walk-away $${c.walk_away}` : ""})` };
-  return { cls: "bad", text: bid >= c.walk_away ? `Stop: $${bid} is at or past your walk-away $${c.walk_away}` : `Stop: $${bid} is at or past his Max $${max}` };
+  if (bid < Math.min(worth, stop)) return { cls: "good", word: "BID", text: `$${bid} is under his Worth $${worth}` };
+  if (bid < stop) return { cls: "even", word: "STRETCH", text: `past his Worth $${worth}: only if you need him · stop at $${stop}` };
+  return { cls: "bad", word: "STOP", text: bid >= c.walk_away ? `at or past your walk-away $${c.walk_away}` : `at or past his Max $${max}` };
 }
 
 // One tooltip for every [data-tip] on the page: instant, never clipped by a scrolling panel.

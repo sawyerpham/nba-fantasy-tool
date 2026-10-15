@@ -41,7 +41,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
             return (
               <div className={`guide-now ${c.cls === "good" ? "go" : c.cls === "even" ? "maybe" : "stop"}`} data-testid="guide-now">
                 <div className="bid-label">Right now · {lot.full_name}</div>
-                <div className="guide-now-call"><CallBadge call={f.verdict} /> {c.text}</div>
+                <div className="guide-now-call"><CallBadge call={f.verdict} /> <strong>{c.word}</strong> {c.text}</div>
               </div>
             );
           })()}
