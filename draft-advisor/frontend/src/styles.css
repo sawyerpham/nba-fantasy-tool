@@ -537,7 +537,8 @@ th.sorted { color: var(--primary); }
   --panel: rgba(255, 255, 255, 0.4); --panel-2: rgba(255, 255, 255, 0.35); --border: rgba(255, 255, 255, 0.6);
   --header: rgba(255, 255, 255, 0.6); --input-bg: rgba(255, 255, 255, 0.78); --panel-solid: rgba(255, 255, 255, 0.96);
 }
-body { background: #0b0d10 url("/wallpaper.jpg") center / cover no-repeat fixed; }
+/* the wallpaper is dimmed so busy art (and bright spots like a moon) sits behind the text instead of fighting it */
+body { background: linear-gradient(rgba(5, 6, 9, 0.42), rgba(5, 6, 9, 0.42)), #0b0d10 url("/wallpaper.jpg") center / cover no-repeat fixed; }
 .panel, .room-card, .block-bar, .sticky-bar, .sticky-block, header.top { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
