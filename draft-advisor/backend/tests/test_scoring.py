@@ -252,12 +252,17 @@ def test_three_season_availability_forgives_one_injured_season_but_not_chronic_o
     assert blend_availability([0.32, 0.96, 1.0]) == 0.648          # one bad year: 50/30/20
     assert blend_availability([0.5, None, None]) == 0.5            # rookie-ish: only seasons in the league count
     assert blend_availability([0.8, 0.6, None]) == round((0.5 * 0.8 + 0.3 * 0.6) / 0.8, 3)
+    # one lost season, durable otherwise: forgiven fully when young, a quarter when old; a pattern is never forgiven
+    assert blend_availability([0.0, 1.0, 0.96], age=26) == 0.982                    # Haliburton
+    assert blend_availability([0.0, 0.76, 0.84], age=34) == 0.496                   # Kyrie: 0.0 -> 0.2
+    assert blend_availability([0.4, 0.84, 0.12], age=27) == blend_availability([0.4, 0.84, 0.12])   # Morant
+    assert blend_availability([0.68, 0.4, 0.6], age=32) == blend_availability([0.68, 0.4, 0.6])     # Embiid
 
     class Store:
         def exists(self, rel): return True
         def read_json(self, rel): return {"seasons": {"2024-25": {"7": 0.96, "9": 0.4}, "2023-24": {"7": 1.0}}}
 
-    bio = lambda exp: SimpleNamespace(bio=SimpleNamespace(years_exp=exp))
+    bio = lambda exp: SimpleNamespace(bio=SimpleNamespace(years_exp=exp, age=None))
     fake = SimpleNamespace(store=Store(), players={7: bio(10), 8: bio(1), 9: bio(5)})
     val = lambda pid, a: PlayerValuation(player_id=pid, stats_season="2025-26", games_played=19, per_game_fpts=[], avg_fpts=0,
                                          best_game_fpts=0, availability=a, bonus_counts={}, minutes_avg=0, teams_played_for=[])

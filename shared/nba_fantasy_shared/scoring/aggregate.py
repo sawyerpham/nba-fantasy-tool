@@ -164,8 +164,25 @@ def season_week_shares(game_dates: dict[int, list[str]]) -> dict[int, float]:
     return {pid: round(len({week_index(date.fromisoformat(d), start) for d in ds}) / weeks, 3) for pid, ds in game_dates.items()}
 
 
-def blend_availability(shares: list[float | None]) -> float:
-    """Weighted mean of the seasons that count (None = before his NBA career / unknown), weights renormalized."""
+LOST_SEASON = 0.5    # a season under this share of weeks counts as lost (one big injury)
+DURABLE = 0.8        # ...and is a one-off when his other seasons average at least this
+
+
+def forgiveness(age: float | None) -> float:
+    """How much of a one-off lost season to forgive: all of it under 30, half at 32, a quarter from 34."""
+    return 1.0 if age is None else min(1.0, max(0.25, (35 - age) / 6))
+
+
+def blend_availability(shares: list[float | None], age: float | None = None) -> float:
+    """Weighted mean of the seasons that count (None = before his NBA career / unknown), weights renormalized.
+    With his age: one lost season from an otherwise durable player is pulled toward his usual share by
+    forgiveness(age); two lost seasons, or a weak record otherwise, is a pattern and stays as it is."""
+    lost = [i for i, s in enumerate(shares) if s is not None and s < LOST_SEASON]
+    others = [s for i, s in enumerate(shares) if s is not None and i not in lost]
+    if age is not None and len(lost) == 1 and others and round(sum(others) / len(others), 3) >= DURABLE:
+        usual = sum(others) / len(others)
+        shares = list(shares)
+        shares[lost[0]] += forgiveness(age) * (usual - shares[lost[0]])
     pairs = [(w, s) for w, s in zip(AVAILABILITY_SEASON_WEIGHTS, shares) if s is not None]
     total = sum(w for w, _ in pairs)
     return round(sum(w * s for w, s in pairs) / total, 3) if total else 0.0

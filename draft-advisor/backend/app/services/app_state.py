@@ -85,7 +85,8 @@ class AppState:
         return self._blend_availability(service.compute(scoring), service.stats_season)
 
     def _blend_availability(self, valuations: dict[int, PlayerValuation], stats_season: str) -> dict[int, PlayerValuation]:
-        """availability = last season and the two before it, 50/30/20 (seasons before his NBA career skipped)."""
+        """availability = last season and the two before it, 50/30/20 (seasons before his NBA career skipped);
+        one lost season from an otherwise durable player is partly forgiven by age (scoring.blend_availability)."""
         if not self.store.exists(config.AVAILABILITY_HISTORY_REL):
             return valuations
         history = self.store.read_json(config.AVAILABILITY_HISTORY_REL).get("seasons", {})
@@ -100,7 +101,7 @@ class AppState:
                 in_league = exp >= k if exp is not None else share is not None
                 shares.append((share or 0.0) if in_league else None)
             per_season = {stats_season: v.availability, **{s: x for s, x in zip(seasons, shares[1:]) if x is not None}}
-            out[pid] = v.model_copy(update={"availability": blend_availability(shares), "availability_seasons": per_season})
+            out[pid] = v.model_copy(update={"availability": blend_availability(shares, rec.bio.age if rec and rec.bio else None), "availability_seasons": per_season})
         return out
 
     def data_status(self) -> dict:

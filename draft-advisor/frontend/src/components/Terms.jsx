@@ -16,7 +16,7 @@ export const TERMS = {
   fit: ["Fit", "0-100, how much he helps your team: his value as a % of the best value left × role (starter 1, bench only 0.6, no spot 0) × call (BUY 1, STAR ONLY 0.85, TOO PRICEY 0.4, CAN'T 0). 70+ strong, 45-69 decent, under 45 weak."],
   value: ["Value", "The tool's ranking score in fantasy points: projected FP/G blended with his expected best game of the week (Lock-In), adjusted for games played, availability, injury, age and schedule, plus position scarcity."],
   fpg: ["Proj FP/G", "Projected fantasy points per game this season (Sleeper). Arrows: change vs last season, one arrow per 0.5 / 1.5 / 3 FP/G."],
-  avail: ["Avail", "Availability: share of fantasy weeks he played at least one game, over the last 3 seasons weighted 50/30/20 (seasons before his NBA career skipped), so one injured season counts less than a pattern. Under 75% is flagged."],
+  avail: ["Avail", "Availability: share of fantasy weeks he played at least one game, over the last 3 seasons weighted 50/30/20 (seasons before his NBA career skipped). One lost season (under 50%) from a player whose other seasons average 80%+ is a one-off: forgiven fully under age 30, half at 32, a quarter from 34. Two lost seasons is a pattern and is never forgiven. Under 75% is flagged."],
   tier: ["Tier", "Players of similar value; T1 is best. 'N more like him' counts how many in his tier are still available. When he's the last one, the next player is a step down."],
   pos_rank: ["Pos rank", "Sleeper's positional rank by average draft position, e.g. #2 SG. It shows what other managers think, not value."],
   rank: ["Rank", "Tier and overall rank by value for your team; players you can't roster sink to the bottom."],
