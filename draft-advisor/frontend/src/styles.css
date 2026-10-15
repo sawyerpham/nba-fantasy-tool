@@ -259,6 +259,7 @@ tr:hover .row-actions, tr.selected .row-actions, .row-actions:focus-within { opa
 .nom-ideas { margin: 10px 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); }
 .nom-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 4px 0; cursor: pointer; }
 .nom-row:hover strong { color: var(--primary); }
+.nom-row .nom-who { flex: 1; min-width: 0; }
 .nom-why { flex-basis: 100%; padding-left: 4px; }
 tr.tier-start td { border-top: 2px solid var(--primary-soft); }
 .tier-tag { white-space: nowrap; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 0 6px; margin-left: 6px; }
@@ -490,8 +491,7 @@ th.sorted { color: var(--primary); }
 [data-testid="spending-guide"] .bid-cell { padding: 6px 9px; }
 [data-testid="spending-guide"] .bid-cell .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-testid="spending-guide"] .nom-ideas { margin: 8px 0; padding: 6px 10px; }
-[data-testid="spending-guide"] .nom-row { padding: 2px 0; }
-[data-testid="spending-guide"] table.plan-table td.plan-total { white-space: normal; font-size: 12.5px; }
+[data-testid="spending-guide"] .nom-row { padding: 2px 0; flex-wrap: nowrap; }
 /* shorter screens: tighter rows so the guide still fits without scrolling */
 @media (max-height: 950px) {
   [data-testid="spending-guide"] table.plan-table td, [data-testid="spending-guide"] table.plan-table th,
