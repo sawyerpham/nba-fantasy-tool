@@ -199,7 +199,8 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 #   pinned  - locked players, and anyone whose game is in progress (he can't be moved), in their current slot;
 #   1       - players whose call is LOCK (they must stay in the lineup to lock);
 #   2       - players who play later today, best projection for today's game first;
-#   3       - no game today: the week plan's starters, then current starters hold any slot still free.
+#   3       - no game today: by next game, earliest tip first (set now for the coming games); then current
+#             starters hold any slot still free.
 # Benching a player with a played, unlocked game forfeits that game; only LOCK players have one worth keeping,
 # and they come first. The moves are the differences from the current Sleeper lineup.
 
@@ -214,33 +215,41 @@ def _today(p: PlanPlayer, today: str) -> Game | None:
     return next((g for g in p.games if g.date == today), None)
 
 
+def _by_tip(ps: list[PlanPlayer], game) -> list[PlanPlayer]:
+    """Start order by game(p): earliest tip first. If the early game goes badly you swap the later player in before
+    his tip (see today_watch); starting the later one first gives that chance away. Tips CLOSE_TIPS_MIN or less
+    apart are one group (no time to judge the first game): the bigger projection starts, unless within CLOSE_PROJ."""
+    from functools import cmp_to_key
+    tips = [game(q).tip for q in ps]
+
+    def first(a: PlanPlayer, b: PlanPlayer) -> int:   # -1: a starts ahead of b
+        A, B = game(a), game(b)
+        ga, gb = _tip_group(A.tip, tips), _tip_group(B.tip, tips)
+        if ga != gb:
+            return -1 if ga < gb else 1
+        pa, pb = A.proj or 0, B.proj or 0
+        if abs(pa - pb) <= CLOSE_PROJ:   # a near tie: the earlier tip (a little more to go on)
+            return -1 if _minutes(A.tip) < _minutes(B.tip) else 1
+        return -1 if pa > pb else 1
+    return sorted(ps, key=cmp_to_key(first))
+
+
 def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: str) -> TodayLineup:
     live_today = {id(p) for p in players if _today(p, today) and _today(p, today).live}
     pinned = [p for p in players if p.slot in slot_counts and (p.locked is not None or id(p) in live_today)]
     free = [p for p in players if p not in pinned and id(p) not in live_today and p.slot != "IR" and p.locked is None]
     tier1 = [p for p in free if p.action == "LOCK"]
-    # Earliest tip first: start the 6:00 player over the 6:45 one. If the early game goes badly you swap the later
-    # player in before his tip (see today_watch); starting the later one first gives that chance away.
-    # Tips CLOSE_TIPS_MIN or less apart are one group: no time to judge the first game, so the bigger projection starts.
     plays = [p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started and p.injury not in OUT]
-    tips = [_today(q, today).tip for q in plays]
-
-    def first(a: PlanPlayer, b: PlanPlayer) -> int:   # -1: a starts ahead of b
-        ga, gb = _tip_group(_today(a, today).tip, tips), _tip_group(_today(b, today).tip, tips)
-        if ga != gb:
-            return -1 if ga < gb else 1
-        pa, pb = _today(a, today).proj or 0, _today(b, today).proj or 0
-        if abs(pa - pb) <= CLOSE_PROJ:   # a near tie: the earlier tip (a little more to go on)
-            return -1 if _minutes(_today(a, today).tip) < _minutes(_today(b, today).tip) else 1
-        return -1 if pa > pb else 1
-    from functools import cmp_to_key
-    tier2 = sorted(plays, key=cmp_to_key(first))
-    # No game today: the slots left go to the week plan's starters (so today's lineup is already set for their next
-    # games, no waiting for game day), then current starters hold whatever is still free.
+    tier2 = _by_tip(plays, lambda p: _today(p, today))
+    # No game today: the slots left go by each player's next game, the same way (earliest tip first), so today's
+    # lineup is already set for the coming games and nobody waits for game day to be moved in. Then current
+    # starters with no next game (or ruled OUT) hold whatever is still free.
+    def nxt(p: PlanPlayer) -> Game | None:
+        return next((g for g in p.games if g.date > today and not g.started), None)
+    rest = [p for p in free if p not in tier1 and p not in tier2]
+    tier3 = _by_tip([p for p in rest if nxt(p) and p.injury not in OUT], nxt)
+    tier3 += sorted((p for p in rest if p not in tier3 and p.slot in slot_counts), key=lambda p: -p.value)
     plan_seat = {id(p): p.seat for p in players}
-    tier3 = sorted((p for p in free if p not in tier1 and p not in tier2
-                    and (p.slot in slot_counts or (plan_seat[id(p)] and p.injury not in OUT))),
-                   key=lambda p: (plan_seat[id(p)] is None, -p.value))
     for p in players:   # today's seating starts empty: nobody keeps a week-plan seat he isn't given today
         p.seat = None
     seats = seat_players(tier1 + tier2 + tier3, slot_counts, pinned)
