@@ -136,3 +136,14 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
         plan_week(players, one)
         w = next(x for x in plan_today(players, one, today).watch if x["kind"] == "swap")
         assert w["decision"] == want, (fp_now, w)
+
+
+def test_a_day_without_games_moves_nobody():
+    from app.engine.weekplan import plan_today
+
+    a = pp("a", ["C"], "C", future(10))                       # no game on the 20th
+    b = pp("b", ["C"], "BN", [Game("2026-10-22", 14)])         # higher week value, also no game on the 20th
+    players = [a, b]
+    plan_week(players, {"C": 1})
+    assert b.seat == "C"                                       # the week plan prefers b ...
+    assert plan_today(players, {"C": 1}, "2026-10-20").moves == []   # ... but nobody plays today: no churn

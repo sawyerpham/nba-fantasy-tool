@@ -124,7 +124,10 @@ def seat_players(order: list[PlanPlayer], slot_counts: dict[str, int], pinned=()
         seats[p.slot].append(p)
 
     def place(p: PlanPlayer, seen: set[str]) -> bool:
-        for slot in roster.candidate_slots(p.eligibility):
+        slots = roster.candidate_slots(p.eligibility)
+        if p.slot in slots:   # his current slot first: fewest moves for the same result
+            slots = [p.slot] + [x for x in slots if x != p.slot]
+        for slot in slots:
             if slot not in seats or slot in seen:
                 continue
             seen.add(slot)
@@ -194,7 +197,7 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 #   pinned  - locked players, and anyone whose game is in progress (he can't be moved), in their current slot;
 #   1       - players whose call is LOCK (they must stay in the lineup to lock);
 #   2       - players who play later today, best projection for today's game first;
-#   3       - everyone else, by week value (an empty slot and a non-playing starter score the same today).
+#   3       - starters with no game today stay where they are unless a slot is needed; bench players stay benched.
 # Benching a player with a played, unlocked game forfeits that game; only LOCK players have one worth keeping,
 # and they come first. The moves are the differences from the current Sleeper lineup.
 
@@ -218,8 +221,11 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     # player in before his tip (see today_watch); starting the later one first gives that chance away.
     tier2 = sorted((p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started),
                    key=lambda p: (_today(p, today).tip or "~", -(_today(p, today).proj or 0)))
-    tier3 = sorted((p for p in free if p not in tier1 and p not in tier2 and p.value > 0), key=lambda p: -p.value)
+    # No game today: current starters keep their slots unless someone who plays needs one; bench players stay put.
+    tier3 = sorted((p for p in free if p not in tier1 and p not in tier2 and p.slot in slot_counts), key=lambda p: -p.value)
     plan_seat = {id(p): p.seat for p in players}
+    for p in players:   # today's seating starts empty: nobody keeps a week-plan seat he isn't given today
+        p.seat = None
     seats = seat_players(tier1 + tier2 + tier3, slot_counts, pinned)
     today_seat = {id(p): p.seat for p in players}
     for p in players:   # leave the week plan's seats on the players
