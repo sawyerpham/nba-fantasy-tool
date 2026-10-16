@@ -119,3 +119,24 @@ def test_news_merges_my_players_newest_first_and_skips_clips():
     n = season_news(view, fetch)
     assert [x["headline"] for x in n["mine"]] == ["Ta scored 30", "Pha (ankle) is questionable"]   # newest first, no clip
     assert [(x["headline"], x["owner"]) for x in n["league"]] == [("Ga (knee) is out", "rival")]   # other teams' players
+
+
+def test_acquisitions_draft_price_then_moves_in_order():
+    from types import SimpleNamespace
+    from app.services.season import acquisitions
+
+    def fetch(url, ttl):
+        if url.endswith("/league/L"):
+            return {"draft_id": "D"}
+        if "/draft/D/picks" in url:
+            return [{"player_id": "9", "roster_id": 1, "is_keeper": False, "metadata": {"amount": "24"}}]
+        if url.endswith("/transactions/1"):
+            return [{"type": "waiver", "status": "complete", "adds": {"9": 2}, "drops": None, "settings": {"waiver_bid": 7}, "status_updated": 30},
+                    {"type": "free_agent", "status": "complete", "adds": None, "drops": {"9": 1}, "status_updated": 20},
+                    {"type": "waiver", "status": "failed", "adds": {"9": 3}, "settings": {"waiver_bid": 9}, "status_updated": 25}]
+        return []
+
+    session = SimpleNamespace(league=SimpleNamespace(sleeper_league_id="L"))
+    view = {"week": 1, "teams": [{"roster_id": 1, "name": "me"}, {"roster_id": 2, "name": "rival"}, {"roster_id": 3, "name": "other"}]}
+    assert [(a["kind"], a["team"], a["price"]) for a in acquisitions(session, fetch, view, "9")] == [
+        ("drafted", "me", 24), ("dropped", "me", None), ("claimed", "rival", 7)]   # failed claim skipped
