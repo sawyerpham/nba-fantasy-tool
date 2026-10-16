@@ -177,7 +177,7 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
     <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
-        <Headshot sleeperId={r.sid} name={r.name} size={34} />
+        <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
           <div className="mu-name">{r.name}{r.injury !== "healthy" && <span className="inj" data-tip={p.injury_note}> {r.injury === "day_to_day" ? "GTD" : "OUT"}</span>}</div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} />{r.seat && r.seat !== r.slot && <span data-tip={`The week plan seats him at ${r.seat}.`}> · plan: {r.seat}</span>}</div>
@@ -240,11 +240,12 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const L = bySlot(shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const mode = MODE[shown.mode] || MODE.even;
-  const row = (l, r, key, slot) => (
+  // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
+  const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" />
-      <div className="mu-slot"><PosTag text={slot} /></div>
-      <PlayerCard data={data} r={r?.r} open={open} side="right" />
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" /></div>
+      <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
   );
   return (
@@ -270,10 +271,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
       </div>
       <div className="mu-grid">
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
-        <div className="mu-divider">Bench</div>
-        {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN"))}
-        <div className="mu-divider">IR</div>
-        {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR"))}
+        {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
+        {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
       </div>
     </div>
   );
