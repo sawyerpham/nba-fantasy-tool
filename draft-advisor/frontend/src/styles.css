@@ -717,3 +717,7 @@ main:has(.season-grid) { padding: 12px 16px; }
 .day-pick button.is-today { font-weight: 800; }
 .win-chance { font-size: 15px; white-space: nowrap; }
 .win-pair { white-space: nowrap; font-size: 12px; }
+.game-chip.pick { border: 2px solid var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
+.game-chip.dim { opacity: 0.45; }
+.verdict.off { opacity: 0.6; font-weight: 600; }
+.day-pick { align-items: center; }
