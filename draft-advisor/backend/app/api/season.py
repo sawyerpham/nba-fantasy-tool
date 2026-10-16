@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..services.app_state import AppState
-from ..services.season import http_fetch, read_locks, season_player, team_plan, waivers, week_view, write_lock
+from ..services.season import _cache, http_fetch,read_locks, season_player, team_plan, waivers, week_view, write_lock
 from .deps import get_state
 from .draft import _session
 
@@ -43,6 +43,14 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
         return team_plan(session, view, roster_id, manual)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/sync")
+def sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Forget every cached Sleeper / ESPN response: the next load pulls the lineup, scores and news fresh."""
+    _session(state, league_id)
+    _cache.clear()
+    return {"ok": True}
 
 
 class LockIn(BaseModel):
