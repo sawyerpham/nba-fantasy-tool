@@ -39,6 +39,12 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
     assert g2["opp"] == "PHX" and g2["fp"] is None and g2["proj"] > 0 and g2["tip"] is None
 
     from app.services import season
+    real = season.today_ct
+    season.today_ct = lambda: date(2026, 10, 20)   # live mode: today's only game is over -> the lineup moves to the next game day
+    try:
+        assert week_view(s, fetch)["day"] == "2026-10-22"
+    finally:
+        season.today_ct = real
     season.RETIRED.add("999")   # a retired player never has games, even with a team and a schedule
     try:
         p = week_view(s, fetch, today=date(2026, 10, 21))["players"]["999"]
