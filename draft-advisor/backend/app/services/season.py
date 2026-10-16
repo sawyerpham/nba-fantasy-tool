@@ -131,7 +131,9 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         stats[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
 
     lid = lg.sleeper_league_id
-    positions = (fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}).get("roster_positions") or []
+    league = fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
+    positions = league.get("roster_positions") or []
+    reserve_slots = (league.get("settings") or {}).get("reserve_slots", 0)
     rosters = fetch(f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL) or []
     users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
     matchups = fetch(f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL) or []
@@ -182,6 +184,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     for (d, team) in plays:
         team_games[team] = team_games.get(team, 0) + 1
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "roster_positions": positions,
+            "reserve_slots": reserve_slots,
             "team_games": team_games,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
@@ -291,11 +294,20 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
 
     today = view["today"]
     t = plan_today(players, counts, today) if today in view["dates"] else None
+    out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)
+    active = [q for q in players if q.slot != "IR"]
+    healthy_ir = [q.name for q in players if q.slot == "IR" and q.injury not in out_now]
+    ir_open = max(0, view.get("reserve_slots", 0) - sum(1 for q in players if q.slot == "IR"))
+    roster_state = {"active": len(active), "limit": len(view["roster_positions"]), "ir_open": ir_open,
+                    # a healthy player on IR counts as a 16th man: Sleeper freezes the lineup and locks until you drop
+                    "illegal": healthy_ir if len(active) + len(healthy_ir) > len(view["roster_positions"]) else [],
+                    "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
     return {"roster_id": team["roster_id"], "name": team["name"], "expected": plan.expected, "slots": counts,
             "points": side.get("points") or 0, "mode": mode,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
             "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": t.watch} if t else None,
+            "roster": roster_state,
             "opponent": opp}
 
 
@@ -326,8 +338,13 @@ def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
     if not espn_id:
         return []
     feed = (fetch(ESPN_NEWS.format(espn_id), NEWS_TTL) or {}).get("feed") or []
-    return [{"published": a.get("published"), "headline": a.get("headline"), "story": a.get("story") or a.get("description") or ""}
-            for a in feed if a.get("headline") and "Highlights" not in a.get("headline", "")][:4]
+    import re
+
+    last = normalize_name(name).split()[-1]
+    clean = lambda t: re.sub(r"<[^>]+>", " ", t or "").strip()   # noqa: E731 - some items carry raw HTML
+    return [{"published": a.get("published"), "headline": clean(a.get("headline")), "story": clean(a.get("story") or a.get("description"))}
+            for a in feed if a.get("headline") and last in normalize_name(a["headline"])   # notes about him, not league articles
+            and "Highlights" not in a["headline"]][:4]
 
 
 def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:

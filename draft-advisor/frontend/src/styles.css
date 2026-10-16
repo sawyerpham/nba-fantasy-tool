@@ -644,3 +644,5 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .dg-cell { white-space: nowrap; } .dg-cell.self { background: var(--primary-soft); border-radius: 6px; font-weight: 800; }
 .dg-cell img { vertical-align: middle; }
 @media (max-width: 1400px) { .season-grid { grid-template-columns: 1fr; } .season-side { position: static; max-height: none; } }
+.season-search { min-width: 220px; margin-left: auto; }
+.roster-alert { padding: 10px 14px; } .roster-alert.bad { border-left: 5px solid var(--danger); } .roster-alert.even { border-left: 5px solid var(--even-t); }

@@ -76,3 +76,19 @@ def test_lock_answers_are_saved_per_league_and_week(tmp_path):
     assert read_locks(store, "lg", 1) == {"999": "2026-10-20", "111": ""} and read_locks(store, "lg", 2) == {}
     write_lock(store, "lg", 1, "999", None)
     assert read_locks(store, "lg", 1) == {"111": ""}
+
+
+def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_world):
+    from app.services.season import team_plan
+
+    s = make_session(fixture_world)
+    positions = ["PG", "SG", "BN"]
+    pl = lambda sid, inj="healthy": {"player_id": None, "name": sid, "team": "DEN", "pos": ["PG"], "injury": inj,
+                                     "injury_note": "", "retired": False, "games": []}
+    view = {"today": "2026-10-16", "dates": [], "roster_positions": positions, "reserve_slots": 2, "matchups": [],
+            "players": {"a": pl("a"), "b": pl("b"), "c": pl("c", "out_long_term"), "back": pl("back")},
+            "teams": [{"roster_id": 1, "name": "me", "is_user": True, "players": ["a", "b", "c", "back"],
+                       "starters": ["a", "b"], "reserve": ["back"]}]}
+    r = team_plan(s, view)["roster"]
+    assert r["illegal"] == ["back"]                  # 3 active + a healthy player on IR = 4 > 3 spots
+    assert r["ir_open"] == 1 and r["ir_candidates"] == ["c"]
