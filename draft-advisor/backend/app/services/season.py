@@ -356,11 +356,14 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
     adp = sorted(((r.projection or {}).get("adp_std"), pid) for pid, r in session.players.items()
                  if (r.projection or {}).get("adp_std"))
     overall = next((i for i, (_, pid) in enumerate(adp, 1) if pid == player_id), None)
+    main = rec.fantasy.position if rec.fantasy else None
+    same = [pid for _, pid in adp if main and session.players[pid].fantasy and session.players[pid].fantasy.position == main]
+    pos_rank = f"#{same.index(player_id) + 1} {main}" if player_id in same else None
     return {"player_id": player_id, "sleeper_id": sid, "week": view["week"], "today": view["today"],
             "owner": {"name": owner["name"], "is_user": owner["is_user"], "roster_id": owner["roster_id"],
                       "ir": sid in owner["reserve"]} if owner else None,
             "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_note": me.get("injury_note", ""),
-            "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall,
+            "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
             "news": espn_news(fetch, rec.full_name, rec.team_abbr)}
 
 

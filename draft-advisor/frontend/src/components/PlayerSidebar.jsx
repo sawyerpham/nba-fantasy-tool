@@ -6,13 +6,16 @@ import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
 
 
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer }) {
+// season: the in-season profile (Season tab): no draft parts (Fit, Worth, bid guide, keeper outlook, tier); adds the
+// fantasy owner, this week's games, the game log, news, overall + position rank and the depth-chart grid.
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
   const [fit, setFit] = useState(null);
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
+  const [sea, setSea] = useState(null);
 
   // All four requests are fetched together and applied in one update, so the card never rebuilds piece by piece;
   // the previous player stays on screen until the new one is ready, and late answers for an older click are dropped.
@@ -23,18 +26,19 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     const opt = (p) => p.catch(() => null);   // drafted players have no fit / bid guide
     Promise.all([
       api.get(`/players/${playerId}` + qs({ league_id: leagueId })),
-      opt(api.get(`/leagues/${leagueId}/fit/${playerId}`)),
-      live ? opt(api.get(`/leagues/${leagueId}/recommend/${playerId}`)) : null,
-      live ? opt(api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => g.focus)) : null,
-    ]).then(([d, f, r, sp]) => {
+      season ? null : opt(api.get(`/leagues/${leagueId}/fit/${playerId}`)),
+      live && !season ? opt(api.get(`/leagues/${leagueId}/recommend/${playerId}`)) : null,
+      live && !season ? opt(api.get(`/leagues/${leagueId}/spending` + qs({ player_id: playerId })).then((g) => g.focus)) : null,
+      season ? opt(api.get(`/leagues/${leagueId}/season/player/${playerId}`)) : null,
+    ]).then(([d, f, r, sp, se]) => {
       if (ticket !== latest.current) return;
-      setData(d); setNotes(d.overrides?.notes || ""); setFit(f); setRec(r); setSpend(sp); setError("");
+      setData(d); setNotes(d.overrides?.notes || ""); setFit(f); setRec(r); setSpend(sp); setSea(se); setError("");
     }).catch((e) => { if (ticket === latest.current) setError(e.message); });
-  }, [leagueId, playerId, live]);
+  }, [leagueId, playerId, live, season]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (!playerId) return <div className="panel muted">Select a player to see his profile, his Fit for your team, his Worth and his Max.</div>;
+  if (!playerId) return <div className="panel muted">{season ? "Click any player to see his profile: owner, this week's games, game log, news and his team's depth chart." : "Select a player to see his profile, his Fit for your team, his Worth and his Max."}</div>;
   if (!data) return <div className="panel">{error || "Loading…"}</div>;
 
   const rec_ = data.record;
@@ -63,7 +67,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
-          {(row?.pos_rank || row?.tier != null || data.team?.role) && (
+          {season && sea && sea.player_id === shownId && (
+            <span className="profile-ranks">
+              {data.team?.role && <span className={`role-tag ${data.team.role.star ? "star" : ""}`} data-testid="team-role">{data.team.role.star ? "★ " : ""}{data.team.role.label}</span>}
+              {sea.pos_rank && <span className={`pos-c ${posClass(sea.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{sea.pos_rank}</span>}
+              {sea.overall_rank && <span className="pos-c" data-tip="Overall rank by Sleeper's average draft position.">#{sea.overall_rank} overall</span>}
+            </span>
+          )}
+          {!season && (row?.pos_rank || row?.tier != null || data.team?.role) && (
             <span className="profile-ranks">
               {data.team?.role && (() => {
                 const r = data.team.role;
@@ -86,8 +97,9 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         {bio.years_exp != null ? ` · ${bio.years_exp} yrs exp` : ""}{bio.draft_year ? ` · drafted ${bio.draft_year} R${bio.draft_round} #${bio.draft_number}` : ""}
       </div>
       {error && <div className="error">{error}</div>}
+      {season && sea && sea.player_id === shownId && <SeasonBlock sea={sea} plan={plan} />}
 
-      {fit && fit.player_id === shownId && (
+      {!season && fit && fit.player_id === shownId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
           <div className="fit-head"><span className="bid-label"><Term k="fit" /> for your team</span> <strong data-testid="team-fit-headline">{fit.headline}</strong></div>
           <ul className="small guide-lines">{fit.score_lines.map((r, i) => <li key={i}>{r}</li>)}</ul>
@@ -100,7 +112,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </div>
       )}
 
-      {fit?.keeper && fit.player_id === shownId && (() => {
+      {!season && fit?.keeper && fit.player_id === shownId && (() => {
         const k = fit.keeper, cls = { good: "good", even: "even", bad: "bad" }[k.verdict];
         return (
           <div className="small keeper-line" data-testid="keeper-outlook">
@@ -114,14 +126,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         );
       })()}
 
-      {!live && row?.worth != null && (
+      {!season && !live && row?.worth != null && (
         <div className="small" data-testid="pre-worth">
           <span className="bid-label"><Term k="worth" /></span> <strong style={{ fontSize: "1.3em" }}>${row.worth}</strong>
           <span className="muted"> at the first nomination, after keepers. Max and your call show once the draft is live.</span>
         </div>
       )}
 
-      {rec && (
+      {!season && rec && (
         <div data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
           <div className="bid-grid">
@@ -154,8 +166,13 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
         <span className="muted">Status:</span>{" "}
-        <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
-        {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
+        {season && sea && sea.player_id === shownId ? (
+          <><strong className={sea.retired ? "warn-text" : sea.injury === "healthy" ? "" : "warn-text"}>{sea.retired ? "retired (always 0)" : sea.injury.replace(/_/g, " ")}</strong>
+            {sea.injury_note && <span className="muted"> · {sea.injury_note}</span>}</>
+        ) : (
+          <><strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
+            {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}</>
+        )}
       </div>
       <div><textarea rows="1" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
@@ -173,6 +190,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
               </div>
             </div>
           </div>
+          {season && data.team.depth_grid ? <DepthGrid grid={data.team.depth_grid} onSelectPlayer={onSelectPlayer} /> : (
           <div className="teammates">
             {[["Starters", data.team.teammates.filter((m) => m.starter)], ["Next up", data.team.teammates.filter((m) => !m.starter)]].map(([label, list]) => (
               <div key={label} className="teammate-col">
@@ -189,7 +207,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
                 ))}
               </div>
             ))}
-          </div>
+          </div>)}
         </div>
       )}
 
@@ -239,5 +257,78 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </>
       )}
     </div>
+  );
+}
+
+const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
+const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
+
+// Season profile: owner, your call on him this week, his games this week, game log and news.
+function SeasonBlock({ sea, plan }) {
+  const mine = plan?.players?.find((p) => p.sid === sea.sleeper_id);
+  return (
+    <div className="season-block" data-testid="season-profile">
+      <div className="small" style={{ margin: "6px 0" }}>
+        <span className="muted">Owner:</span>{" "}
+        {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
+      </div>
+      {mine && (
+        <div className="small" style={{ marginBottom: 6 }} data-testid="season-call">
+          <span className="verdict info">{mine.action}</span> <span className="muted">{mine.why}</span>
+        </div>
+      )}
+      <div className="bid-label">Week {sea.week} games</div>
+      {sea.games.length ? (
+        <table className="small">
+          <thead><tr><th>Day</th><th>Opp</th><th>Tip (CT)</th><th className="num">Proj</th><th className="num">FP</th><th className="num">Min</th></tr></thead>
+          <tbody>{sea.games.map((g) => (
+            <tr key={g.date} className={g.date === sea.today ? "you-need" : ""}><td>{dayName(g.date)} {g.date.slice(5)}</td><td>{g.home ? "vs" : "@"} {g.opp}</td>
+              <td>{g.state === "in" ? <span className="warn-text">live</span> : g.state === "post" ? "final" : ctTime(g.tip)}</td>
+              <td className="num">{g.proj != null ? g.proj.toFixed(1) : ""}</td><td className="num"><strong>{g.fp != null ? g.fp.toFixed(1) : ""}</strong></td>
+              <td className="num">{g.min ?? ""}</td></tr>))}</tbody>
+        </table>
+      ) : <div className="small muted">No games this week.</div>}
+      {sea.game_log.length > 0 && (
+        <>
+          <div className="bid-label" style={{ marginTop: 8 }}>Last {sea.game_log.length} games</div>
+          <table className="small">
+            <thead><tr><th>Date</th><th>Opp</th><th className="num">FP</th><th className="num">Min</th><th className="num">PTS</th><th className="num">REB</th><th className="num">AST</th><th className="num">STL</th><th className="num">BLK</th><th className="num">TO</th></tr></thead>
+            <tbody>{sea.game_log.map((g) => (
+              <tr key={g.date}><td>{g.date.slice(5)}</td><td>{g.opp}</td><td className="num"><strong>{g.fp.toFixed(1)}</strong></td><td className="num">{g.min}</td>
+                <td className="num">{g.pts}</td><td className="num">{g.reb}</td><td className="num">{g.ast}</td><td className="num">{g.stl}</td><td className="num">{g.blk}</td><td className="num">{g.to}</td></tr>))}</tbody>
+          </table>
+        </>
+      )}
+      {sea.news.length > 0 && (
+        <>
+          <div className="bid-label" style={{ marginTop: 8 }}>Latest news</div>
+          {sea.news.map((n, i) => (
+            <div key={i} className="news-item small">
+              <strong>{n.headline}</strong> <span className="muted">{n.published ? new Date(n.published).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</span>
+              {n.story && n.story !== n.headline && <div className="muted">{n.story}</div>}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top.
+function DepthGrid({ grid, onSelectPlayer }) {
+  return (
+    <table className="depth-grid small" data-testid="depth-grid">
+      <thead><tr><th></th><th>1st</th><th>2nd</th><th>3rd</th></tr></thead>
+      <tbody>{["PG", "SG", "SF", "PF", "C"].map((pos) => (
+        <tr key={pos}><td><PosTag text={pos} /></td>
+          {[0, 1, 2].map((i) => {
+            const m = grid[pos]?.[i];
+            return <td key={i} className={m ? `dg-cell ${m.is_self ? "self" : "clickable"}` : "muted"} onClick={() => m && !m.is_self && onSelectPlayer?.(m.player_id)}
+              data-tip={m ? `${m.name} · ${m.fpg} FP/G${m.drafted_by ? ` · ${m.drafted_by}` : ""}` : ""}>
+              {m ? <><Headshot sleeperId={m.sleeper_id} name={m.name} size={22} /> <span className="dg-name">{m.name.split(" ")[0][0]}. {m.name.split(" ").slice(1).join(" ")}</span></> : "—"}
+            </td>;
+          })}
+        </tr>))}</tbody>
+    </table>
   );
 }
