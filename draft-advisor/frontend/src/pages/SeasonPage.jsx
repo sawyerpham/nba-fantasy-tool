@@ -367,7 +367,7 @@ function NewsView({ data, leagueId, open, refreshKey }) {
   if (error) return <div className="panel error">{error}</div>;
   if (!news) return <div className="panel muted">Loading news…</div>;
   return (
-    <>
+    <div className="news-col">
       <details className="panel news" open data-testid="news-mine">
         <summary><h3>My team <span className="small muted">({news.mine.length})</span></h3></summary>
         {news.mine.length ? news.mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
@@ -377,7 +377,7 @@ function NewsView({ data, leagueId, open, refreshKey }) {
         <h3>League-wide <span className="small muted">(other teams' players)</span></h3>
         {news.league.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} owner />)}
       </div>
-    </>
+    </div>
   );
 }
 

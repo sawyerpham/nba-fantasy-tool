@@ -622,8 +622,12 @@ main:has(.season-grid) { max-width: none; }   /* season tab: full width like the
 .inj { font-weight: 700; text-transform: uppercase; font-size: 11px; }
 .inj.ok { background: var(--good); color: var(--good-t); }
 button.tiny { font-size: 11.5px; padding: 1px 6px; }
-.news { overflow: auto; } .news h3 { margin: 0 0 6px; display: inline; }
-.news > summary { cursor: pointer; margin-bottom: 6px; } .news > h3 { display: block; }
+/* the News column scrolls as one (panels keep their natural height, so collapsed My team is a single bar) and is
+   inset on the left by the player profile's width (500px column + 12px gap), centering it between equal margins */
+.news-col { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; margin-left: 512px; }
+@media (max-width: 1500px) { .news-col { margin-left: 0; } }
+.news { flex: none; } .news h3 { margin: 0; display: inline; }
+.news > summary { cursor: pointer; } .news[open] > summary { margin-bottom: 6px; } .news > h3 { display: block; margin-bottom: 6px; }
 .news-item { padding: 8px 0; border-bottom: 1px solid var(--border); } .news-item:last-child { border-bottom: none; }
 .news-head { display: flex; align-items: center; gap: 8px; }
 .news-player { display: inline-flex; align-items: center; gap: 6px; } .news-player:hover strong { color: var(--primary); }
