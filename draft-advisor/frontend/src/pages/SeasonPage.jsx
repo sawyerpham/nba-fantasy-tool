@@ -129,10 +129,12 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
   return (
     <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
+        <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={34} />
-        <div className="mu-who clickable" onClick={() => open(r.sid)}>
+        <div className="mu-who">
           <div className="mu-name">{r.name}{r.injury !== "healthy" && <span className="inj" data-tip={p.injury_note}> {r.injury === "day_to_day" ? "GTD" : "OUT"}</span>}</div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} />{r.seat && r.seat !== r.slot && <span data-tip={`The week plan seats him at ${r.seat}.`}> · plan: {r.seat}</span>}</div>
+        </div>
         </div>
         <GameChips games={p.games} today={data.today} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
         <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
