@@ -715,3 +715,5 @@ main:has(.season-grid) { padding: 12px 16px; }
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .day-pick button.is-today { font-weight: 800; }
+.win-chance { font-size: 15px; white-space: nowrap; }
+.win-pair { white-space: nowrap; font-size: 12px; }

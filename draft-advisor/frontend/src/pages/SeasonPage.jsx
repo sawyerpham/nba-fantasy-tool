@@ -44,6 +44,7 @@ export default function SeasonPage({ leagueId }) {
   // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
   // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
   const [alerts, setAlerts] = useState([]);
+  const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
   const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
   const arm = () => {
     alarmSound();   // the click also unlocks sound for later
@@ -53,7 +54,10 @@ export default function SeasonPage({ leagueId }) {
   useEffect(() => {
     if (!armed || !plan?.today) return undefined;
     const timers = plan.today.watch.filter((w) => w.alarm).map((w) => {
-      const ms = Date.parse(w.alarm) - Date.now();
+      const key = `${plan.today.date}-${w.kind}-${w.sid}`;
+      if (w.alarm === "now" && rung.current.has(key)) return null;
+      if (w.alarm === "now") rung.current.add(key);
+      const ms = w.alarm === "now" ? 0 : Date.parse(w.alarm) - Date.now();
       if (ms < 0 || ms > 24 * 3600e3) return null;
       return setTimeout(async () => {
         let line = w;
@@ -61,8 +65,10 @@ export default function SeasonPage({ leagueId }) {
           const fresh = await api.get(`/leagues/${leagueId}/season/plan` + qs({ week }));
           setPlan(fresh);
           line = fresh.today?.watch.find((x) => x.kind === w.kind && (w.kind === "swap" ? x.backup_sid === w.backup_sid : x.sid === w.sid)) || w;
+          if (w.kind === "lock" && !fresh.today?.watch.some((x) => x.kind === "lock" && x.sid === w.sid)) return;   // locked meanwhile
         } catch { /* ring with what we have */ }
-        const title = line.kind === "gtd" ? `Check ${line.name} (GTD)` : line.decision === "SWAP" ? `SWAP: bench ${line.name}, start ${line.backup}` : `${line.decision}: ${line.backup} check`;
+        const title = line.kind === "gtd" ? `Check ${line.name} (GTD)` : line.kind === "out" ? `${line.name} is OUT` : line.kind === "lock" ? `Lock ${line.name} now`
+          : line.decision === "SWAP" ? `SWAP: bench ${line.name}, start ${line.backup}` : `${line.decision}: ${line.backup} check`;
         alarmSound();
         setAlerts((a) => [{ key: `${w.sid}-${w.kind}-${Date.now()}`, title, text: line.text, decision: line.decision, kind: line.kind }, ...a]);
         try { if (Notification.permission === "granted") new Notification(title, { body: line.text }); } catch { /* ignore */ }
@@ -104,7 +110,7 @@ export default function SeasonPage({ leagueId }) {
       <section className="season-main">
         {headerSlot ? createPortal(bar, headerSlot) : bar}
         {alerts.map((a) => (
-          <div key={a.key} className={`panel roster-alert ${a.kind === "gtd" || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
+          <div key={a.key} className={`panel roster-alert ${["gtd", "out"].includes(a.kind) || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
             <strong>⏰ {a.title}</strong> {a.text}
             <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
           </div>
@@ -202,6 +208,9 @@ function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
         {mine && (
           <span className="mu-call">
             <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>
+            {r.win_lock != null && (word === "LOCK" || word === "PASS") && (
+              <span className="small muted win-pair" data-tip={r.why}>lock {Math.round(r.win_lock * 100)}% · wait {Math.round(r.win_wait * 100)}%</span>
+            )}
             {starter && (r.lock_status === "locked"
               ? <span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span>
               : lastPlayed && <button className="tiny" onClick={() => setLock(r.sid, lastPlayed.date)}
@@ -226,7 +235,9 @@ function bySlot(rows, positions, irSlots) {
   return { lines, bench, ir };
 }
 
-const MODE = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: ["bad", "Behind: the plan leans to big games"], even: ["", "Close: straight expected points"] };
+const MODE = { ahead: ["good", "60%+ to win"], behind: ["bad", "40% or less to win"], even: ["", "Close: 40-60% to win"] };
+const WIN_TIP = "Chance to win the week: your counted/locked points + what your other slots are expected to add (with their " +
+  "spread) vs the same for your opponent. Every LOCK / PASS and KEEP / SWAP call picks the choice with the higher chance.";
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
@@ -276,6 +287,7 @@ function WeekView({ data, plan, open, setLock, leagueId, setDay }) {
         <div className="mu-mid">
           <span className="small muted">{idx + 1}/{n}</span>
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
+          {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
           {isMine && (
             <span className="day-pick" data-tip="Whose lineup the call column shows: that day's moves (start whoever plays, earliest tip first).">
@@ -341,9 +353,9 @@ function TodayView({ data, plan, open }) {
           <h3 style={{ marginTop: 0 }}>Watch tonight</h3>
           {[...t.watch].sort((a, b) => (a.by || "~").localeCompare(b.by || "~")).map((w, i) => (
             <div key={i} className={`watch-line ${w.kind}`}>
-              <span className={`verdict ${w.kind === "gtd" ? "bad" : w.decision === "SWAP" ? "bad" : w.decision === "KEEP" ? "good" : "even"}`}>
-                {w.kind === "gtd" ? "GTD" : w.decision}</span>{" "}
-              {w.text} {w.by && <span className="muted">({w.kind === "gtd" ? "his tip" : `${w.backup} tips`} {ctTime(w.by)} CT{w.alarm ? ` · alarm ${ctTime(w.alarm)}` : ""})</span>}
+              <span className={`verdict ${["gtd", "out"].includes(w.kind) || w.decision === "SWAP" ? "bad" : w.decision === "KEEP" || w.kind === "lock" ? "good" : "even"}`}>
+                {w.kind === "gtd" ? "GTD" : w.kind === "out" ? "OUT" : w.kind === "lock" ? "LOCK" : w.decision}</span>{" "}
+              {w.text} {w.by && <span className="muted">({w.kind === "swap" ? `${w.backup} tips` : "his tip"} {ctTime(w.by)} CT{w.alarm === "now" ? " · alarm now" : w.alarm ? ` · alarm ${ctTime(w.alarm)}` : ""})</span>}
             </div>
           ))}
         </div>
