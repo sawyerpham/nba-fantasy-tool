@@ -378,27 +378,28 @@ def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
             and a.get("type") != "Media"][:4]   # Media = video clips / highlights, no note
 
 
-ESPN_NBA_NEWS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=30"
+LEAGUE_NEWS = 80   # newest league-wide notes shown
 
 
 def season_news(view: dict, fetch: Fetch) -> dict:
-    """The News tab: the fantasy notes on every player of yours (newest first; ESPN's notes feed only works per
-    player), then ESPN's NBA-wide headlines (there is no league-wide feed of fantasy notes)."""
+    """The News tab: fantasy notes (RotoWire, via ESPN) on every player of yours, then on every player the other teams
+    roster, newest first. ESPN's notes feed only works one player at a time (no league-wide feed), so this is one
+    request per player, in parallel and cached NEWS_TTL: only the first load after a Sync pays for it."""
     from concurrent.futures import ThreadPoolExecutor
 
-    me = next(t for t in view["teams"] if t["is_user"])
     players = view["players"]
+    owner = {sid: t for t in view["teams"] for sid in t["players"]}
 
     def notes(sid: str) -> list[dict]:
-        p = players[sid]
-        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"]} for n in espn_news(fetch, p["name"], p["team"])]
-    with ThreadPoolExecutor(8) as ex:   # one request per player; cached NEWS_TTL, so only a Sync pays this
-        mine = [n for ns in ex.map(notes, [s for s in me["players"] if s in players]) for n in ns]
-    league = [{"published": a.get("published"), "headline": a.get("headline"), "story": a.get("description"),
-               "link": ((a.get("links") or {}).get("web") or {}).get("href")}
-              for a in (fetch(ESPN_NBA_NEWS, NEWS_TTL) or {}).get("articles", []) if a.get("headline") and a.get("type") != "Media"]
-    by_time = lambda n: n.get("published") or ""   # noqa: E731
-    return {"mine": sorted(mine, key=by_time, reverse=True), "league": sorted(league, key=by_time, reverse=True)}
+        p, t = players[sid], owner[sid]
+        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "owner": t["name"]}
+                for n in espn_news(fetch, p["name"], p["team"])]
+    sids = [s for s in owner if s in players and s not in RETIRED]
+    with ThreadPoolExecutor(16) as ex:
+        every = [n for ns in ex.map(notes, sids) for n in ns]
+    every.sort(key=lambda n: n.get("published") or "", reverse=True)
+    mine = [n for n in every if owner[n["sid"]]["is_user"]]
+    return {"mine": mine, "league": [n for n in every if not owner[n["sid"]]["is_user"]][:LEAGUE_NEWS]}
 
 
 def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:

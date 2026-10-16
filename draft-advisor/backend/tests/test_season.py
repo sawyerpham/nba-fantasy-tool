@@ -103,18 +103,19 @@ def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_worl
 def test_news_merges_my_players_newest_first_and_skips_clips():
     from app.services.season import season_news
 
+    feeds = {"1": [{"type": "Rotowire", "headline": "Pha (ankle) is questionable", "published": "2026-10-20T10:00:00Z"},
+                   {"type": "Media", "headline": "Al Pha dunks", "published": "2026-10-21T10:00:00Z"}],
+             "2": [{"type": "Rotowire", "headline": "Ta scored 30", "published": "2026-10-21T09:00:00Z"}],
+             "3": [{"type": "Rotowire", "headline": "Ga (knee) is out", "published": "2026-10-21T11:00:00Z"}]}
+
     def fetch(url, ttl):
         if "teams/" in url:
-            return {"athletes": [{"id": "1", "displayName": "Al Pha"}, {"id": "2", "displayName": "Bo Ta"}]}
-        if "playerId=1" in url:
-            return {"feed": [{"type": "Rotowire", "headline": "Pha (ankle) is questionable", "published": "2026-10-20T10:00:00Z"},
-                             {"type": "Media", "headline": "Al Pha dunks", "published": "2026-10-21T10:00:00Z"}]}
-        if "playerId=2" in url:
-            return {"feed": [{"type": "Rotowire", "headline": "Ta scored 30", "published": "2026-10-21T09:00:00Z"}]}
-        return {"articles": [{"headline": "NBA story", "published": "2026-10-21T08:00:00Z", "links": {"web": {"href": "https://x"}}}]}
+            return {"athletes": [{"id": "1", "displayName": "Al Pha"}, {"id": "2", "displayName": "Bo Ta"}, {"id": "3", "displayName": "Cy Ga"}]}
+        return {"feed": feeds[url.split("playerId=")[1].split("&")[0]]}
 
-    view = {"teams": [{"is_user": True, "players": ["a", "b"]}],
-            "players": {"a": {"name": "Al Pha", "team": "MIA", "player_id": 1}, "b": {"name": "Bo Ta", "team": "MIA", "player_id": 2}}}
+    view = {"teams": [{"is_user": True, "name": "me", "players": ["a", "b"]}, {"is_user": False, "name": "rival", "players": ["c"]}],
+            "players": {"a": {"name": "Al Pha", "team": "MIA", "player_id": 1}, "b": {"name": "Bo Ta", "team": "MIA", "player_id": 2},
+                        "c": {"name": "Cy Ga", "team": "MIA", "player_id": 3}}}
     n = season_news(view, fetch)
     assert [x["headline"] for x in n["mine"]] == ["Ta scored 30", "Pha (ankle) is questionable"]   # newest first, no clip
-    assert n["league"] == [{"published": "2026-10-21T08:00:00Z", "headline": "NBA story", "story": None, "link": "https://x"}]
+    assert [(x["headline"], x["owner"]) for x in n["league"]] == [("Ga (knee) is out", "rival")]   # other teams' players
