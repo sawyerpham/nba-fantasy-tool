@@ -328,7 +328,7 @@ function TeamColumn({ data, team, open }) {
   );
 }
 
-// News: your players' fantasy notes (collapsible, always starts open) and NBA-wide headlines under it.
+// News: fantasy notes on your players (collapsible, always starts open), then on the other teams' players under it.
 // Reloads on Sync (refreshKey); the backend caches both for 15 minutes otherwise.
 // "2d 5h ago · 10/14/26" (under an hour: "35m ago")
 const newsTime = (iso) => {
@@ -338,6 +338,25 @@ const newsTime = (iso) => {
   const ago = mins < 60 ? `${mins}m` : d ? `${d}d ${h}h` : `${h}h`;
   return `${ago} ago · ${t.toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "2-digit", day: "2-digit", year: "2-digit" })}`;
 };
+
+// One note: who (opens his profile), his injury tag, the fantasy team that has him (league-wide), when, the note.
+function NewsNote({ n, data, open, owner }) {
+  const p = data.players[n.sid];
+  return (
+    <div className="news-item">
+      <div className="news-head">
+        <span className="clickable news-player" onClick={() => open(n.sid)}>
+          <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
+        </span>
+        <InjuryTag tag={p?.injury_tag} note={p?.injury_note} />
+        {owner && <span className="small muted">· {n.owner}</span>}
+        <span className="small muted news-time">{newsTime(n.published)}</span>
+      </div>
+      <div className="news-title">{n.headline}</div>
+      {n.story && <div className="small news-story">{n.story}</div>}
+    </div>
+  );
+}
 
 function NewsView({ data, leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
@@ -351,31 +370,12 @@ function NewsView({ data, leagueId, open, refreshKey }) {
     <>
       <details className="panel news" open data-testid="news-mine">
         <summary><h3>My team <span className="small muted">({news.mine.length})</span></h3></summary>
-        {news.mine.length ? news.mine.map((n, i) => (
-          <div key={i} className="news-item">
-            <div className="news-head">
-              <span className="clickable news-player" onClick={() => open(n.sid)}>
-                <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
-              </span>
-              <InjuryTag tag={data.players[n.sid]?.injury_tag} note={data.players[n.sid]?.injury_note} />
-              <span className="small muted news-time">{newsTime(n.published)}</span>
-            </div>
-            <div className="news-title">{n.headline}</div>
-            {n.story && <div className="small news-story">{n.story}</div>}
-          </div>
-        )) : <div className="muted">No recent notes on your players.</div>}
+        {news.mine.length ? news.mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
+          : <div className="muted">No recent notes on your players.</div>}
       </details>
       <div className="panel news" data-testid="news-league">
-        <h3>League-wide</h3>
-        {news.league.map((n, i) => (
-          <div key={i} className="news-item">
-            <div className="news-head">
-              {n.link ? <a className="news-title" href={n.link} target="_blank" rel="noreferrer">{n.headline}</a> : <span className="news-title">{n.headline}</span>}
-              <span className="small muted news-time">{newsTime(n.published)}</span>
-            </div>
-            {n.story && <div className="small news-story">{n.story}</div>}
-          </div>
-        ))}
+        <h3>League-wide <span className="small muted">(other teams' players)</span></h3>
+        {news.league.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} owner />)}
       </div>
     </>
   );
