@@ -30,6 +30,10 @@ STAT_KEYS = {"pts": "pts", "reb": "reb", "ast": "ast", "stl": "stl", "blk": "blk
              "fgm": "fgm", "fga": "fga", "ftm": "ftm", "fta": "fta", "fg3m": "tpm", "fg3a": "tpa",
              "oreb": "oreb", "dreb": "dreb", "pf": "pf", "plus_minus": "plus_minus"}
 
+# Retired players: no games, always 0, whatever Sleeper's feed says (Sleeper still lists Westbrook as an active FA).
+# Anyone Sleeper itself marks RET is treated the same way.
+RETIRED = {"1434"}   # Russell Westbrook
+
 Fetch = Callable[[str, int], Any]
 _cache: dict[str, tuple[float, Any]] = {}
 
@@ -146,8 +150,9 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         val = session.valuations.get(rec.player_id) if rec else None
         team = rec.team_abbr if rec else None
         bonus = val.bonus_fpts_per_game if val else 0.0
+        retired = sid in RETIRED or (rec is not None and rec.sleeper_status == "RET")
         games = []
-        for d in dates:
+        for d in ([] if retired else dates):
             opp = plays.get((d, team)) if team else None
             if opp is None:
                 continue
@@ -159,7 +164,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "min": round(float(st.get("sp") or 0) / 60, 1) if played else None})
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": ov.injury_status if ov else "healthy",
-                        "injury_note": ov.injury_note if ov else "", "games": games}
+                        "injury_note": ov.injury_note if ov else "", "retired": retired, "games": games}
 
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
