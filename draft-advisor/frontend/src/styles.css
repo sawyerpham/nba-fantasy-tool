@@ -674,3 +674,15 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .header-slot .season-bar { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; flex-wrap: nowrap; }
 .season-week { font-size: 18px; white-space: nowrap; }
 .header-slot .season-bar > .muted { white-space: nowrap; }
+
+/* compact matchup header: one line, arrows at the ends */
+.matchup { padding-top: 8px; padding-bottom: 10px; }
+.matchup .mu-head { display: flex; align-items: center; gap: 12px; padding: 0; margin-bottom: 8px; }
+.matchup .mu-team { flex: 1; display: flex; align-items: baseline; gap: 10px; min-width: 0; text-align: left; }
+.matchup .mu-team.right { justify-content: flex-end; }
+.matchup .mc-name { font-size: 16px; } .matchup .mc-points { font-size: 26px; line-height: 1; }
+.matchup .mu-mid { flex-direction: row; gap: 8px; }
+.mu-arrow { position: static; font-size: 15px; padding: 3px 10px; }
+.mu-grid { gap: 4px 8px; }
+.mu-card { padding: 3px 10px; }
+.mu-divider { margin-top: 4px; padding-top: 4px; }

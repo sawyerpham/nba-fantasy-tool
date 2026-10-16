@@ -235,7 +235,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
       <button className="mu-arrow right" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
     </>
   );
-  if (!shown) return <div className="panel matchup">{nav}<div className="muted" style={{ textAlign: "center" }}>Loading matchup {idx + 1} of {n}…</div></div>;
+  if (!shown) return <div className="panel matchup"><div className="mu-head">{nav}<div className="muted">Loading matchup {idx + 1} of {n}…</div></div></div>;
   const o = shown.opponent;
   const L = bySlot(shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
@@ -249,23 +249,24 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
   return (
     <div className="panel matchup" data-testid="my-week">
-      {nav}
       <div className="mu-head">
+        <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
-          <div className="mc-name">{shown.name} {isMine && <span className="badge info">YOU</span>}</div>
-          <div className="mc-points">{fp(shown.points)}</div>
-          <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{shown.expected}</strong></span> · {shown.games_left} games left</div>
+          <span className="mc-name">{shown.name}</span>{isMine && <span className="badge info">YOU</span>}
+          <span className="mc-points">{fp(shown.points)}</span>
+          <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{shown.expected}</strong></span> · {shown.games_left} left</span>
         </div>
         <div className="mu-mid">
-          <div className="small muted">matchup {idx + 1} of {n}</div>
+          <span className="small muted">{idx + 1}/{n}</span>
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
-          {!isMine && <div><button className="tiny" onClick={() => setIdx(mineIdx)}>back to mine</button></div>}
+          {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
         </div>
         <div className="mu-team right">
-          <div className="mc-name">{o ? o.name : "no opponent"}</div>
-          <div className="mc-points">{o ? fp(o.points) : ""}</div>
-          {o && <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} games left · {o.locked} locked</div>}
+          {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
+          <span className="mc-points">{o ? fp(o.points) : ""}</span>
+          <span className="mc-name">{o ? o.name : "no opponent"}</span>
         </div>
+        <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
       <div className="mu-grid">
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
