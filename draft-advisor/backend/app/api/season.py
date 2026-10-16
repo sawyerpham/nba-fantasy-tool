@@ -3,6 +3,8 @@ plan (lock / pass / today's lineup), your lock answers, any player's season page
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
@@ -31,11 +33,12 @@ def week(league_id: str, week: int | None = Query(None, ge=1), state: AppState =
 
 @router.get("/plan")
 def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | None = Query(None),
+         today: date | None = Query(None, description="preview another day's lineup (testing)"),
          state: AppState = Depends(get_state)) -> dict:
     """Lock / pass / where to seat every player of one team this week (default: yours), today's lineup and the opponent."""
     session = _session(state, league_id)
     try:
-        view = week_view(session, _fetch(state), week)
+        view = week_view(session, _fetch(state), week, today)
         manual = read_locks(state.store, league_id, view["week"]) if not roster_id else {}
         return team_plan(session, view, roster_id, manual)
     except ValueError as exc:

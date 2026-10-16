@@ -4,6 +4,7 @@ import DataPage from "./pages/DataPage.jsx";
 import LeaguePage from "./pages/LeaguePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import DraftPage from "./pages/DraftPage.jsx";
+import SeasonPage from "./pages/SeasonPage.jsx";
 import { TipLayer } from "./components/Terms.jsx";
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
   ["league", "League"],
   ["settings", "Settings"],
   ["draft", "Draft"],
+  ["season", "Season"],
 ];
 
 export default function App() {
@@ -71,6 +73,7 @@ export default function App() {
         {tab === "league" && <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />}
         {tab === "settings" && <SettingsPage leagueId={leagueId} />}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
+        {tab === "season" && <SeasonPage leagueId={leagueId} />}
       </main>
       <TipLayer />
     </>
