@@ -101,3 +101,38 @@ def test_today_never_moves_a_player_mid_game_and_flags_swaps_and_gtd():
     assert {"gtd", "swap"} <= kinds
     swap = next(w for w in t.watch if w["kind"] == "swap")
     assert swap["name"] == "early" and swap["backup"] == "late" and swap["by"] == "2026-10-22T02:00Z" and swap["bar"] > 0
+
+
+def test_live_estimate_projects_the_rest_of_his_game():
+    from app.engine.weekplan import live_estimate
+
+    half = Game("2026-10-21", 16.0, fp=10.0, started=True, live=True, min=17.0, proj_min=34.0, period=3, clock=720.0)
+    est = live_estimate(half)                       # halftime, on pace: about double
+    assert 18 < est < 22
+    cold = Game("2026-10-21", 16.0, fp=2.0, started=True, live=True, min=17.0, proj_min=34.0, period=3, clock=720.0)
+    assert live_estimate(cold) < est - 5            # a cold half drags the estimate down
+    done = Game("2026-10-21", 16.0, fp=25.0, started=True, final=True, min=36.0)
+    assert live_estimate(done) == 25.0 and live_estimate(Game("2026-10-21", 16.0)) is None
+
+
+def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap():
+    from app.engine.weekplan import plan_today
+
+    today = "2026-10-21"
+    early = pp("early", ["SG"], "BN", [Game(today, 10, tip="2026-10-21T23:00Z", proj_min=30)] + future(10))
+    late = pp("late", ["SG"], "BN", [Game(today, 12, tip="2026-10-21T23:45Z", proj_min=30)])
+    one = {"SG": 1}
+    players = [early, late]
+    plan_week(players, one)
+    t = plan_today(players, one, today)
+    assert t.seats == {"SG": ["early"]}                                   # earlier tip first, despite the lower projection
+    w = next(x for x in t.watch if x["kind"] == "swap")
+    assert w["decision"] == "PENDING" and w["backup"] == "late" and w["alarm"] == "2026-10-21T23:40Z"
+
+    # 6:40: early is ice cold in the 2nd quarter -> SWAP; on fire -> KEEP
+    for fp_now, want in ((1.0, "SWAP"), (14.0, "KEEP")):
+        early.games[0] = Game(today, 10, fp=fp_now, started=True, live=True, tip="2026-10-21T23:00Z", min=10, proj_min=30, period=2, clock=600)
+        early.slot = "SG"
+        plan_week(players, one)
+        w = next(x for x in plan_today(players, one, today).watch if x["kind"] == "swap")
+        assert w["decision"] == want, (fp_now, w)
