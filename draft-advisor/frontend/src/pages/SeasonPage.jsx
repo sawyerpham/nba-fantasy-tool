@@ -129,7 +129,7 @@ export default function SeasonPage({ leagueId }) {
           </div>
         ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
+        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
         {view === "today" && <TodayView data={data} plan={plan} open={open} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
