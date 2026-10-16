@@ -53,3 +53,26 @@ def test_current_week_is_the_monday_to_sunday_span_holding_today():
     assert current_week(weeks, date(2026, 10, 25)) == 1    # Sunday still week 1
     assert current_week(weeks, date(2026, 10, 26)) == 2
     assert current_week(weeks, date(2027, 6, 1)) == 2      # after the season: the last week
+
+
+def test_lock_detection_and_your_answers():
+    from app.services.season import detect_lock
+
+    games = [{"date": "2026-10-20", "fp": 18.5}, {"date": "2026-10-22", "fp": 11.0}, {"date": "2026-10-24", "fp": None}]
+    assert detect_lock(18.5, games, None) == ("locked", "2026-10-20")    # counts an earlier game: locked
+    assert detect_lock(11.0, games, None) == ("maybe", "2026-10-22")     # counts his latest: can't tell yet
+    assert detect_lock(0, games, None) == ("no", None)
+    assert detect_lock(11.0, games, "2026-10-20") == ("locked", "2026-10-20")   # your answer wins
+    assert detect_lock(18.5, games, "") == ("no", None)
+
+
+def test_lock_answers_are_saved_per_league_and_week(tmp_path):
+    from app.services.season import read_locks, write_lock
+    from nba_fantasy_shared.storage import JsonStore
+
+    store = JsonStore(tmp_path)
+    write_lock(store, "lg", 1, "999", "2026-10-20")
+    write_lock(store, "lg", 1, "111", "")
+    assert read_locks(store, "lg", 1) == {"999": "2026-10-20", "111": ""} and read_locks(store, "lg", 2) == {}
+    write_lock(store, "lg", 1, "999", None)
+    assert read_locks(store, "lg", 1) == {"111": ""}

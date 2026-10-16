@@ -162,6 +162,11 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         "talent_fpg": round(talent.get(abbr, 0.0), 1),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
         "teammates": [mate(fpg_of[pid], pid) for pid in shown],
+        # Sleeper's depth chart: PG -> C, 1st / 2nd / 3rd option at each spot
+        "depth_grid": {pos: [mate(fpg_of[pid], pid) for pid in sorted(
+            (pid for _, pid in roster if (session.players[pid].fantasy and session.players[pid].fantasy.depth_chart_position == pos
+                                         and session.players[pid].fantasy.depth_chart_order)),
+            key=lambda pid: session.players[pid].fantasy.depth_chart_order)[:3]] for pos in pos_order},
         "role": _team_role(session, roster, player_id),
     }
 

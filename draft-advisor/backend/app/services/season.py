@@ -34,6 +34,11 @@ STAT_KEYS = {"pts": "pts", "reb": "reb", "ast": "ast", "stl": "stl", "blk": "blk
 # Anyone Sleeper itself marks RET is treated the same way.
 RETIRED = {"1434"}   # Russell Westbrook
 
+# Sleeper injury tags -> the site's statuses (engine/weekplan.py PLAY_CHANCE).
+SLEEPER_INJURY = {"GTD": "day_to_day", "DTD": "day_to_day", "Questionable": "day_to_day", "Doubtful": "day_to_day",
+                  "Probable": "healthy", "Out": "out_short_term", "Suspended": "out_short_term", "IR": "out_long_term"}
+LOCKS_FILE = "season_locks.json"   # your "I locked it" answers: {league: {week: {sleeper id: game date or ""}}}
+
 Fetch = Callable[[str, int], Any]
 _cache: dict[str, tuple[float, Any]] = {}
 
@@ -99,7 +104,7 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
     return out
 
 
-def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None) -> dict:
+def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
     lg = session.league
     if not lg.sleeper_league_id:
         raise ValueError("league is not linked to Sleeper (Settings)")
@@ -115,9 +120,13 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
             plays[(g["date"], g["away"]["team"])] = g["home"]["team"]
     tips = {d: espn_day(fetch, d, today) for d in dates}
 
-    proj, stats = {}, {}
+    proj, stats, injury = {}, {}, {}
     for e in fetch(f"{SLEEPER}/projections/nba/{year}/{week}?season_type=regular", WEEK_TTL) or []:
         proj[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
+        pl = e.get("player") or {}
+        if pl.get("injury_status"):
+            note = " - ".join(x for x in (pl.get("injury_body_part"), pl.get("injury_notes")) if x)
+            injury[str(e["player_id"])] = (SLEEPER_INJURY.get(pl["injury_status"], "day_to_day"), f"{pl['injury_status']}: {note}".rstrip(": "))
     for e in fetch(f"{SLEEPER}/stats/nba/{year}/{week}?season_type=regular", LIVE_TTL) or []:
         stats[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
 
@@ -135,6 +144,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                       "name": users.get(r.get("owner_id")) or (m.name if m else f"Team {r['roster_id']}"),
                       "is_user": bool(m and m.is_user), "wins": s.get("wins", 0), "losses": s.get("losses", 0),
                       "ties": s.get("ties", 0), "fpts": round(s.get("fpts", 0) + s.get("fpts_decimal", 0) / 100, 2),
+                      "faab_used": s.get("waiver_budget_used", 0),
                       "players": r.get("players") or [], "starters": r.get("starters") or [], "reserve": r.get("reserve") or []})
 
     pairs: dict[int, list[dict]] = {}
@@ -143,7 +153,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         pairs.setdefault(m.get("matchup_id") or -m["roster_id"], []).append(side)
 
     by_sleeper = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
-    rostered = {sid for t in teams for sid in t["players"]}
+    rostered = {sid for t in teams for sid in t["players"]} | set(extra)
     players = {}
     for sid in rostered:
         rec = by_sleeper.get(sid)
@@ -163,42 +173,225 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "detail": tip.get("detail", ""), "proj": round(projected_fp(p, lg.scoring, bonus), 2) if p else None,
                           "fp": round(actual_fp(st, lg.scoring), 2) if played else None,
                           "min": round(float(st.get("sp") or 0) / 60, 1) if played else None})
+        inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
-                        "team": team, "pos": list(ov.eligibility) if ov else [], "injury": ov.injury_status if ov else "healthy",
-                        "injury_note": ov.injury_note if ov else "", "retired": retired, "games": games}
+                        "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
+                        "injury_note": note, "retired": retired, "games": games}
 
+    team_games: dict[str, int] = {}
+    for (d, team) in plays:
+        team_games[team] = team_games.get(team, 0) + 1
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "roster_positions": positions,
+            "team_games": team_games,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
 
 
-def team_plan(session, view: dict, roster_id: int | None = None) -> dict:
-    """The week plan (engine/weekplan.py) for one team of a week_view: the user's team by default."""
-    from ..engine.weekplan import Game, PlanPlayer, plan_week, swing_of
+def detect_lock(counted: float | None, games: list[dict], manual: str | None) -> tuple[str, str | None]:
+    """("locked" | "maybe" | "no", locked game date). Your answer wins; otherwise from Sleeper's counted points:
+    equal to an earlier game than his latest -> locked; equal to his latest with nothing later yet -> maybe."""
+    played = [g for g in games if g["fp"] is not None]
+    if manual is not None:
+        return ("locked", manual) if manual else ("no", None)
+    if not counted or not played:
+        return "no", None
+    same = [g for g in played if abs(g["fp"] - counted) < 0.06]
+    if not same:
+        return "no", None
+    g = same[-1]
+    if g is not played[-1]:
+        return "locked", g["date"]
+    return "maybe", g["date"]
 
-    team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
-    if team is None:
-        raise ValueError("no such team in this league")
-    positions = view["roster_positions"]
-    slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
+
+def read_locks(store, league_id: str, week: int) -> dict[str, str]:
+    data = store.read_json(LOCKS_FILE) if store.exists(LOCKS_FILE) else {}
+    return data.get(league_id, {}).get(str(week), {})
+
+
+def write_lock(store, league_id: str, week: int, sid: str, game_date: str | None) -> None:
+    """game_date = the locked game; "" = not locked; None = forget your answer (back to detection)."""
+    data = store.read_json(LOCKS_FILE) if store.exists(LOCKS_FILE) else {}
+    week_locks = data.setdefault(league_id, {}).setdefault(str(week), {})
+    if game_date is None:
+        week_locks.pop(sid, None)
+    else:
+        week_locks[sid] = game_date
+    store.write_json(LOCKS_FILE, data)
+
+
+def _slot_counts(positions: list[str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for pos in positions:
         if pos not in ("BN", "IR"):
             counts[pos] = counts.get(pos, 0) + 1
-    players = []
+    return counts
+
+
+def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
+    from ..engine.weekplan import Game, PlanPlayer, swing_of
+
+    positions = view["roster_positions"]
+    slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
+    side = next((m for pair in view["matchups"] for m in pair if m["roster_id"] == team["roster_id"]), {}) or {}
+    counted = side.get("players_points") or {}
+    out, locks = [], {}
     for sid in team["players"]:
         p = view["players"].get(sid)
         if p is None:
             continue
         val = session.valuations.get(p["player_id"]) if p["player_id"] else None
-        games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None)
-                 for g in p["games"]]
-        players.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games,
-                                  slot="IR" if sid in team["reserve"] else slot_of.get(sid, "BN"),
-                                  swing=swing_of(val.per_game_fpts) if val else swing_of([]), injury=p["injury"]))
+        slot = "IR" if sid in team["reserve"] else slot_of.get(sid, "BN")
+        status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
+        locks[sid] = (status, when)
+        locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status == "locked" else None
+        games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None,
+                      live=g["state"] == "in", tip=g["tip"]) for g in p["games"]]
+        out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
+                              swing=swing_of(val.per_game_fpts) if val else swing_of([]), injury=p["injury"]))
+    return out, locks, side
+
+
+AHEAD, BEHIND = 0.85, 1.2   # swing multipliers when well ahead / behind (more weight on sure / big games)
+MARGIN = 0.08               # "well" = the expected totals differ by more than 8 %
+
+
+def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
+    """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
+    opponent's outlook, the ahead/behind adjustment and today's lineup."""
+    from ..engine.weekplan import plan_today, plan_week
+
+    team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
+    if team is None:
+        raise ValueError("no such team in this league")
+    counts = _slot_counts(view["roster_positions"])
+    players, locks, side = _plan_players(session, view, team, manual or {})
     plan = plan_week(players, counts)
+
+    opp = None
+    pair = next((pr for pr in view["matchups"] if any(m["roster_id"] == team["roster_id"] for m in pr)), [])
+    other = next((m for m in pair if m["roster_id"] != team["roster_id"]), None)
+    mode = "even"
+    if other:
+        oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
+        oplayers, olocks, _ = _plan_players(session, view, oteam, {})
+        oplan = plan_week(oplayers, counts)
+        if plan.expected < oplan.expected * (1 - MARGIN):
+            mode = "behind"
+        elif plan.expected > oplan.expected * (1 + MARGIN):
+            mode = "ahead"
+        if mode != "even":
+            for q in players:
+                q.swing *= BEHIND if mode == "behind" else AHEAD
+            plan = plan_week(players, counts)
+        opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "expected": oplan.expected,
+               "points": other.get("points") or 0, "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
+               "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
+               "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
+
+    today = view["today"]
+    t = plan_today(players, counts, today) if today in view["dates"] else None
     return {"roster_id": team["roster_id"], "name": team["name"], "expected": plan.expected, "slots": counts,
-            "players": [{"sid": q.sid, "name": q.name, "pos": q.eligibility, "slot": q.slot, "seat": q.seat,
-                         "x": q.x, "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2),
-                         "locked": q.locked, "action": q.action, "why": q.why}
-                        for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))]}
+            "points": side.get("points") or 0, "mode": mode,
+            "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
+            "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
+            "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": t.watch} if t else None,
+            "opponent": opp}
+
+
+def _player_out(q, locks: dict) -> dict:
+    status, when = locks.get(q.sid, ("no", None))
+    return {"sid": q.sid, "name": q.name, "pos": q.eligibility, "slot": q.slot, "seat": q.seat, "x": q.x,
+            "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2), "locked": q.locked,
+            "lock_status": status, "lock_date": when, "action": q.action, "why": q.why, "injury": q.injury}
+
+
+# ---- one player's season page --------------------------------------------------------------------------
+ESPN_CODE = {v: k for k, v in ESPN_TEAM.items()}
+ESPN_ROSTER = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{}/roster"
+ESPN_NEWS = "https://site.api.espn.com/apis/fantasy/v2/games/fba/news/players?playerId={}&limit=6"
+NEWS_TTL = 15 * 60
+GAME_LOG = 10
+
+
+def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
+    """Latest fantasy news blurbs from ESPN (the same RotoWire-style notes Sleeper shows), matched by name on his team."""
+    from nba_fantasy_shared.reconcile.names import normalize_name
+
+    if not team:
+        return []
+    roster = fetch(ESPN_ROSTER.format(ESPN_CODE.get(team, team).lower()), DAY_TTL) or {}
+    want = normalize_name(name)
+    espn_id = next((a["id"] for a in roster.get("athletes", []) if normalize_name(a.get("displayName", "")) == want), None)
+    if not espn_id:
+        return []
+    feed = (fetch(ESPN_NEWS.format(espn_id), NEWS_TTL) or {}).get("feed") or []
+    return [{"published": a.get("published"), "headline": a.get("headline"), "story": a.get("story") or a.get("description") or ""}
+            for a in feed if a.get("headline") and "Highlights" not in a.get("headline", "")][:4]
+
+
+def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:
+    """Owner, this week's games, recent game log, ranks and news for any player (rostered or not)."""
+    rec = session.players.get(player_id)
+    if rec is None or not rec.sleeper_id:
+        raise ValueError("unknown player")
+    sid = rec.sleeper_id
+    view = week_view(session, fetch, week, extra=(sid,))
+    owner = next((t for t in view["teams"] if sid in t["players"]), None)
+    me = view["players"].get(sid, {})
+
+    year, log = session.league.roster_season.split("-")[0], []
+    for w in range(view["week"], 0, -1):   # walk back through the season's box scores
+        ttl = LIVE_TTL if w == view["week"] else DAY_TTL
+        rows = [e for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", ttl) or []
+                if str(e.get("player_id")) == sid and (e.get("stats") or {}).get("sp")]
+        for e in sorted(rows, key=lambda e: e["date"], reverse=True):
+            st = e["stats"]
+            log.append({"date": e["date"], "opp": e.get("opponent"), "fp": round(actual_fp(st, session.league.scoring), 2),
+                        "min": round(float(st.get("sp") or 0) / 60, 1), "pts": st.get("pts"), "reb": st.get("reb"),
+                        "ast": st.get("ast"), "stl": st.get("stl"), "blk": st.get("blk"), "to": st.get("to")})
+        if len(log) >= GAME_LOG:
+            break
+
+    adp = sorted(((r.projection or {}).get("adp_std"), pid) for pid, r in session.players.items()
+                 if (r.projection or {}).get("adp_std"))
+    overall = next((i for i, (_, pid) in enumerate(adp, 1) if pid == player_id), None)
+    return {"player_id": player_id, "sleeper_id": sid, "week": view["week"], "today": view["today"],
+            "owner": {"name": owner["name"], "is_user": owner["is_user"], "roster_id": owner["roster_id"],
+                      "ir": sid in owner["reserve"]} if owner else None,
+            "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_note": me.get("injury_note", ""),
+            "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall,
+            "news": espn_news(fetch, rec.full_name, rec.team_abbr)}
+
+
+# ---- waivers ---------------------------------------------------------------------------------------------
+FAAB_TOTAL = 200
+WAIVER_SHOW = 12
+# ponytail: bid = share of FAAB left that grows with the upgrade over your weakest player (8 value points = 60 %);
+# no data on rivals' bids, so it is a guide, not a price.
+
+
+def waivers(session, view: dict) -> dict:
+    """Free agents worth claiming: rest-of-season value (the draft value: projection, Lock-In ceiling, availability),
+    this week's games, the player of yours to drop and a suggested blind bid. Claims process Saturday 2 AM."""
+    me = next(t for t in view["teams"] if t["is_user"])
+    rostered = {sid for t in view["teams"] for sid in t["players"]}
+    by_sleeper = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
+    fa_ids = [pid for pid, r in session.players.items()
+              if r.sleeper_id and r.team_abbr and r.sleeper_id not in rostered and r.sleeper_id not in RETIRED
+              and r.sleeper_status != "RET"]
+    mine = [by_sleeper[sid] for sid in me["players"] if sid in by_sleeper and sid not in me["reserve"]]
+    rows = {r.player_id: r for r in session.rank([], fa_ids + mine)}
+    drop = min((rows[pid] for pid in mine if pid in rows), key=lambda r: r.value, default=None)
+    faab_left = FAAB_TOTAL - (me.get("faab_used") or 0)
+    out = []
+    floor = drop.value if drop else 0.0   # only real upgrades over your weakest player
+    for pid in sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]:
+        r = rows[pid]
+        up = r.value - (drop.value if drop else 0)
+        bid = max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1
+        out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
+                    "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
+                    "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
+    return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "name": drop.full_name, "value": round(drop.value, 2)} if drop else None,
+            "claims": out, "process": "Saturday 2:00 AM"}

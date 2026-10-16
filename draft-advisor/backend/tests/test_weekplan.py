@@ -64,3 +64,40 @@ def test_swing_comes_from_his_own_games():
     assert swing_of([10.0] * 20) == 0.12                                  # perfectly steady: the floor
     assert swing_of([5.0, 25.0] * 10) == 0.6                              # wild: the ceiling
     assert swing_of([10.0] * 5) == 0.3                                    # too few games: the default
+
+
+def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
+    from app.engine.weekplan import plan_today
+
+    today = "2026-10-21"
+    star = pp("star", ["PG"], "PG", [Game("2026-10-20", 20, fp=9.0, started=True), Game("2026-10-23", 20)])   # bad game, plays Fri
+    hot = pp("hot", ["PG", "SG"], "SG", [Game("2026-10-20", 12, fp=30.0, started=True)] + future(12))       # lockable 30
+    flier = pp("flier", ["PG"], "BN", [Game(today, 11, tip="2026-10-22T00:00Z")])                         # plays tonight
+    sg = pp("sg", ["SG"], "SG", [Game("2026-10-24", 10)])
+    players = [star, hot, flier, sg]
+    one_each = {"PG": 1, "SG": 1}
+    plan_week(players, one_each)
+    assert hot.action == "LOCK" and star.action == "PASS" and star.seat == "PG" and hot.seat == "SG"
+    t = plan_today(players, one_each, today)
+    assert t.seats == {"PG": ["flier"], "SG": ["hot"]}            # tonight's game gets the PG slot; the lock stays in
+    moved = {m["sid"]: (m["from"], m["to"]) for m in t.moves}
+    assert moved["flier"] == ("BN", "PG") and moved["star"] == ("PG", "BN") and moved["flier"] and "hot" not in moved
+    assert star.seat == "PG"                                       # the week plan's seats are left alone
+
+
+def test_today_never_moves_a_player_mid_game_and_flags_swaps_and_gtd():
+    from app.engine.weekplan import plan_today
+
+    today = "2026-10-21"
+    live = pp("live", ["PG"], "PG", [Game(today, 15, started=True, live=True)] + future(15))
+    early = pp("early", ["SG"], "SG", [Game(today, 14, tip="2026-10-21T23:00Z")] + future(14), injury="day_to_day")
+    late = pp("late", ["SG"], "BN", [Game(today, 12, tip="2026-10-22T02:00Z")])
+    players = [live, early, late]
+    one_each = {"PG": 1, "SG": 1}
+    plan_week(players, one_each)
+    t = plan_today(players, one_each, today)
+    assert "live" in t.seats["PG"]                                                    # in progress: stays put
+    kinds = {w["kind"] for w in t.watch}
+    assert {"gtd", "swap"} <= kinds
+    swap = next(w for w in t.watch if w["kind"] == "swap")
+    assert swap["name"] == "early" and swap["backup"] == "late" and swap["by"] == "2026-10-22T02:00Z" and swap["bar"] > 0
