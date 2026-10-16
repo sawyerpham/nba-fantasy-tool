@@ -199,7 +199,7 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 #   pinned  - locked players, and anyone whose game is in progress (he can't be moved), in their current slot;
 #   1       - players whose call is LOCK (they must stay in the lineup to lock);
 #   2       - players who play later today, best projection for today's game first;
-#   3       - starters with no game today stay where they are unless a slot is needed; bench players stay benched.
+#   3       - no game today: the week plan's starters, then current starters hold any slot still free.
 # Benching a player with a played, unlocked game forfeits that game; only LOCK players have one worth keeping,
 # and they come first. The moves are the differences from the current Sleeper lineup.
 
@@ -235,9 +235,12 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
         return -1 if pa > pb else 1
     from functools import cmp_to_key
     tier2 = sorted(plays, key=cmp_to_key(first))
-    # No game today: current starters keep their slots unless someone who plays needs one; bench players stay put.
-    tier3 = sorted((p for p in free if p not in tier1 and p not in tier2 and p.slot in slot_counts), key=lambda p: -p.value)
+    # No game today: the slots left go to the week plan's starters (so today's lineup is already set for their next
+    # games, no waiting for game day), then current starters hold whatever is still free.
     plan_seat = {id(p): p.seat for p in players}
+    tier3 = sorted((p for p in free if p not in tier1 and p not in tier2
+                    and (p.slot in slot_counts or (plan_seat[id(p)] and p.injury not in OUT))),
+                   key=lambda p: (plan_seat[id(p)] is None, -p.value))
     for p in players:   # today's seating starts empty: nobody keeps a week-plan seat he isn't given today
         p.seat = None
     seats = seat_players(tier1 + tier2 + tier3, slot_counts, pinned)
