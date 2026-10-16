@@ -147,3 +147,19 @@ def test_a_day_without_games_moves_nobody():
     plan_week(players, {"C": 1})
     assert b.seat == "C"                                       # the week plan prefers b ...
     assert plan_today(players, {"C": 1}, "2026-10-20").moves == []   # ... but nobody plays today: no churn
+
+
+def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_check():
+    from app.engine.weekplan import plan_today
+
+    today = "2026-10-21"
+    six = pp("six", ["SG"], "BN", [Game(today, 9, tip="2026-10-21T23:00Z")])
+    six10 = pp("six10", ["SG"], "BN", [Game(today, 14, tip="2026-10-21T23:10Z")])     # 10 min later, projects more
+    seven = pp("seven", ["SG"], "BN", [Game(today, 20, tip="2026-10-22T00:00Z")])     # an hour later
+    one = {"SG": 1}
+    players = [six, six10, seven]
+    plan_week(players, one)
+    t = plan_today(players, one, today)
+    assert t.seats == {"SG": ["six10"]}                       # 6:00 and 6:10 are one group: the bigger projection starts
+    swap = [w for w in t.watch if w["kind"] == "swap"]
+    assert [w["backup"] for w in swap] == ["seven"]           # the 7:00 player is watched; the 6:00 one isn't (too close)

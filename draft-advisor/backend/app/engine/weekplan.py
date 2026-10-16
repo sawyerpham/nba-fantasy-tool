@@ -219,8 +219,10 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     tier1 = [p for p in free if p.action == "LOCK"]
     # Earliest tip first: start the 6:00 player over the 6:45 one. If the early game goes badly you swap the later
     # player in before his tip (see today_watch); starting the later one first gives that chance away.
-    tier2 = sorted((p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started),
-                   key=lambda p: (_today(p, today).tip or "~", -(_today(p, today).proj or 0)))
+    # Tips CLOSE_TIPS_MIN or less apart are one group: no time to judge the first game, so the bigger projection starts.
+    plays = [p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started]
+    tier2 = sorted(plays, key=lambda p: (_tip_group(_today(p, today).tip, [_today(q, today).tip for q in plays]),
+                                         -(_today(p, today).proj or 0)))
     # No game today: current starters keep their slots unless someone who plays needs one; bench players stay put.
     tier3 = sorted((p for p in free if p not in tier1 and p not in tier2 and p.slot in slot_counts), key=lambda p: -p.value)
     plan_seat = {id(p): p.seat for p in players}
@@ -244,6 +246,24 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
 
 
 GAME_SECONDS, QUARTER_SECONDS, PRIOR_MINUTES = 48 * 60, 12 * 60, 10.0
+CLOSE_TIPS_MIN = 15  # tips this close count as the same time (bigger projection starts; no swap check between them)
+
+
+def _minutes(iso: str | None) -> float:
+    from datetime import datetime
+    return datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() / 60 if iso else float("inf")
+
+
+def _tip_group(tip: str | None, tips: list[str | None]) -> float:
+    """The start of his tip's group: groups open at the earliest tip and hold every tip within CLOSE_TIPS_MIN of
+    that opening tip (6:00, 6:10 together; 6:20 opens the next group)."""
+    start = None
+    for t in sorted(_minutes(x) for x in tips):
+        if start is None or t - start > CLOSE_TIPS_MIN:
+            start = t
+        if t >= _minutes(tip):
+            return start
+    return _minutes(tip)
 ALARM_LEAD_MIN = 5   # the swap check fires this many minutes before the later player's tip
 MIN_SWAP_GAIN = 0.5  # only watch a swap that could add at least this much (FP) over keeping the starter
 
@@ -309,8 +329,8 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
             lines.append({"kind": "gtd", "sid": s.sid, "name": s.name, "slot": slot, "by": gs.tip,
                           "alarm": _minus_minutes(gs.tip, 30), "backup": backup.name, "backup_tip": _today(backup, today).tip,
                           "text": f"{s.name} is questionable: check before his tip. If he's out, start {backup.name} at {slot}."})
-        for b in fits:   # every later bench player who could take this slot is a candidate swap
-            if (_today(b, today).tip or "") <= (gs.tip or ""):
+        for b in fits:   # every bench player tipping later (by more than CLOSE_TIPS_MIN) is a candidate swap
+            if _minutes(_today(b, today).tip) - _minutes(gs.tip) <= CLOSE_TIPS_MIN:
                 continue
             call = swap_call(s, b, today)
             if call["swap"] - call["bar"] >= MIN_SWAP_GAIN:   # his game must beat just waiting on S's later games
