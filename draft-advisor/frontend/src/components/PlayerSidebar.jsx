@@ -39,7 +39,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (!playerId) return <div className="panel muted">{season ? "Click any player to see his profile: owner, this week's games, game log, news and his team's depth chart." : "Select a player to see his profile, his Fit for your team, his Worth and his Max."}</div>;
+  if (!playerId) return season ? null : <div className="panel muted">Select a player to see his profile, his Fit for your team, his Worth and his Max.</div>;
   if (!data) return <div className="panel">{error || "Loading…"}</div>;
 
   const rec_ = data.record;
