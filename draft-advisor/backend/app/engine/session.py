@@ -24,6 +24,10 @@ from .ranking import RankedPlayer, pool_values, rank_players, scarcity_bonus, sc
 from .spending import SpendingGuide, spending_guide
 
 
+# R value (user's formula): player #180 by Sleeper projected FP/G is replacement; $1903 is the room's auction money.
+R_REPLACEMENT_RANK, R_TOTAL_DOLLARS = 180, 1903
+
+
 @dataclass
 class ManagerSummary:
     manager_id: str
@@ -165,6 +169,25 @@ class DraftSession:
         """Worth at the first nomination: $1 + value above replacement × the post-keeper $ per point."""
         rate = self.keeper_start_rate()
         return round(min(self.league.min_bid + max(0.0, value - rate.replacement) * rate.dollars_per_var, rate.market_cap))
+
+    def r_values(self, replacement_rank: int = R_REPLACEMENT_RANK, total_dollars: int = R_TOTAL_DOLLARS) -> dict[int, int]:
+        """R value: a plain Sleeper-projection auction price, fixed for the whole draft.
+        Board = every player except this season's keepers, ranked by Sleeper projected FP/G. The player at
+        replacement_rank is replacement level; VAR = FP/G - his FP/G. rate = total_dollars / Σ VAR of the top
+        replacement_rank; R value = VAR × rate, or $1 at or below replacement (or with no projection)."""
+        from .ranking import projected_fpts
+
+        kept = {p.player_id for p in self.draft.picks if p.is_keeper}
+        kept |= {r.player_id for r in self.keeper_history.records if r.season == self.league.roster_season}
+        fpg = {pid: projected_fpts(rec, self.valuations.get(pid), self.league.scoring)
+               for pid, rec in self.players.items() if pid not in kept}
+        board = sorted((f for f in fpg.values() if f is not None), reverse=True)
+        if len(board) < replacement_rank:
+            return {}
+        repl = board[replacement_rank - 1]
+        var_total = sum(f - repl for f in board[:replacement_rank])
+        rate = total_dollars / var_total if var_total > 0 else 0.0
+        return {pid: max(1, round((f - repl) * rate)) if f is not None and f > repl else 1 for pid, f in fpg.items()}
 
     def spending_guide(self, manager_id: str | None = None, player_id: int | None = None, call_ids=()) -> SpendingGuide:
         manager_id = manager_id or self.user_manager_id()
