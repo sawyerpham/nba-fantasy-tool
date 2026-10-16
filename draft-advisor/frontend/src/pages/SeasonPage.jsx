@@ -135,7 +135,7 @@ export default function SeasonPage({ leagueId }) {
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
       <aside className="season-side">
-        <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} />
+        <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
       </aside>
     </div>
   );
