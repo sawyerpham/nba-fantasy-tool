@@ -44,6 +44,11 @@ export default function SeasonPage({ leagueId }) {
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", back); };
   }, [load, tick]);
   useEffect(() => { try { localStorage.setItem("da.season.view", view); } catch { /* ignore */ } }, [view]);
+  const [syncing, setSyncing] = useState(false);
+  const sync = () => {
+    setSyncing(true);
+    api.post(`/leagues/${leagueId}/season/sync`, {}).then(load).catch((e) => setError(e.message)).finally(() => setSyncing(false));
+  };
 
   // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
   // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
@@ -105,7 +110,9 @@ export default function SeasonPage({ leagueId }) {
           <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
             data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
             {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
-          <button className="small ghost" onClick={load} title="refresh now">↻</button>
+          <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
+            data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
+            {syncing ? "Syncing…" : "⟳ Sync"}</button>
           {error && <span className="small warn-text">{error}</span>}
         </div>
   );
@@ -173,28 +180,18 @@ function GameChips({ games, today, lockDate, day }) {   // day: the lineup day s
 const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
   "his locked game, else the better of locking his last game now and waiting for the rest (more games = more chances at a big one).";
 
-// The call for the chosen day: LOCKED / LOCK / PASS when a game is locked or lockable, else the lineup move:
-// "→ PG" (start him at PG), "→ BN" (sit him), IN (stays in), SIT (stays on the bench).
-function dayCall(r, move, seated, data) {
-  const g = (data.players[r.sid]?.games || []).find((x) => x.date === data.day);
-  const when = move?.by ? ` before ${ctTime(move.by)} CT` : "";
+// The lineup itself is the advice (your side shows the best lineup); the only call left is locking.
+function lockCall(r) {
   if (r.lock_status === "locked") return ["info", "LOCKED", `Locked ${r.lock_date}: this slot's score is set.`];
   if (r.action === "LOCK") return ["good", "LOCK", r.why];
-  const pass = r.action === "PASS" ? `PASS on his last game (${r.why}). ` : "";
-  if (move) {
-    return move.to === "BN"
-      ? ["bad", "→ BN", `${pass}Sit him ${dayName(data.day)}${g ? "" : " (no game)"}: his slot goes to someone who plays${when}.`]
-      : ["good", `→ ${move.to}`, `${pass}Start him at ${move.to} ${dayName(data.day)}${when}${g ? `: ${g.home ? "vs" : "@"} ${g.opp} ${ctTime(g.tip)} CT` : ""}.`];
-  }
   if (r.action === "PASS") return ["even", "PASS", r.why];
-  if (seated) return ["", "IN", g ? `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.` : `No game ${dayName(data.day)}: he holds his slot (nobody who plays that day needs it).`];
-  return ["", "SIT", g ? `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.` : `No game ${dayName(data.day)}: stays on the bench.`];
+  return ["", "", ""];
 }
 
-function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
+function PlayerCard({ data, r, open, setLock, mine, side }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
-  const [cls, word, tip] = mine ? dayCall(r, move, seated, data) : ["", "", ""];
+  const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
   const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
   const starter = r.slot !== "BN" && r.slot !== "IR";
   return (
@@ -204,14 +201,14 @@ function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
           <div className="mu-name">{r.name}{r.injury !== "healthy" && <span className="inj" data-tip={p.injury_note}> {r.injury === "day_to_day" ? "GTD" : "OUT"}</span>}</div>
-          <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} />{r.seat && r.seat !== r.slot && <span data-tip={`The week plan seats him at ${r.seat}.`}> · plan: {r.seat}</span>}</div>
+          <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
         <GameChips games={p.games} today={data.today} day={mine ? data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
         <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
         {mine && (
           <span className="mu-call">
-            <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>
+            {word && <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>}
             {r.win_lock != null && (word === "LOCK" || word === "PASS") && (
               <span className="small muted win-pair" data-tip={r.why}>lock {Math.round(r.win_lock * 100)}% · wait {Math.round(r.win_wait * 100)}%</span>
             )}
@@ -246,8 +243,10 @@ const WIN_TIP = "Chance to win the week: your counted/locked points + what your 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
 function WeekView({ data, plan, open, setLock, leagueId }) {
-  const moves = Object.fromEntries((plan.today?.moves || []).map((m) => [m.sid, m]));
-  const seated = new Set(Object.values(plan.today?.seats || {}).flat());
+  // Your side shows the best lineup: everyone in the slot he should be in (from plan.today), not his Sleeper slot.
+  const best = {};
+  for (const [slot, sids] of Object.entries(plan.today?.seats || {})) for (const sid of sids) best[sid] = slot;
+  const bestRows = plan.today ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -268,13 +267,13 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
   if (!shown) return <div className="panel matchup"><div className="mu-head">{nav}<div className="muted">Loading matchup {idx + 1} of {n}…</div></div></div>;
   const o = shown.opponent;
-  const L = bySlot(shown.players, data.roster_positions, data.reserve_slots);
+  const L = bySlot(isMine ? bestRows : shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" move={isMine ? moves[l?.r?.sid] : null} seated={isMine && seated.has(l?.r?.sid)} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
@@ -294,8 +293,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
           {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
           {isMine && data.day && (
-            <span className="lineup-day" data-tip="The calls are for this day: start whoever plays, earliest tip first. Updates on its own (every minute and when you open the page); after the day's last game it moves to the next game day.">
-              Lineup: <strong>{data.day === data.today ? "today" : dayName(data.day)}</strong>{data.now && <span className="muted"> · {ctTime(data.now)} CT</span>}
+            <span className="lineup-day" data-tip="Your side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Updates on its own (every minute and when you open the page); after the day's last game it moves to the next game day.">
+              Best lineup: <strong>{data.day === data.today ? "today" : dayName(data.day)}</strong>{data.now && <span className="muted"> · {ctTime(data.now)} CT</span>}
             </span>
           )}
         </div>
