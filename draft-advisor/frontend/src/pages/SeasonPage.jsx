@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, qs } from "../api.js";
 import Headshot from "../components/Headshot.jsx";
 import { PosList, PosTag } from "../components/Pos.jsx";
@@ -32,6 +33,8 @@ export default function SeasonPage({ leagueId }) {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [tick, setTick] = useState(0);
+  const [headerSlot, setHeaderSlot] = useState(null);
+  useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
 
   const load = useCallback(() => {
     if (!leagueId) return;
@@ -81,11 +84,10 @@ export default function SeasonPage({ leagueId }) {
   const setLock = (sid, gameDate) => api.post(`/leagues/${leagueId}/season/locks`, { week: data.week, sleeper_id: sid, game_date: gameDate })
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
-  return (
-    <div className="season-grid">
-      <section className="season-main">
-        <div className="panel row season-bar">
-          <h2 style={{ margin: 0 }}>Week {data.week}</h2>
+  // The week bar lives in the app header (top bar) while this tab is open.
+  const bar = (
+        <div className="season-bar">
+          <strong className="season-week">Week {data.week}</strong>
           <span className="muted small">{data.dates.length ? `${dayName(data.dates[0])} ${data.dates[0].slice(5)} – ${dayName(data.dates.at(-1))} ${data.dates.at(-1).slice(5)}` : ""}</span>
           <button className="small ghost" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)}>◂</button>
           <button className="small ghost" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)}>▸</button>
@@ -100,6 +102,11 @@ export default function SeasonPage({ leagueId }) {
           <button className="small ghost" onClick={load} title="refresh now">↻</button>
           {error && <span className="small warn-text">{error}</span>}
         </div>
+  );
+  return (
+    <div className="season-grid">
+      <section className="season-main">
+        {headerSlot ? createPortal(bar, headerSlot) : bar}
         {alerts.map((a) => (
           <div key={a.key} className={`panel roster-alert ${a.kind === "gtd" || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
             <strong>⏰ {a.title}</strong> {a.text}

@@ -667,3 +667,10 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .mu-arrow.left { left: 10px; } .mu-arrow.right { right: 10px; }
 .matchup .mu-head { padding: 0 52px; }
 .mu-mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* page bars docked in the app header (Season tab's week bar) */
+.header-slot { flex: 1; min-width: 0; display: flex; align-items: center; margin: 0 16px; }
+.header-slot:empty { display: none; }
+.header-slot .season-bar { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; flex-wrap: nowrap; }
+.season-week { font-size: 18px; white-space: nowrap; }
+.header-slot .season-bar > .muted { white-space: nowrap; }

@@ -57,6 +57,7 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         <span className="meta">
           <span data-testid="health">
             {health && <span className={`dot ${health.ok ? "" : "down"}`} />}
