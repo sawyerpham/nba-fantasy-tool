@@ -163,3 +163,42 @@ def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_chec
     assert t.seats == {"SG": ["six10"]}                       # 6:00 and 6:10 are one group: the bigger projection starts
     swap = [w for w in t.watch if w["kind"] == "swap"]
     assert [w["backup"] for w in swap] == ["seven"]           # the 7:00 player is watched; the 6:00 one isn't (too close)
+
+
+def test_lock_or_wait_by_the_chance_to_win_your_scenario():
+    from app.engine.weekplan import decide_by_win_chance
+
+    # everyone else locked at 100; the great player's unlocked game is 15; his last game is projected 20
+    def team():
+        done = pp("done", ["PG"], "PG", [], locked=100.0)
+        star = pp("star", ["SG"], "SG", [Game("2026-10-24", 18, fp=15.0, started=True), Game("2026-10-25", 20)])
+        plan_week([done, star], SLOTS)
+        return done, star
+    done, star = team()
+    decide_by_win_chance([done, star], (113.0, 0.0))      # they finish at 113 for sure: locking 15 (115) wins
+    assert star.action == "LOCK" and star.win_lock == 1.0 and star.win_wait < 1.0
+    done, star = team()
+    decide_by_win_chance([done, star], (120.0, 0.0))      # they finish at 120: 115 can't win, the 20-proj game can
+    assert star.action == "PASS" and star.win_lock == 0.0 and star.win_wait > 0.2
+    done, star = team()
+    decide_by_win_chance([done, star], (113.0, 64.0))     # their total is uncertain (±8): both chances in between
+    assert 0 < star.win_lock < 1 and 0 < star.win_wait < 1 and "to win" in star.why
+
+
+def test_late_scratch_alarms_now_and_close_projections_go_to_the_earlier_tip():
+    from app.engine.weekplan import plan_today
+
+    today = "2026-10-21"
+    scratched = pp("scr", ["SG"], "SG", [Game(today, 15, tip="2026-10-22T00:00Z")], injury="out_short_term")
+    sub = pp("sub", ["SG"], "BN", [Game(today, 9, tip="2026-10-22T01:00Z")])
+    players = [scratched, sub]
+    plan_week(players, {"SG": 1})
+    t = plan_today(players, {"SG": 1}, today)
+    out = next(w for w in t.watch if w["kind"] == "out")
+    assert out["name"] == "scr" and out["backup"] == "sub" and out["alarm"] == "now"
+    assert t.seats == {"SG": ["sub"]}                                 # an OUT player never gets the slot
+
+    a = pp("a", ["SG"], "BN", [Game(today, 12.0, tip="2026-10-21T23:00Z")])
+    b = pp("b", ["SG"], "BN", [Game(today, 12.8, tip="2026-10-21T23:10Z")])   # 10 min later, only 0.8 more
+    plan_week([a, b], {"SG": 1})
+    assert plan_today([a, b], {"SG": 1}, today).seats == {"SG": ["a"]}   # near tie: the earlier tip

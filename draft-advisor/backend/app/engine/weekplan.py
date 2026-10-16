@@ -71,6 +71,8 @@ class PlanPlayer:
     seat: str | None = None
     action: str = ""            # LOCKED / LOCK / PASS / BENCH (not seated) / DONE
     why: str = ""
+    win_lock: float | None = None   # chance to win the week if he locks now / if he waits (decide_by_win_chance)
+    win_wait: float | None = None
 
 
 @dataclass
@@ -220,9 +222,19 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     # Earliest tip first: start the 6:00 player over the 6:45 one. If the early game goes badly you swap the later
     # player in before his tip (see today_watch); starting the later one first gives that chance away.
     # Tips CLOSE_TIPS_MIN or less apart are one group: no time to judge the first game, so the bigger projection starts.
-    plays = [p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started]
-    tier2 = sorted(plays, key=lambda p: (_tip_group(_today(p, today).tip, [_today(q, today).tip for q in plays]),
-                                         -(_today(p, today).proj or 0)))
+    plays = [p for p in free if p not in tier1 and _today(p, today) and not _today(p, today).started and p.injury not in OUT]
+    tips = [_today(q, today).tip for q in plays]
+
+    def first(a: PlanPlayer, b: PlanPlayer) -> int:   # -1: a starts ahead of b
+        ga, gb = _tip_group(_today(a, today).tip, tips), _tip_group(_today(b, today).tip, tips)
+        if ga != gb:
+            return -1 if ga < gb else 1
+        pa, pb = _today(a, today).proj or 0, _today(b, today).proj or 0
+        if abs(pa - pb) <= CLOSE_PROJ:   # a near tie: the earlier tip (a little more to go on)
+            return -1 if _minutes(_today(a, today).tip) < _minutes(_today(b, today).tip) else 1
+        return -1 if pa > pb else 1
+    from functools import cmp_to_key
+    tier2 = sorted(plays, key=cmp_to_key(first))
     # No game today: current starters keep their slots unless someone who plays needs one; bench players stay put.
     tier3 = sorted((p for p in free if p not in tier1 and p not in tier2 and p.slot in slot_counts), key=lambda p: -p.value)
     plan_seat = {id(p): p.seat for p in players}
@@ -247,6 +259,8 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
 
 GAME_SECONDS, QUARTER_SECONDS, PRIOR_MINUTES = 48 * 60, 12 * 60, 10.0
 CLOSE_TIPS_MIN = 15  # tips this close count as the same time (bigger projection starts; no swap check between them)
+CLOSE_PROJ = 1.0     # ...unless the projections are this close: then the earlier tip
+OUT = ("out_short_term", "out_long_term", "out_season")
 
 
 def _minutes(iso: str | None) -> float:
@@ -321,6 +335,15 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
     starters = [p for p in players if seat.get(id(p)) and p.locked is None and _today(p, today)]
     bench = [p for p in players if not seat.get(id(p)) and p.slot != "IR" and p.locked is None
              and _today(p, today) and not _today(p, today).started]
+    for p in players:   # in the lineup now, plays today, ruled OUT before tip: start someone else right away
+        g = _today(p, today)
+        if p.slot not in ("BN", "IR") and p.injury in OUT and g and not g.started:
+            # who today's lineup moves into his spot (a bench player who plays tonight), else the best one who fits
+            fits = [b for b in players if b is not p and b.slot in ("BN",) and seat.get(id(b)) and _today(b, today)]                 or [b for b in bench if p.slot in roster.candidate_slots(b.eligibility)]
+            backup = max(fits, key=lambda b: _today(b, today).proj or 0, default=None)
+            lines.append({"kind": "out", "sid": p.sid, "name": p.name, "slot": p.slot, "by": g.tip, "alarm": "now",
+                          "backup": backup.name if backup else None,
+                          "text": f"{p.name} is OUT tonight: bench him" + (f" and start {backup.name} at {p.slot} now." if backup else " (nobody on the bench who plays tonight fits).")})
     for s in starters:
         gs, slot = _today(s, today), seat[id(s)]
         fits = [b for b in bench if slot in roster.candidate_slots(b.eligibility)]
@@ -361,3 +384,66 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
                       "by": tip, "alarm": _minus_minutes(tip, ALARM_LEAD_MIN), "text": text, **call, "decision": decision,
                       "options": [{"name": o[0].name, "slot": o[1], **o[2]} for o in opts]})
     return lines
+
+
+# ---- win chance -----------------------------------------------------------------------------------------
+# The decision rule for locks, passes and swaps: the choice with the higher chance to win the week, not the higher
+# expected points. Each team's final = its counted/locked points (certain) + every other slot's value, which is
+# uncertain while it still waits on games (spread = value × the player's swing × SPREAD). Chance to win =
+# Φ((my total − their total) / √(my spread² + their spread²)). Example: everyone else locked, you need 13 more:
+# locking 15 wins unless they beat their estimate by 2; waiting on a 20-proj game wins unless it lands under 13,
+# and the site shows both chances side by side.
+SPREAD = 0.8   # ponytail: a slot's spread ≈ one game's swing, shrunk a bit for the option of locking the best game
+
+
+def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
+    """(expected FP, variance) a seated player adds to his team's final: certain once locked (or locking now)."""
+    if p.locked is not None:
+        return p.locked, 0.0
+    if lock and p.x is not None:
+        return p.x, 0.0
+    return p.w, (p.w * p.swing * SPREAD) ** 2
+
+
+def team_total(players: list[PlanPlayer], skip: PlanPlayer | None = None) -> tuple[float, float]:
+    mean = var = 0.0
+    for p in players:
+        if p.seat is None or p is skip:
+            continue
+        m, v = slot_spread(p, lock=p.action == "LOCK")
+        mean, var = mean + m, var + v
+    return mean, var
+
+
+def win_chance(mine: tuple[float, float], theirs: tuple[float, float]) -> float:
+    sd = math.sqrt(mine[1] + theirs[1])
+    if sd == 0:
+        return 1.0 if mine[0] > theirs[0] else 0.5 if mine[0] == theirs[0] else 0.0
+    return _cdf((mine[0] - theirs[0]) / sd)
+
+
+def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float]) -> float:
+    """Re-decide every lockable seated player (LOCK vs PASS) by the chance to win, and return the team's chance."""
+    for p in players:
+        if p.seat is None or p.locked is not None or p.x is None:
+            continue
+        mean, var = team_total(players, skip=p)
+        p.win_lock = win_chance((mean + p.x, var), theirs)
+        p.win_wait = win_chance((mean + p.w, var + (p.w * p.swing * SPREAD) ** 2), theirs) if p.w > 0 else 0.0
+        p.action = "LOCK" if p.win_lock >= p.win_wait else "PASS"
+        p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · wait (~{p.w:.1f} from his later games): {p.win_wait:.0%}"
+                 + (f" · lock in the {p.seat} slot" if p.action == "LOCK" else ""))
+    return win_chance(team_total(players), theirs)
+
+
+def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, backup_swing: float,
+                    theirs: tuple[float, float]) -> tuple[float, float] | None:
+    """(win chance keeping the starter, win chance swapping the later player in) for one watch line."""
+    s = next((p for p in players if p.sid == starter_sid), None)
+    if s is None or call.get("keep") is None:
+        return None
+    mean, var = team_total(players, skip=s)
+    keep_var = 0.0 if call["est"] is not None and call["keep"] == call["est"] else (call["keep"] * s.swing * SPREAD) ** 2
+    keep = win_chance((mean + call["keep"], var + keep_var), theirs)
+    swap = win_chance((mean + call["swap"], var + (call["swap"] * backup_swing * SPREAD) ** 2), theirs)
+    return keep, swap

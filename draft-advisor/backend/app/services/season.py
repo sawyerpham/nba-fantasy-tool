@@ -260,14 +260,13 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
     return out, locks, side
 
 
-AHEAD, BEHIND = 0.85, 1.2   # swing multipliers when well ahead / behind (more weight on sure / big games)
-MARGIN = 0.08               # "well" = the expected totals differ by more than 8 %
+LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
 
 
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
-    opponent's outlook, the ahead/behind adjustment and today's lineup."""
-    from ..engine.weekplan import plan_today, plan_week
+    opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
+    from ..engine.weekplan import _minus_minutes, decide_by_win_chance, plan_today, plan_week, swap_win_chance, team_total
 
     team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
     if team is None:
@@ -279,19 +278,14 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     opp = None
     pair = next((pr for pr in view["matchups"] if any(m["roster_id"] == team["roster_id"] for m in pr)), [])
     other = next((m for m in pair if m["roster_id"] != team["roster_id"]), None)
-    mode = "even"
+    mode, chance, theirs = "even", None, None
     if other:
         oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
         oplayers, olocks, _ = _plan_players(session, view, oteam, {})
         oplan = plan_week(oplayers, counts)
-        if plan.expected < oplan.expected * (1 - MARGIN):
-            mode = "behind"
-        elif plan.expected > oplan.expected * (1 + MARGIN):
-            mode = "ahead"
-        if mode != "even":
-            for q in players:
-                q.swing *= BEHIND if mode == "behind" else AHEAD
-            plan = plan_week(players, counts)
+        theirs = team_total(oplayers)
+        chance = decide_by_win_chance(players, theirs)   # LOCK / PASS by the chance to win, not expected points
+        mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "expected": oplan.expected,
                "points": other.get("points") or 0, "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
@@ -299,6 +293,24 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
 
     today = view["today"]
     t = plan_today(players, counts, today) if today in view["dates"] else None
+    if t and theirs:   # KEEP / SWAP by the chance to win as well
+        swings = {q.name: q.swing for q in players}
+        for w in t.watch:
+            if w["kind"] == "swap" and w["decision"] in ("KEEP", "SWAP"):
+                both = swap_win_chance(players, w["sid"], w, swings.get(w["backup"], 0.3), theirs)
+                if both:
+                    w["win_keep"], w["win_swap"] = round(both[0], 3), round(both[1], 3)
+                    w["decision"] = "SWAP" if both[1] > both[0] else "KEEP"
+                    w["text"] += f" Win chance: keep {both[0]:.0%} · swap {both[1]:.0%}."
+    # LOCK calls not locked yet: remind before his next tip, when the window closes
+    reminders = []
+    for q in players:
+        if q.action == "LOCK" and q.locked is None:
+            nxt = next((g for g in q.games if not g.started), None)
+            if nxt and nxt.tip:
+                reminders.append({"kind": "lock", "sid": q.sid, "name": q.name, "slot": q.seat, "by": nxt.tip,
+                                  "alarm": _minus_minutes(nxt.tip, LOCK_REMINDER_MIN), "decision": "LOCK",
+                                  "text": f"Lock {q.name} ({q.x:.1f}) in the {q.seat} slot before his next tip: {q.why}."})
     out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)
     active = [q for q in players if q.slot != "IR"]
     healthy_ir = [q.name for q in players if q.slot == "IR" and q.injury not in out_now]
@@ -308,10 +320,11 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     "illegal": healthy_ir if len(active) + len(healthy_ir) > len(view["roster_positions"]) else [],
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
     return {"roster_id": team["roster_id"], "name": team["name"], "expected": plan.expected, "slots": counts,
-            "points": side.get("points") or 0, "mode": mode,
+            "points": side.get("points") or 0, "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
-            "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": t.watch} if t else None,
+            "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": reminders + t.watch} if t else
+                     ({"date": today, "seats": {}, "moves": [], "watch": reminders} if reminders else None),
             "roster": roster_state,
             "opponent": opp}
 
@@ -320,7 +333,9 @@ def _player_out(q, locks: dict) -> dict:
     status, when = locks.get(q.sid, ("no", None))
     return {"sid": q.sid, "name": q.name, "pos": q.eligibility, "slot": q.slot, "seat": q.seat, "x": q.x,
             "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2), "locked": q.locked,
-            "lock_status": status, "lock_date": when, "action": q.action, "why": q.why, "injury": q.injury}
+            "lock_status": status, "lock_date": when, "action": q.action, "why": q.why, "injury": q.injury,
+            "win_lock": round(q.win_lock, 3) if q.win_lock is not None else None,
+            "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None}
 
 
 # ---- one player's season page --------------------------------------------------------------------------
