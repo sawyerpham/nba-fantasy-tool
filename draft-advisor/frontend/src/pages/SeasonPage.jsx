@@ -330,7 +330,14 @@ function TeamColumn({ data, team, open }) {
 
 // News: your players' fantasy notes (collapsible, always starts open) and NBA-wide headlines under it.
 // Reloads on Sync (refreshKey); the backend caches both for 15 minutes otherwise.
-const newsTime = (iso) => (iso ? new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", minute: "2-digit" }) + " CT" : "");
+// "2d 5h ago · 10/14/26" (under an hour: "35m ago")
+const newsTime = (iso) => {
+  if (!iso) return "";
+  const t = new Date(iso), mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
+  const ago = mins < 60 ? `${mins}m` : d ? `${d}d ${h}h` : `${h}h`;
+  return `${ago} ago · ${t.toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "2-digit", day: "2-digit", year: "2-digit" })}`;
+};
 
 function NewsView({ data, leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
