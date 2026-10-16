@@ -3,6 +3,7 @@ import { api, qs } from "../api.js";
 import Headshot from "../components/Headshot.jsx";
 import { PosList, PosTag } from "../components/Pos.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
+import PlayerSearch from "../components/PlayerSearch.jsx";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
@@ -61,18 +62,39 @@ export default function SeasonPage({ leagueId }) {
           <nav className="season-tabs">
             {VIEWS.map(([id, label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)} data-testid={`season-${id}`}>{label}</button>)}
           </nav>
+          <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
           <button className="small ghost" onClick={load} title="refresh now">↻</button>
           {error && <span className="small warn-text">{error}</span>}
         </div>
+        <RosterAlerts roster={plan.roster} />
         {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} />}
         {view === "today" && <TodayView data={data} plan={plan} open={open} />}
-        {view === "league" && <LeagueView data={data} />}
+        {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
       <aside className="season-side">
         <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} />
       </aside>
     </div>
+  );
+}
+
+function RosterAlerts({ roster }) {
+  if (!roster) return null;
+  return (
+    <>
+      {roster.illegal.length > 0 && (
+        <div className="panel roster-alert bad" data-testid="roster-illegal">
+          <strong>Roster illegal:</strong> {roster.illegal.join(", ")} {roster.illegal.length > 1 ? "are" : "is"} healthy on IR, which makes 16 healthy players.
+          Sleeper won't let you change your lineup or lock games until you drop someone or trade.
+        </div>
+      )}
+      {roster.ir_candidates.length > 0 && (
+        <div className="panel roster-alert even" data-testid="roster-ir">
+          <strong>IR spot open ({roster.ir_open}):</strong> move {roster.ir_candidates.join(", ")} to IR. That opens a roster spot for a waiver claim (see Waivers).
+        </div>
+      )}
+    </>
   );
 }
 
@@ -221,8 +243,10 @@ function TodayView({ data, plan, open }) {
   );
 }
 
-function LeagueView({ data }) {
+function LeagueView({ data, leagueId, open }) {
   const team = Object.fromEntries(data.teams.map((t) => [t.roster_id, t]));
+  const [shown, setShown] = useState(null);   // another team's week plan (roster + games), from the plan endpoint
+  const show = (rid) => api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setShown).catch(() => setShown(null));
   const standings = [...data.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
   return (
     <>
@@ -234,7 +258,8 @@ function LeagueView({ data }) {
               {pair.map((m) => {
                 const t = team[m.roster_id] || {}, other = pair.find((x) => x !== m);
                 return (
-                  <div key={m.roster_id} className={`lm-row ${t.is_user ? "me" : ""} ${other && (m.points || 0) > (other.points || 0) ? "lead" : ""}`}>
+                  <div key={m.roster_id} className={`lm-row clickable ${t.is_user ? "me" : ""} ${other && (m.points || 0) > (other.points || 0) ? "lead" : ""}`}
+                    onClick={() => show(m.roster_id)} data-tip="Show this team's roster and games">
                     <span>{t.name}</span><strong>{fp(m.points || 0)}</strong>
                   </div>
                 );
@@ -243,12 +268,19 @@ function LeagueView({ data }) {
           ))}
         </div>
       </div>
+      {shown && (
+        <div className="panel" data-testid="team-roster">
+          <h3 style={{ marginTop: 0 }}>{shown.name} <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
+            <button className="small ghost" style={{ marginLeft: 8 }} onClick={() => setShown(null)}>close</button></h3>
+          <PlanTable data={data} rows={shown.players} open={open} />
+        </div>
+      )}
       <div className="panel">
         <h3 style={{ marginTop: 0 }}>Standings</h3>
         <table className="small" data-testid="standings">
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
-            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td>{t.name}</td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
+            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}>{t.name}</td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
               <td className="num">{fp(t.fpts)}</td><td className="num">${200 - (t.faab_used || 0)}</td></tr>))}</tbody>
         </table>
       </div>
