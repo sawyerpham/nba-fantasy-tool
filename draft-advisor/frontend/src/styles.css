@@ -30,7 +30,10 @@ body {
   margin: 0; color: var(--text); background: var(--bg);
   font: 16px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "tnum" 1, "cv11" 1; -webkit-font-smoothing: antialiased;
+  cursor: default;   /* arrow over plain text, not the I-beam; typing fields keep theirs below */
 }
+input, textarea, select, [contenteditable] { cursor: text; }
+select, input[type="checkbox"], input[type="radio"], .clickable { cursor: pointer; }
 ::selection { background: var(--primary-soft); }
 
 /* ---------- top bar ---------- */
@@ -75,7 +78,6 @@ th {
 tbody tr:last-child td { border-bottom: 0; }
 tr.selected td { background: var(--selected); }
 tr.unrosterable td { color: var(--muted); }
-tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--hover); }
 tr.selected.clickable:hover td { background: var(--selected); }
 table.small { font-size: 14px; }
@@ -495,6 +497,7 @@ th.sorted { color: var(--primary); }
 /* vocabulary: dotted underline on defined terms, one fixed tooltip for every [data-tip] */
 .term { text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-underline-offset: 3px; cursor: help; }
 [data-tip] { cursor: help; }
+button:not(:disabled)[data-tip], .clickable[data-tip] { cursor: pointer; }
 .tip { position: fixed; z-index: 100; transform: translateX(-50%); max-width: 320px; width: max-content; padding: 8px 11px; border-radius: 10px;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 13px; font-weight: 500;
   line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: normal; text-align: left; pointer-events: none; }
