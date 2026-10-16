@@ -9,7 +9,7 @@ import InjuryTag from "./InjuryTag.jsx";
 
 // season: the in-season profile (Season tab): no draft parts (Fit, Worth, bid guide, keeper outlook, tier); adds the
 // fantasy owner, this week's games, the game log, news, overall + position rank and the depth-chart grid.
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -62,7 +62,8 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   };
 
   return (
-    <div className="panel scroll" data-testid="player-sidebar">
+    <div className="panel scroll" data-testid="player-sidebar" style={{ position: "relative" }}>
+      {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.team_abbr || "FA"}</span>
