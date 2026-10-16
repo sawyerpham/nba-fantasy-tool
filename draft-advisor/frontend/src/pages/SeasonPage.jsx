@@ -148,14 +148,14 @@ function RosterAlerts({ roster }) {
 }
 
 // One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
-function GameChips({ games, today, lockDate }) {
+function GameChips({ games, today, lockDate, day }) {   // day: the lineup day shown (its chip lights up, the rest dim)
   if (!games.length) return <span className="muted small">no games</span>;
   return (
     <span className="chips-row">
       {games.map((g) => {
         const played = g.fp != null, live = g.state === "in";
         return (
-          <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""}`}
+          <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""}`}
             data-tip={`${dayName(g.date)} ${g.date.slice(5)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${ctTime(g.tip)} CT · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : ctTime(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
@@ -183,8 +183,9 @@ function dayCall(r, move, seated, data) {
       : ["good", `→ ${move.to}`, `${pass}Start him at ${move.to} ${dayName(data.day)}${when}${g ? `: ${g.home ? "vs" : "@"} ${g.opp} ${ctTime(g.tip)} CT` : ""}.`];
   }
   if (r.action === "PASS") return ["even", "PASS", r.why];
-  if (seated) return ["", "IN", g ? `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.` : `No game ${dayName(data.day)}: nobody who plays needs his slot, so he stays in.`];
-  return ["", "SIT", g ? `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.` : `No game ${dayName(data.day)}.`];
+  if (!g) return ["off", "NO GAME", `No game ${dayName(data.day)}${seated ? ": he holds his slot (nobody who plays that day needs it)" : ""}.`];
+  if (seated) return ["", "IN", `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.`];
+  return ["", "SIT", `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.`];
 }
 
 function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
@@ -203,7 +204,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} />{r.seat && r.seat !== r.slot && <span data-tip={`The week plan seats him at ${r.seat}.`}> · plan: {r.seat}</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} today={data.today} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
+        <GameChips games={p.games} today={data.today} day={mine ? data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
         <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
         {mine && (
           <span className="mu-call">
@@ -290,7 +291,8 @@ function WeekView({ data, plan, open, setLock, leagueId, setDay }) {
           {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
           {isMine && (
-            <span className="day-pick" data-tip="Whose lineup the call column shows: that day's moves (start whoever plays, earliest tip first).">
+            <span className="day-pick" data-tip="Which day's lineup the calls show: start whoever plays that day, earliest tip first.">
+              <span className="small muted">Lineup for</span>
               {data.dates.map((d) => (
                 <button key={d} className={`tiny ${d === data.day ? "active" : ""} ${d === data.today ? "is-today" : ""}`} onClick={() => setDay(d)} data-testid={`day-${d}`}>
                   {dayName(d)}
