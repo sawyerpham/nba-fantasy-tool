@@ -187,9 +187,8 @@ function dayCall(r, move, seated, data) {
       : ["good", `→ ${move.to}`, `${pass}Start him at ${move.to} ${dayName(data.day)}${when}${g ? `: ${g.home ? "vs" : "@"} ${g.opp} ${ctTime(g.tip)} CT` : ""}.`];
   }
   if (r.action === "PASS") return ["even", "PASS", r.why];
-  if (!g) return ["off", "NO GAME", `No game ${dayName(data.day)}${seated ? ": he holds his slot (nobody who plays that day needs it)" : ""}.`];
-  if (seated) return ["", "IN", `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.`];
-  return ["", "SIT", `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.`];
+  if (seated) return ["", "IN", g ? `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.` : `No game ${dayName(data.day)}: he holds his slot (nobody who plays that day needs it).`];
+  return ["", "SIT", g ? `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.` : `No game ${dayName(data.day)}: stays on the bench.`];
 }
 
 function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
