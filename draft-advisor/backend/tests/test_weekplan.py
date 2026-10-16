@@ -138,16 +138,18 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
         assert w["decision"] == want, (fp_now, w)
 
 
-def test_a_day_without_games_sets_the_week_plan_lineup():
+def test_a_day_without_games_seats_by_next_tip():
     from app.engine.weekplan import plan_today
 
-    a = pp("a", ["C"], "C", future(10))                       # no game on the 20th
-    b = pp("b", ["C"], "BN", [Game("2026-10-22", 14)])         # higher week value, also no game on the 20th
-    players = [a, b]
-    plan_week(players, {"C": 1})
+    a = pp("a", ["C"], "C", [Game("2026-10-21", 10, tip="2026-10-21T23:00:00Z")])   # no game on the 20th
+    b = pp("b", ["C"], "BN", [Game("2026-10-21", 14, tip="2026-10-21T23:30:00Z")])  # bigger, but tips later
+    plan_week([a, b], {"C": 1})
     assert b.seat == "C"                                       # the week plan prefers b ...
-    moves = {m["sid"]: m["to"] for m in plan_today(players, {"C": 1}, "2026-10-20").moves}
-    assert moves == {"b": "C", "a": "BN"}                      # ... so set it now, not on b's game day
+    assert plan_today([a, b], {"C": 1}, "2026-10-20").moves == []   # ... but a plays first: he keeps the slot
+
+    c = pp("c", ["C"], "BN", [Game("2026-10-21", 9, tip="2026-10-21T22:00:00Z")])   # on the bench, plays first
+    moves = {m["sid"]: m["to"] for m in plan_today([a, c], {"C": 1}, "2026-10-20").moves}
+    assert moves == {"c": "C", "a": "BN"}                      # set now, not on c's game day
 
 
 def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_check():
