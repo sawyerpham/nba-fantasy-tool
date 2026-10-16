@@ -102,8 +102,8 @@ export default function SeasonPage({ leagueId }) {
         <div className="season-bar">
           <strong className="season-week">Week {data.week}</strong>
           <span className="muted small">{data.dates.length ? `${dayName(data.dates[0])} ${data.dates[0].slice(5)} – ${dayName(data.dates.at(-1))} ${data.dates.at(-1).slice(5)}` : ""}</span>
-          <button className="small ghost" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)}>◂</button>
-          <button className="small ghost" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)}>▸</button>
+          <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
+          <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
           {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
           <nav className="season-tabs">
             {VIEWS.map(([id, label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)} data-testid={`season-${id}`}>{label}</button>)}
