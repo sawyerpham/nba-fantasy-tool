@@ -12,14 +12,6 @@ import { alarmSound } from "../components/sounds.js";
 // profile on the right. Data: backend services/season.py + engine/weekplan.py; refreshed every 2 minutes.
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 const VIEWS = [["week", "This week"], ["today", "Today"], ["league", "League"], ["waivers", "Waivers"]];
-const ACTION = {
-  LOCK: ["good", "Lock this game now (before his next tip-off)."],
-  PASS: ["even", "Don't lock: his remaining games are worth more."],
-  WAIT: ["", "No lockable game yet: his games are still to come."],
-  LOCKED: ["info", "Locked: this slot's score is set."],
-  BENCH: ["", "Not worth a starting slot this week."],
-  DONE: ["", "No games left this week."],
-};
 
 export const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
@@ -36,12 +28,16 @@ export default function SeasonPage({ leagueId }) {
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
 
+  const [pickedDay, setPickedDay] = useState(null);   // null = today on a game day, else the next game day
   const load = useCallback(() => {
     if (!leagueId) return;
-    Promise.all([api.get(`/leagues/${leagueId}/season/week` + qs({ week })), api.get(`/leagues/${leagueId}/season/plan` + qs({ week }))])
-      .then(([w, p]) => { setData(w); setPlan(p); setError(""); })
-      .catch((e) => setError(e.message));
-  }, [leagueId, week]);
+    api.get(`/leagues/${leagueId}/season/week` + qs({ week })).then((w) => {
+      const day = pickedDay && w.dates.includes(pickedDay) ? pickedDay
+        : w.dates.find((d) => d >= w.today) || w.dates[0];
+      return api.get(`/leagues/${leagueId}/season/plan` + qs({ week, today: day === w.today ? undefined : day }))
+        .then((p) => { setData({ ...w, day }); setPlan(p); setError(""); });
+    }).catch((e) => setError(e.message));
+  }, [leagueId, week, pickedDay]);
   useEffect(() => { load(); const t = setInterval(load, REFRESH_MS); return () => clearInterval(t); }, [load, tick]);
   useEffect(() => { try { localStorage.setItem("da.season.view", view); } catch { /* ignore */ } }, [view]);
 
@@ -114,7 +110,7 @@ export default function SeasonPage({ leagueId }) {
           </div>
         ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
+        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} setDay={setPickedDay} />}
         {view === "today" && <TodayView data={data} plan={plan} open={open} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -167,10 +163,28 @@ function GameChips({ games, today, lockDate }) {
 const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
   "his locked game, else the better of locking his last game now and waiting for the rest (more games = more chances at a big one).";
 
-function PlayerCard({ data, r, open, setLock, mine, side }) {
+// The call for the chosen day: LOCKED / LOCK / PASS when a game is locked or lockable, else the lineup move:
+// "→ PG" (start him at PG), "→ BN" (sit him), IN (stays in), SIT (stays on the bench).
+function dayCall(r, move, seated, data) {
+  const g = (data.players[r.sid]?.games || []).find((x) => x.date === data.day);
+  const when = move?.by ? ` before ${ctTime(move.by)} CT` : "";
+  if (r.lock_status === "locked") return ["info", "LOCKED", `Locked ${r.lock_date}: this slot's score is set.`];
+  if (r.action === "LOCK") return ["good", "LOCK", r.why];
+  const pass = r.action === "PASS" ? `PASS on his last game (${r.why}). ` : "";
+  if (move) {
+    return move.to === "BN"
+      ? ["bad", "→ BN", `${pass}Sit him ${dayName(data.day)}${g ? "" : " (no game)"}: his slot goes to someone who plays${when}.`]
+      : ["good", `→ ${move.to}`, `${pass}Start him at ${move.to} ${dayName(data.day)}${when}${g ? `: ${g.home ? "vs" : "@"} ${g.opp} ${ctTime(g.tip)} CT` : ""}.`];
+  }
+  if (r.action === "PASS") return ["even", "PASS", r.why];
+  if (seated) return ["", "IN", g ? `Plays ${dayName(data.day)} ${ctTime(g.tip)} CT: stays in.` : `No game ${dayName(data.day)}: nobody who plays needs his slot, so he stays in.`];
+  return ["", "SIT", g ? `Plays ${dayName(data.day)} but the slots he fits go to players who play earlier or project more.` : `No game ${dayName(data.day)}.`];
+}
+
+function PlayerCard({ data, r, open, setLock, mine, side, move, seated }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
-  const [cls, tip] = ACTION[r.action] || ["", ""];
+  const [cls, word, tip] = mine ? dayCall(r, move, seated, data) : ["", "", ""];
   const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
   const starter = r.slot !== "BN" && r.slot !== "IR";
   return (
@@ -187,7 +201,7 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
         <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
         {mine && (
           <span className="mu-call">
-            <span className={`verdict ${cls}`} data-tip={`${tip} ${r.why}`}>{r.action}</span>
+            <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>
             {starter && (r.lock_status === "locked"
               ? <span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span>
               : lastPlayed && <button className="tiny" onClick={() => setLock(r.sid, lastPlayed.date)}
@@ -216,7 +230,9 @@ const MODE = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: 
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
-function WeekView({ data, plan, open, setLock, leagueId }) {
+function WeekView({ data, plan, open, setLock, leagueId, setDay }) {
+  const moves = Object.fromEntries((plan.today?.moves || []).map((m) => [m.sid, m]));
+  const seated = new Set(Object.values(plan.today?.seats || {}).flat());
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -243,7 +259,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" move={isMine ? moves[l?.r?.sid] : null} seated={isMine && seated.has(l?.r?.sid)} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
@@ -261,6 +277,15 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
           <span className="small muted">{idx + 1}/{n}</span>
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
+          {isMine && (
+            <span className="day-pick" data-tip="Whose lineup the call column shows: that day's moves (start whoever plays, earliest tip first).">
+              {data.dates.map((d) => (
+                <button key={d} className={`tiny ${d === data.day ? "active" : ""} ${d === data.today ? "is-today" : ""}`} onClick={() => setDay(d)} data-testid={`day-${d}`}>
+                  {dayName(d)}
+                </button>
+              ))}
+            </span>
+          )}
         </div>
         <div className="mu-team right">
           {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
