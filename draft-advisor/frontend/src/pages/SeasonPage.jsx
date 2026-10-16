@@ -196,13 +196,15 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
   const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
   const starter = r.slot !== "BN" && r.slot !== "IR";
+  const misplaced = mine && r.sleeper_slot && r.sleeper_slot !== r.slot;   // Sleeper's lineup differs from the best one
   return (
-    <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
+    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${misplaced ? "misplaced" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
-          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
+          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} />
+            {misplaced && <span className="move-tag" data-tip={`Sleeper has him at ${r.sleeper_slot}: move him to ${r.slot}.`}>now {r.sleeper_slot}</span>}</div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
@@ -248,7 +250,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // Your side shows the best lineup: everyone in the slot he should be in (from plan.today), not his Sleeper slot.
   const best = {};
   for (const [slot, sids] of Object.entries(plan.today?.seats || {})) for (const sid of sids) best[sid] = slot;
-  const bestRows = plan.today ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
+  const bestRows = plan.today ? plan.players.map((r) => ({ ...r, sleeper_slot: r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);

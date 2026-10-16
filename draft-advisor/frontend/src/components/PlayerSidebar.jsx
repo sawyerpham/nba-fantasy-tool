@@ -275,6 +275,18 @@ function SeasonBlock({ sea, plan }) {
         <span className="muted">Owner:</span>{" "}
         {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
       </div>
+      {sea.acquired?.length > 0 && (
+        <div className="small" style={{ margin: "0 0 6px" }} data-testid="season-acquired">
+          {sea.acquired.map((a, i) => (
+            <div key={i}>
+              <span className="muted">{a.kind[0].toUpperCase() + a.kind.slice(1)}</span>{" "}
+              {a.kind !== "traded to" && "by "}<strong>{a.team || "?"}</strong>
+              {a.price != null && <> for <strong>${a.price}</strong></>}
+              {a.when && <span className="muted"> · {new Date(a.when).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "2-digit", day: "2-digit", year: "2-digit" })}</span>}
+            </div>
+          ))}
+        </div>
+      )}
       {mine && (
         <div className="small" style={{ marginBottom: 6 }} data-testid="season-call">
           <span className="verdict info">{mine.action}</span> <span className="muted">{mine.why}</span>

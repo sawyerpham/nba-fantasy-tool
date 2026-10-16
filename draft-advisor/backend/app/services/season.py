@@ -402,6 +402,35 @@ def season_news(view: dict, fetch: Fetch) -> dict:
     return {"mine": mine, "league": [n for n in every if not owner[n["sid"]]["is_user"]][:LEAGUE_NEWS]}
 
 
+def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:
+    """How he changed hands this season: the draft (auction price, keeper flag) from Sleeper's draft picks, then every
+    completed transaction in order: waiver claims (FAAB bid), free-agent pickups, trades (to whom) and drops."""
+    lid = session.league.sleeper_league_id
+    team = {t["roster_id"]: t["name"] for t in view["teams"]}
+    out = []
+    draft_id = (fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}).get("draft_id")
+    for pk in (fetch(f"{SLEEPER}/v1/draft/{draft_id}/picks", DAY_TTL) or []) if draft_id else []:
+        if pk.get("player_id") == sid:
+            amount = (pk.get("metadata") or {}).get("amount")
+            out.append({"kind": "keeper" if pk.get("is_keeper") else "drafted", "team": team.get(pk.get("roster_id")),
+                        "price": int(amount) if amount else None, "when": None})
+    moves = []
+    for w in range(1, view["week"] + 1):
+        moves += fetch(f"{SLEEPER}/v1/league/{lid}/transactions/{w}", LIVE_TTL if w == view["week"] else DAY_TTL) or []
+    for t in sorted(moves, key=lambda t: t.get("status_updated") or 0):
+        adds, drops = t.get("adds") or {}, t.get("drops") or {}
+        if t.get("status") != "complete" or sid not in adds and sid not in drops:
+            continue
+        if sid in adds:   # a trade both adds and drops him: "traded to" the team that got him
+            # ponytail: waiver_bid is Sleeper's documented field; no claim had run yet to confirm it (2026-10-16)
+            bid = (t.get("settings") or {}).get("waiver_bid") if t.get("type") == "waiver" else None
+            kind = {"waiver": "claimed", "free_agent": "picked up", "trade": "traded to"}.get(t.get("type"), "added")
+            out.append({"kind": kind, "team": team.get(adds[sid]), "price": bid, "when": t.get("status_updated")})
+        else:
+            out.append({"kind": "dropped", "team": team.get(drops[sid]), "price": None, "when": t.get("status_updated")})
+    return out
+
+
 def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:
     """Owner, this week's games, recent game log, ranks and news for any player (rostered or not)."""
     rec = session.players.get(player_id)
@@ -437,6 +466,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_tag": me.get("injury_tag"),
             "injury_note": me.get("injury_note", ""),
             "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
+            "acquired": acquisitions(session, fetch, view, sid),
             "news": espn_news(fetch, rec.full_name, rec.team_abbr)}
 
 
