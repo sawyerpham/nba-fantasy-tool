@@ -38,6 +38,14 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
     assert g1["fp"] == round(actual_fp(box, s.league.scoring), 2) and g1["fp"] > 20   # scored with the league formula
     assert g2["opp"] == "PHX" and g2["fp"] is None and g2["proj"] > 0 and g2["tip"] is None
 
+    from app.services import season
+    season.RETIRED.add("999")   # a retired player never has games, even with a team and a schedule
+    try:
+        p = week_view(s, fetch, today=date(2026, 10, 21))["players"]["999"]
+        assert p["retired"] and p["games"] == []
+    finally:
+        season.RETIRED.discard("999")
+
 
 def test_current_week_is_the_monday_to_sunday_span_holding_today():
     weeks = {1: ["2026-10-20", "2026-10-25"], 2: ["2026-10-26", "2026-11-01"]}
