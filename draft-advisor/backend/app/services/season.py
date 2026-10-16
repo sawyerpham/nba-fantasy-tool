@@ -122,6 +122,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         stats[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
 
     lid = lg.sleeper_league_id
+    positions = (fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}).get("roster_positions") or []
     rosters = fetch(f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL) or []
     users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
     matchups = fetch(f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL) or []
@@ -166,5 +167,38 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": ov.injury_status if ov else "healthy",
                         "injury_note": ov.injury_note if ov else "", "retired": retired, "games": games}
 
-    return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "teams": teams,
+    return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "roster_positions": positions,
+            "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
+
+
+def team_plan(session, view: dict, roster_id: int | None = None) -> dict:
+    """The week plan (engine/weekplan.py) for one team of a week_view: the user's team by default."""
+    from ..engine.weekplan import Game, PlanPlayer, plan_week, swing_of
+
+    team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
+    if team is None:
+        raise ValueError("no such team in this league")
+    positions = view["roster_positions"]
+    slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
+    counts: dict[str, int] = {}
+    for pos in positions:
+        if pos not in ("BN", "IR"):
+            counts[pos] = counts.get(pos, 0) + 1
+    players = []
+    for sid in team["players"]:
+        p = view["players"].get(sid)
+        if p is None:
+            continue
+        val = session.valuations.get(p["player_id"]) if p["player_id"] else None
+        games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None)
+                 for g in p["games"]]
+        players.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games,
+                                  slot="IR" if sid in team["reserve"] else slot_of.get(sid, "BN"),
+                                  swing=swing_of(val.per_game_fpts) if val else swing_of([]), injury=p["injury"]))
+    plan = plan_week(players, counts)
+    return {"roster_id": team["roster_id"], "name": team["name"], "expected": plan.expected, "slots": counts,
+            "players": [{"sid": q.sid, "name": q.name, "pos": q.eligibility, "slot": q.slot, "seat": q.seat,
+                         "x": q.x, "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2),
+                         "locked": q.locked, "action": q.action, "why": q.why}
+                        for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))]}
