@@ -68,6 +68,35 @@ def assign_slot(league: LeagueSettings, picks: Iterable[Pick], eligibility: Iter
     return None
 
 
+def make_room(league: LeagueSettings, picks: list[Pick], eligibility: Iterable[str], eligibility_of) -> tuple[str, list[tuple[Pick, str]]] | None:
+    """When nothing fits the new player: a chain of moves that frees a slot for him, e.g. an SG/SF in SG slides to the
+    open SF so a PG/SG can take SG; or a PF/C slides to the open C, a bench SF/PF moves up to that PF, and the
+    newcomer takes the bench spot. Returns (his slot, [(pick, its new slot), ...]) or None when no chain exists.
+    The newcomer tries the bench first, so nobody already rostered loses a starting spot to make room."""
+    opens = open_slots(league, picks)
+    seen: set[str] = set()
+
+    def path(slots: list[str]) -> list | None:   # [slot, occupant, slot, occupant, ..., open slot]
+        for slot in slots:
+            if slot == "IR" or slot in seen:
+                continue
+            seen.add(slot)
+            if opens.get(slot, 0) > 0:
+                return [slot]
+            for p in picks:
+                if p.slot == slot:
+                    tail = path(candidate_slots(eligibility_of(p.player_id)))
+                    if tail is not None:
+                        return [slot, p, *tail]
+        return None
+
+    own = candidate_slots(eligibility)
+    chain = path(sorted(own, key=lambda s: s != "BN"))
+    if chain is None:
+        return None
+    return chain[0], [(chain[i], chain[i + 1]) for i in range(1, len(chain), 2)]
+
+
 def is_rosterable(league: LeagueSettings, picks: Iterable[Pick], eligibility: Iterable[str]) -> bool:
     return assign_slot(league, picks, eligibility) is not None
 

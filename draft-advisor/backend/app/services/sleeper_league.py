@@ -332,6 +332,34 @@ def _fresh(platform: Any, path: str) -> Any:
     return resp.json()
 
 
+def _add_sleeper_only(platform: Any, session: Any, sleeper_id: str) -> PlayerRecord | None:
+    """A drafted player the pool left out (free agent / retired per Sleeper at pull time): add him from Sleeper's player
+    list as a sleeper-only record (synthetic id, no stats) with his Sleeper positions, so the pick can be recorded.
+    Drafted players are snapshotted in the league file, so he survives restarts."""
+    from nba_fantasy_shared.models.players import PlayerOverrides
+    from nba_fantasy_shared.providers.sleeper_provider import bio_from_sleeper_entry, fantasy_attributes_from_entry
+    from nba_fantasy_shared.reconcile.reconciler import merge_bio, synthetic_player_id
+
+    try:
+        payload = platform.load_players_payload()[0]
+    except Exception:  # noqa: BLE001 - no player list: the pick stays a hand entry
+        return None
+    entry = payload.get(sleeper_id)
+    if not entry:
+        return None
+    bio, fantasy = bio_from_sleeper_entry(entry), fantasy_attributes_from_entry(entry)
+    pid = synthetic_player_id(sleeper_id)
+    rec = PlayerRecord(player_id=pid, sleeper_id=sleeper_id, full_name=bio.full_name, first_name=bio.first_name,
+                       last_name=bio.last_name, normalized_name=bio.normalized_name, team_abbr=bio.team_abbr,
+                       sleeper_status=bio.roster_status, bio=merge_bio(None, bio), fantasy=fantasy,
+                       match_method="sleeper_only", has_stats=False)
+    session.players[pid] = rec
+    session.overrides[pid] = session.engine.overrides[pid] = PlayerOverrides(player_id=pid, eligibility=list(fantasy.fantasy_positions),
+                                             eligibility_source="sleeper", updated_at=datetime.now(timezone.utc))
+    session.invalidate()
+    return rec
+
+
 def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
     """Fetch the Sleeper draft's picks live and record the ones not recorded yet (manual entries win)."""
     from ..engine.draft_state import DraftError
@@ -356,6 +384,8 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
         drafted = session.engine.drafted_ids()
         for p in sorted(picks, key=lambda x: x.get("pick_no") or 0):
             rec = by_sleeper.get(str(p.get("player_id")))
+            if rec is None and p.get("player_id"):
+                rec = _add_sleeper_only(platform, session, str(p["player_id"]))
             manager = manager_for(p)
             meta = p.get("metadata") or {}
             name = rec.full_name if rec else (f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip() or f"Sleeper player {p.get('player_id')}")
