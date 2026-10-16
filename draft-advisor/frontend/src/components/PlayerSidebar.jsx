@@ -4,6 +4,7 @@ import { tierHue } from "./RankingsTable.jsx";
 import { api, qs } from "../api.js";
 import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
+import InjuryTag from "./InjuryTag.jsx";
 
 
 // season: the in-season profile (Season tab): no draft parts (Fit, Worth, bid guide, keeper outlook, tier); adds the
@@ -167,8 +168,9 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
         <span className="muted">Status:</span>{" "}
         {season && sea && sea.player_id === shownId ? (
-          <><strong className={sea.retired ? "warn-text" : sea.injury === "healthy" ? "" : "warn-text"}>{sea.retired ? "retired (always 0)" : sea.injury.replace(/_/g, " ")}</strong>
-            {sea.injury_note && <span className="muted"> · {sea.injury_note}</span>}</>
+          sea.retired ? <strong className="warn-text">retired (always 0)</strong>
+            : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> · {sea.injury_note}</span>}</>
+            : <strong>healthy</strong>
         ) : (
           <><strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
             {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}</>
