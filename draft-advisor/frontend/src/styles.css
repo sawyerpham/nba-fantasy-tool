@@ -613,7 +613,8 @@ main:has(.season-grid) { max-width: none; }   /* season tab: full width like the
 .season-tabs { display: flex; gap: 4px; margin-left: 12px; }
 .season-tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .mc-name { font-weight: 800; font-size: 17px; } .mc-points { font-size: 40px; font-weight: 900; line-height: 1.05; }
-.inj { color: var(--danger); font-weight: 700; text-transform: uppercase; font-size: 11px; }
+.inj { font-weight: 700; text-transform: uppercase; font-size: 11px; }
+.inj.ok { background: var(--good); color: var(--good-t); }
 button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .watch-line { padding: 5px 0; border-bottom: 1px solid var(--border); }
 .today-seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px; }

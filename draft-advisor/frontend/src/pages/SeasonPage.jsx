@@ -5,6 +5,7 @@ import Headshot from "../components/Headshot.jsx";
 import { PosList, PosTag } from "../components/Pos.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
+import InjuryTag from "../components/InjuryTag.jsx";
 import { alarmSound } from "../components/sounds.js";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
@@ -16,6 +17,7 @@ const VIEWS = [["week", "This week"], ["today", "Today"], ["league", "League"], 
 export const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 const fp = (x) => (x == null ? "" : x.toFixed(1));
+
 
 export default function SeasonPage({ leagueId }) {
   const [view, setView] = useState(() => localStorage.getItem("da.season.view") || "week");
@@ -200,7 +202,7 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
-          <div className="mu-name">{r.name}{r.injury !== "healthy" && <span className="inj" data-tip={p.injury_note}> {r.injury === "day_to_day" ? "GTD" : "OUT"}</span>}</div>
+          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
@@ -432,7 +434,7 @@ function WaiversView({ leagueId, onSelect }) {
           <thead><tr><th>Player</th><th>Team</th><th>Pos</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
             <th className="num" data-tip="Value over your drop candidate.">Upgrade</th><th className="num">Games this wk</th><th className="num" data-tip="A guide: share of your FAAB that grows with the upgrade. Other bids are hidden.">Bid</th></tr></thead>
           <tbody>{w.claims.map((c) => (
-            <tr key={c.player_id}><td className="clickable" onClick={() => onSelect(c.player_id)}><strong>{c.name}</strong>{c.injury !== "healthy" && <span className="inj"> {c.injury.replace(/_/g, " ")}</span>}</td>
+            <tr key={c.player_id}><td className="clickable" onClick={() => onSelect(c.player_id)}><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /></td>
               <td>{c.team}</td><td><PosList list={c.pos} /></td><td className="num">{c.value}</td><td className="num ok">+{c.upgrade}</td>
               <td className="num">{c.games_this_week}</td><td className="num"><strong>${c.bid}</strong></td></tr>))}</tbody>
         </table>

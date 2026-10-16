@@ -36,7 +36,8 @@ RETIRED = {"1434"}   # Russell Westbrook
 
 # Sleeper injury tags -> the site's statuses (engine/weekplan.py PLAY_CHANCE).
 SLEEPER_INJURY = {"GTD": "day_to_day", "DTD": "day_to_day", "Questionable": "day_to_day", "Doubtful": "day_to_day",
-                  "Probable": "healthy", "Out": "out_short_term", "Suspended": "out_short_term", "IR": "out_long_term"}
+                  "Probable": "healthy", "Out": "out_short_term", "Suspended": "out_short_term", "Sus": "out_short_term",
+                  "IR": "out_long_term"}
 LOCKS_FILE = "season_locks.json"   # your "I locked it" answers: {league: {week: {sleeper id: game date or ""}}}
 
 Fetch = Callable[[str, int], Any]
@@ -122,13 +123,14 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
             plays[(g["date"], g["away"]["team"])] = g["home"]["team"]
     tips = {d: espn_day(fetch, d, today) for d in dates}
 
-    proj, stats, injury = {}, {}, {}
+    proj, stats, injury, injury_tags = {}, {}, {}, {}
     for e in fetch(f"{SLEEPER}/projections/nba/{year}/{week}?season_type=regular", WEEK_TTL) or []:
         proj[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
         pl = e.get("player") or {}
         if pl.get("injury_status"):
             note = " - ".join(x for x in (pl.get("injury_body_part"), pl.get("injury_notes")) if x)
             injury[str(e["player_id"])] = (SLEEPER_INJURY.get(pl["injury_status"], "day_to_day"), f"{pl['injury_status']}: {note}".rstrip(": "))
+            injury_tags[str(e["player_id"])] = pl["injury_status"]   # Sleeper's own tag (GTD, DTD, Out, ...) for display
     for e in fetch(f"{SLEEPER}/stats/nba/{year}/{week}?season_type=regular", LIVE_TTL) or []:
         stats[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
 
@@ -182,7 +184,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
-                        "injury_note": note, "retired": retired, "games": games}
+                        "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games}
 
     team_games: dict[str, int] = {}
     for (d, team) in plays:
@@ -194,7 +196,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
             "now": None if preview else datetime.now(CT).isoformat(), "roster_positions": positions,
             "reserve_slots": reserve_slots,
-            "team_games": team_games,
+            "team_games": team_games, "injury_tags": injury_tags,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
 
@@ -408,7 +410,8 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
     return {"player_id": player_id, "sleeper_id": sid, "week": view["week"], "today": view["today"],
             "owner": {"name": owner["name"], "is_user": owner["is_user"], "roster_id": owner["roster_id"],
                       "ir": sid in owner["reserve"]} if owner else None,
-            "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_note": me.get("injury_note", ""),
+            "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_tag": me.get("injury_tag"),
+            "injury_note": me.get("injury_note", ""),
             "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
             "news": espn_news(fetch, rec.full_name, rec.team_abbr)}
 
@@ -441,6 +444,7 @@ def waivers(session, view: dict) -> dict:
         bid = max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1
         out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
+                    "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id),
                     "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
     return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "name": drop.full_name, "value": round(drop.value, 2)} if drop else None,
             "claims": out, "process": "Saturday 2:00 AM"}
