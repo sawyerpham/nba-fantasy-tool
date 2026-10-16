@@ -316,7 +316,12 @@ class DraftEngine:
         if slot is None:
             slot = roster.assign_slot(self.league, own, eligibility)
             if slot is None:
-                raise DraftError(f"{manager_id} has no open slot that fits {', '.join(eligibility) or 'this player'}")
+                room = roster.make_room(self.league, own, eligibility, self.eligibility)
+                if room is None:
+                    raise DraftError(f"{manager_id} has no open slot that fits {', '.join(eligibility) or 'this player'}")
+                slot, moves = room
+                for moved, to in moves:   # each slides along the chain; the new player takes the freed slot
+                    moved.slot = to
         else:
             error = roster.validate_slot(self.league, own, eligibility, slot)
             if error:

@@ -325,3 +325,32 @@ def test_remove_pick_renumbers_frees_the_player_and_steps_the_pointer_back():
     with pytest.raises(DraftError, match="no pick #5"):
         e.remove_pick(5)
 
+
+
+def test_make_room_slides_a_multi_position_player_to_the_open_slot():
+    from app.engine import roster
+    from nba_fantasy_shared.models.draft import Pick
+    from nba_fantasy_shared.models.league import RosterSlotSpec
+
+    lg = small_league(roster_slots=[RosterSlotSpec(slot="PG", count=1), RosterSlotSpec(slot="SG", count=1), RosterSlotSpec(slot="SF", count=1)])
+    elig = {1: ["PG"], 2: ["SG", "SF"]}
+    picks = [Pick(pick_number=1, player_id=1, manager_id="m1", price=5, slot="PG", timestamp=NOW),
+             Pick(pick_number=2, player_id=2, manager_id="m1", price=5, slot="SG", timestamp=NOW)]
+    assert roster.assign_slot(lg, picks, ["PG", "SG"]) is None            # SF is open, but a PG/SG can't play it
+    slot, moves = roster.make_room(lg, picks, ["PG", "SG"], elig.get)
+    assert slot == "SG" and [(m.player_id, to) for m, to in moves] == [(2, "SF")]   # the SG/SF slides over
+    assert roster.make_room(lg, picks, ["C"], elig.get) is None           # nobody can free a C spot
+
+
+def test_make_room_chains_moves_and_benches_the_newcomer_first():
+    from app.engine import roster
+    from nba_fantasy_shared.models.draft import Pick
+    from nba_fantasy_shared.models.league import RosterSlotSpec
+
+    # Chris Paul's case: only C is open. PF/C slides to C, the bench SF/PF moves up to PF, the PG takes the bench.
+    lg = small_league(roster_slots=[RosterSlotSpec(slot="PG", count=1), RosterSlotSpec(slot="PF", count=1),
+                                    RosterSlotSpec(slot="C", count=1), RosterSlotSpec(slot="BN", count=1)])
+    elig = {1: ["PG"], 2: ["PF", "C"], 3: ["SF", "PF"]}
+    picks = [Pick(pick_number=i, player_id=i, manager_id="m1", price=1, slot=sl, timestamp=NOW) for i, sl in ((1, "PG"), (2, "PF"), (3, "BN"))]
+    slot, moves = roster.make_room(lg, picks, ["PG"], elig.get)
+    assert slot == "BN" and [(m.player_id, to) for m, to in moves] == [(3, "PF"), (2, "C")]
