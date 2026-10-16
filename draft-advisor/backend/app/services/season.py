@@ -100,7 +100,8 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
         st = e["status"]["type"]
         for side, team in teams.items():
             out[team] = {"tip": e["date"], "state": st["state"], "detail": st.get("shortDetail", ""),
-                         "opp": teams["away" if side == "home" else "home"], "home": side == "home"}
+                         "opp": teams["away" if side == "home" else "home"], "home": side == "home",
+                         "period": e["status"].get("period") or 0, "clock": float(e["status"].get("clock") or 0)}
     return out
 
 
@@ -170,11 +171,13 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
             if opp is None:
                 continue
             tip, p, st = tips.get(d, {}).get(team, {}), proj.get((sid, d)), stats.get((sid, d))
-            played = bool(st and (st.get("sp") or st.get("gp")))
+            played = bool(st and (st.get("sp") or st.get("gp")))   # live games count too: the feed updates in-game
             games.append({"date": d, "opp": opp, "home": tip.get("home"), "tip": tip.get("tip"), "state": tip.get("state", "pre"),
                           "detail": tip.get("detail", ""), "proj": round(projected_fp(p, lg.scoring, bonus), 2) if p else None,
                           "fp": round(actual_fp(st, lg.scoring), 2) if played else None,
-                          "min": round(float(st.get("sp") or 0) / 60, 1) if played else None})
+                          "min": round(float(st.get("sp") or 0) / 60, 1) if played else None,
+                          "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
+                          "period": tip.get("period", 0), "clock": tip.get("clock", 0.0)})
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
@@ -249,7 +252,9 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
         locks[sid] = (status, when)
         locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status == "locked" else None
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None,
-                      live=g["state"] == "in", tip=g["tip"]) for g in p["games"]]
+                      live=g["state"] == "in", tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
+                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0))
+                 for g in p["games"]]
         out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
                               swing=swing_of(val.per_game_fpts) if val else swing_of([]), injury=p["injury"]))
     return out, locks, side

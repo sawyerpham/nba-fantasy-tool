@@ -662,3 +662,8 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .game-chip.locked { border: 2px solid var(--ok); background: var(--good); }
 .team-col { display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
 .team-col-row { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; }
+.matchup { position: relative; }
+.mu-arrow { position: absolute; top: 10px; font-size: 18px; padding: 4px 12px; border-radius: 10px; }
+.mu-arrow.left { left: 10px; } .mu-arrow.right { right: 10px; }
+.matchup .mu-head { padding: 0 52px; }
+.mu-mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }

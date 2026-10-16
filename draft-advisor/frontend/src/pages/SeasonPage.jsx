@@ -4,11 +4,12 @@ import Headshot from "../components/Headshot.jsx";
 import { PosList, PosTag } from "../components/Pos.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
+import { alarmSound } from "../components/sounds.js";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
 // profile on the right. Data: backend services/season.py + engine/weekplan.py; refreshed every 2 minutes.
-const REFRESH_MS = 120000;
+const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 const VIEWS = [["week", "This week"], ["today", "Today"], ["league", "League"], ["waivers", "Waivers"]];
 const ACTION = {
   LOCK: ["good", "Lock this game now (before his next tip-off)."],
@@ -41,6 +42,36 @@ export default function SeasonPage({ leagueId }) {
   useEffect(() => { load(); const t = setInterval(load, REFRESH_MS); return () => clearInterval(t); }, [load, tick]);
   useEffect(() => { try { localStorage.setItem("da.season.view", view); } catch { /* ignore */ } }, [view]);
 
+  // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
+  // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
+  const [alerts, setAlerts] = useState([]);
+  const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
+  const arm = () => {
+    alarmSound();   // the click also unlocks sound for later
+    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    setArmed(true); try { localStorage.setItem("da.season.alarms", "1"); } catch { /* ignore */ }
+  };
+  useEffect(() => {
+    if (!armed || !plan?.today) return undefined;
+    const timers = plan.today.watch.filter((w) => w.alarm).map((w) => {
+      const ms = Date.parse(w.alarm) - Date.now();
+      if (ms < 0 || ms > 24 * 3600e3) return null;
+      return setTimeout(async () => {
+        let line = w;
+        try {
+          const fresh = await api.get(`/leagues/${leagueId}/season/plan` + qs({ week }));
+          setPlan(fresh);
+          line = fresh.today?.watch.find((x) => x.kind === w.kind && (w.kind === "swap" ? x.backup_sid === w.backup_sid : x.sid === w.sid)) || w;
+        } catch { /* ring with what we have */ }
+        const title = line.kind === "gtd" ? `Check ${line.name} (GTD)` : line.decision === "SWAP" ? `SWAP: bench ${line.name}, start ${line.backup}` : `${line.decision}: ${line.backup} check`;
+        alarmSound();
+        setAlerts((a) => [{ key: `${w.sid}-${w.kind}-${Date.now()}`, title, text: line.text, decision: line.decision, kind: line.kind }, ...a]);
+        try { if (Notification.permission === "granted") new Notification(title, { body: line.text }); } catch { /* ignore */ }
+      }, ms);
+    }).filter(Boolean);
+    return () => timers.forEach(clearTimeout);
+  }, [armed, plan?.today?.watch?.map((w) => `${w.sid}${w.alarm}`).join(","), leagueId, week]);
+
   if (!leagueId) return <div className="panel muted">Pick a league on the League tab first.</div>;
   if (error && !data) return <div className="panel error">{error}</div>;
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
@@ -63,11 +94,20 @@ export default function SeasonPage({ leagueId }) {
             {VIEWS.map(([id, label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)} data-testid={`season-${id}`}>{label}</button>)}
           </nav>
           <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
+          <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
+            data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
+            {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
           <button className="small ghost" onClick={load} title="refresh now">↻</button>
           {error && <span className="small warn-text">{error}</span>}
         </div>
+        {alerts.map((a) => (
+          <div key={a.key} className={`panel roster-alert ${a.kind === "gtd" || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
+            <strong>⏰ {a.title}</strong> {a.text}
+            <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
+          </div>
+        ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} />}
+        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
         {view === "today" && <TodayView data={data} plan={plan} open={open} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -153,30 +193,67 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
   );
 }
 
-// Slot order down the middle (PG PG SG SG ... C C, then bench and IR); each team's players fill their current slots.
-function bySlot(rows, positions) {
+// Slot order down the middle (PG PG SG SG ... C C), then every bench spot and every IR spot (empty ones too);
+// each team's players fill their current slots.
+function bySlot(rows, positions, irSlots) {
   const pool = {};
   for (const r of [...rows].sort((a, b) => b.value - a.value)) (pool[r.slot] ||= []).push(r);
+  const fill = (slot, n) => Array.from({ length: n }, () => ({ slot, r: (pool[slot] || []).shift() }));
   const lines = positions.filter((x) => x !== "BN" && x !== "IR").map((slot) => ({ slot, r: (pool[slot] || []).shift() }));
-  const rest = [...(pool.BN || []), ...(pool.IR || [])].map((r) => ({ slot: r.slot, r }));
-  return [lines, rest];
+  const bench = fill("BN", Math.max(positions.filter((x) => x === "BN").length, (pool.BN || []).length));
+  const ir = fill("IR", Math.max(irSlots || 0, (pool.IR || []).length));
+  return { lines, bench, ir };
 }
 
-function WeekView({ data, plan, open, setLock }) {
-  const o = plan.opponent;
-  const [mine, myBench] = bySlot(plan.players, data.roster_positions);
-  const [theirs, theirBench] = o ? bySlot(o.players, data.roster_positions) : [[], []];
-  const benchRows = Math.max(myBench.length, theirBench.length);
-  const mode = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: ["bad", "Behind: the plan leans to big games"], even: ["", "Close: straight expected points"] }[plan.mode];
+const MODE = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: ["bad", "Behind: the plan leans to big games"], even: ["", "Close: straight expected points"] };
+
+// One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
+// yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
+function WeekView({ data, plan, open, setLock, leagueId }) {
+  const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
+  const [idx, setIdx] = useState(mineIdx);
+  const [other, setOther] = useState(null);
+  const isMine = idx === mineIdx;
+  useEffect(() => {
+    if (isMine) { setOther(null); return; }
+    const rid = data.matchups[idx]?.[0]?.roster_id;
+    api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
+  }, [idx, isMine, leagueId, data.week, data.matchups]);
+  const shown = isMine ? plan : other;
+  const n = data.matchups.length;
+  const step = (d) => setIdx((i) => (i + d + n) % n);
+  const nav = (
+    <>
+      <button className="mu-arrow left" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
+      <button className="mu-arrow right" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
+    </>
+  );
+  if (!shown) return <div className="panel matchup">{nav}<div className="muted" style={{ textAlign: "center" }}>Loading matchup {idx + 1} of {n}…</div></div>;
+  const o = shown.opponent;
+  const L = bySlot(shown.players, data.roster_positions, data.reserve_slots);
+  const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
+  const mode = MODE[shown.mode] || MODE.even;
+  const row = (l, r, key, slot) => (
+    <React.Fragment key={key}>
+      <PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" />
+      <div className="mu-slot"><PosTag text={slot} /></div>
+      <PlayerCard data={data} r={r?.r} open={open} side="right" />
+    </React.Fragment>
+  );
   return (
     <div className="panel matchup" data-testid="my-week">
+      {nav}
       <div className="mu-head">
         <div className="mu-team">
-          <div className="mc-name">{plan.name} <span className="badge info">YOU</span></div>
-          <div className="mc-points">{fp(plan.points)}</div>
-          <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{plan.expected}</strong></span> · {plan.games_left} games left</div>
+          <div className="mc-name">{shown.name} {isMine && <span className="badge info">YOU</span>}</div>
+          <div className="mc-points">{fp(shown.points)}</div>
+          <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{shown.expected}</strong></span> · {shown.games_left} games left</div>
         </div>
-        <div className="mu-mid"><span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{plan.mode}</span></div>
+        <div className="mu-mid">
+          <div className="small muted">matchup {idx + 1} of {n}</div>
+          <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
+          {!isMine && <div><button className="tiny" onClick={() => setIdx(mineIdx)}>back to mine</button></div>}
+        </div>
         <div className="mu-team right">
           <div className="mc-name">{o ? o.name : "no opponent"}</div>
           <div className="mc-points">{o ? fp(o.points) : ""}</div>
@@ -184,21 +261,11 @@ function WeekView({ data, plan, open, setLock }) {
         </div>
       </div>
       <div className="mu-grid">
-        {mine.map((line, i) => (
-          <React.Fragment key={`s${i}`}>
-            <PlayerCard data={data} r={line.r} open={open} setLock={setLock} mine side="left" />
-            <div className="mu-slot"><PosTag text={line.slot} /></div>
-            <PlayerCard data={data} r={theirs[i]?.r} open={open} side="right" />
-          </React.Fragment>
-        ))}
+        {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         <div className="mu-divider">Bench</div>
-        {Array.from({ length: benchRows }, (_, i) => (
-          <React.Fragment key={`b${i}`}>
-            <PlayerCard data={data} r={myBench[i]?.r} open={open} setLock={setLock} mine side="left" />
-            <div className="mu-slot"><PosTag text={myBench[i]?.slot || theirBench[i]?.slot || "BN"} /></div>
-            <PlayerCard data={data} r={theirBench[i]?.r} open={open} side="right" />
-          </React.Fragment>
-        ))}
+        {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN"))}
+        <div className="mu-divider">IR</div>
+        {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR"))}
       </div>
     </div>
   );
@@ -206,10 +273,10 @@ function WeekView({ data, plan, open, setLock }) {
 
 // Another team's week (League tab): the same cards in one column.
 function TeamColumn({ data, team, open }) {
-  const [lines, bench] = bySlot(team.players, data.roster_positions);
+  const { lines, bench, ir } = bySlot(team.players, data.roster_positions, data.reserve_slots);
   return (
     <div className="team-col">
-      {[...lines, ...bench].map((line, i) => (
+      {[...lines, ...bench, ...ir].map((line, i) => (
         <div key={i} className="team-col-row"><div className="mu-slot"><PosTag text={line.slot} /></div><PlayerCard data={data} r={line.r} open={open} side="left" /></div>
       ))}
     </div>
@@ -242,8 +309,9 @@ function TodayView({ data, plan, open }) {
           <h3 style={{ marginTop: 0 }}>Watch tonight</h3>
           {[...t.watch].sort((a, b) => (a.by || "~").localeCompare(b.by || "~")).map((w, i) => (
             <div key={i} className={`watch-line ${w.kind}`}>
-              <span className={`verdict ${w.kind === "gtd" ? "bad" : "even"}`}>{w.kind === "gtd" ? "GTD" : "SWAP?"}</span>{" "}
-              {w.text} {w.by && <span className="muted">({w.kind === "gtd" ? "his tip" : `${w.backup} tips`} {ctTime(w.by)} CT)</span>}
+              <span className={`verdict ${w.kind === "gtd" ? "bad" : w.decision === "SWAP" ? "bad" : w.decision === "KEEP" ? "good" : "even"}`}>
+                {w.kind === "gtd" ? "GTD" : w.decision}</span>{" "}
+              {w.text} {w.by && <span className="muted">({w.kind === "gtd" ? "his tip" : `${w.backup} tips`} {ctTime(w.by)} CT{w.alarm ? ` · alarm ${ctTime(w.alarm)}` : ""})</span>}
             </div>
           ))}
         </div>
