@@ -98,101 +98,119 @@ function RosterAlerts({ roster }) {
   );
 }
 
-function Scoreboard({ plan }) {
-  const o = plan.opponent;
-  const mode = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: ["bad", "Behind: the plan leans to big games"], even: ["", "Close: straight expected points"] }[plan.mode];
+// One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
+function GameChips({ games, today, lockDate }) {
+  if (!games.length) return <span className="muted small">no games</span>;
   return (
-    <div className="panel matchup-card" data-testid="matchup">
-      <div className="mc-side me">
-        <div className="mc-name">{plan.name} <span className="badge info">YOU</span></div>
-        <div className="mc-points">{fp(plan.points)}</div>
-        <div className="small muted">expected <strong style={{ color: "var(--text)" }}>{plan.expected}</strong> · {plan.games_left} games left</div>
-      </div>
-      <div className="mc-vs"><span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{plan.mode}</span></div>
-      {o ? (
-        <div className="mc-side">
-          <div className="mc-name">{o.name}</div>
-          <div className="mc-points">{fp(o.points)}</div>
-          <div className="small muted">expected <strong style={{ color: "var(--text)" }}>{o.expected}</strong> · {o.games_left} games left · {o.locked} locked</div>
+    <span className="chips-row">
+      {games.map((g) => {
+        const played = g.fp != null, live = g.state === "in";
+        return (
+          <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""}`}
+            data-tip={`${dayName(g.date)} ${g.date.slice(5)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${ctTime(g.tip)} CT · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
+            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : ctTime(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
+  "his locked game, else the better of locking his last game now and waiting for the rest (more games = more chances at a big one).";
+
+function PlayerCard({ data, r, open, setLock, mine, side }) {
+  if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
+  const p = data.players[r.sid] || { games: [] };
+  const [cls, tip] = ACTION[r.action] || ["", ""];
+  const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
+  const starter = r.slot !== "BN" && r.slot !== "IR";
+  return (
+    <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
+      <div className="mu-top">
+        <Headshot sleeperId={r.sid} name={r.name} size={34} />
+        <div className="mu-who clickable" onClick={() => open(r.sid)}>
+          <div className="mu-name">{r.name}{r.injury !== "healthy" && <span className="inj" data-tip={p.injury_note}> {r.injury === "day_to_day" ? "GTD" : "OUT"}</span>}</div>
+          <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} />{r.seat && r.seat !== r.slot && <span data-tip={`The week plan seats him at ${r.seat}.`}> · plan: {r.seat}</span>}</div>
         </div>
-      ) : <div className="mc-side muted">no opponent this week</div>}
+        <GameChips games={p.games} today={data.today} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
+        <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
+        {mine && (
+          <span className="mu-call">
+            <span className={`verdict ${cls}`} data-tip={`${tip} ${r.why}`}>{r.action}</span>
+            {starter && (r.lock_status === "locked"
+              ? <span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span>
+              : lastPlayed && <button className="tiny" onClick={() => setLock(r.sid, lastPlayed.date)}
+                  data-tip={`${r.lock_status === "maybe" ? "Sleeper counts his latest game: locked or not? " : ""}Click if you locked his ${dayName(lastPlayed.date)} game (${fp(lastPlayed.fp)}).`}>
+                  {r.lock_status === "maybe" ? "locked?" : "I locked"}</button>)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function GameCell({ g, today, locked }) {
-  if (!g) return <td className="gc none">·</td>;
-  const played = g.fp != null;
-  return (
-    <td className={`gc ${played ? "played" : ""} ${g.date === today ? "today" : ""} ${locked ? "locked" : ""} ${g.state === "in" ? "live" : ""}`}
-      data-tip={`${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : g.state === "in" ? `live: ${g.detail}` : `tips ${ctTime(g.tip)} CT · projected ${fp(g.proj)} FP`}${locked ? " · LOCKED" : ""}`}>
-      <div className="gc-num">{played ? fp(g.fp) : g.state === "in" ? "live" : fp(g.proj)}</div>
-      <div className="gc-opp">{g.home ? "" : "@"}{g.opp}</div>
-    </td>
-  );
-}
-
-function PlanTable({ data, rows, open, setLock, mine }) {
-  const ordered = [...rows.filter((r) => r.slot !== "BN" && r.slot !== "IR"), ...rows.filter((r) => r.slot === "BN"), ...rows.filter((r) => r.slot === "IR")];
-  const order = ["PG", "SG", "SF", "PF", "C", "BN", "IR"];
-  ordered.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
-  return (
-    <table className="plan-week" data-testid={mine ? "my-week" : "opp-week"}>
-      <thead>
-        <tr><th>Slot</th><th>Player</th>{data.dates.map((d) => <th key={d} className={`gc ${d === data.today ? "today" : ""}`}>{dayName(d)}<div className="muted small">{d.slice(5)}</div></th>)}
-          <th className="num" data-tip="What this player is worth to you this week: his locked score, else the better of locking now and waiting.">Value</th>
-          {mine && <th>Call</th>}{mine && <th data-tip="Sleeper doesn't say which game you locked; the site guesses from the counted points. Tell it if it's wrong.">Locked?</th>}</tr>
-      </thead>
-      <tbody>
-        {ordered.map((r) => {
-          const p = data.players[r.sid] || { games: [] };
-          const byDate = Object.fromEntries(p.games.map((g) => [g.date, g]));
-          const [cls, tip] = ACTION[r.action] || ["", ""];
-          const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
-          return (
-            <tr key={r.sid} className={`${r.slot === "BN" || r.slot === "IR" ? "bench-row" : ""} ${r.seat && r.seat !== r.slot ? "reseat" : ""}`}>
-              <td><PosTag text={r.slot} />{r.seat && r.seat !== r.slot && <span className="small muted" data-tip={`The week plan seats him at ${r.seat}.`}> → {r.seat}</span>}</td>
-              <td className="clickable plan-name" onClick={() => open(r.sid)}>
-                <Headshot sleeperId={r.sid} name={r.name} size={28} />
-                <span><strong>{r.name}</strong> <span className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></span>
-                  {r.injury !== "healthy" && <span className="inj small" data-tip={p.injury_note}> {r.injury.replace(/_/g, " ")}</span>}</span>
-              </td>
-              {data.dates.map((d) => <GameCell key={d} g={byDate[d]} today={data.today} locked={r.lock_status === "locked" && r.lock_date === d} />)}
-              <td className="num"><strong>{fp(r.value)}</strong></td>
-              {mine && <td><span className={`verdict ${cls}`} data-tip={`${tip} ${r.why}`}>{r.action}</span></td>}
-              {mine && (
-                <td className="small">
-                  {r.slot === "BN" || r.slot === "IR" ? "" : r.lock_status === "locked" ? <span className="ok" data-tip="Click to say it isn't locked." onClick={() => setLock(r.sid, "")} style={{ cursor: "pointer" }}>✓ {r.lock_date?.slice(5)}</span>
-                    : lastPlayed ? (
-                      <span className="lock-btns">
-                        {r.lock_status === "maybe" && <span className="muted" data-tip="Sleeper counts his latest game: locked, or just counting it for now?">? </span>}
-                        <button className="tiny" onClick={() => setLock(r.sid, lastPlayed.date)} data-tip={`I locked his ${lastPlayed.date.slice(5)} game (${fp(lastPlayed.fp)}).`}>I locked</button>
-                      </span>) : <span className="muted">—</span>}
-                </td>
-              )}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
+// Slot order down the middle (PG PG SG SG ... C C, then bench and IR); each team's players fill their current slots.
+function bySlot(rows, positions) {
+  const pool = {};
+  for (const r of [...rows].sort((a, b) => b.value - a.value)) (pool[r.slot] ||= []).push(r);
+  const lines = positions.filter((x) => x !== "BN" && x !== "IR").map((slot) => ({ slot, r: (pool[slot] || []).shift() }));
+  const rest = [...(pool.BN || []), ...(pool.IR || [])].map((r) => ({ slot: r.slot, r }));
+  return [lines, rest];
 }
 
 function WeekView({ data, plan, open, setLock }) {
+  const o = plan.opponent;
+  const [mine, myBench] = bySlot(plan.players, data.roster_positions);
+  const [theirs, theirBench] = o ? bySlot(o.players, data.roster_positions) : [[], []];
+  const benchRows = Math.max(myBench.length, theirBench.length);
+  const mode = { ahead: ["good", "Ahead: the plan leans to sure points"], behind: ["bad", "Behind: the plan leans to big games"], even: ["", "Close: straight expected points"] }[plan.mode];
   return (
-    <>
-      <Scoreboard plan={plan} />
-      <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Your week plan <span className="small muted">expected {plan.expected} FP · numbers are FP (actual once played, else Sleeper's projection in your scoring)</span></h3>
-        <PlanTable data={data} rows={plan.players} open={open} setLock={setLock} mine />
-      </div>
-      {plan.opponent && (
-        <div className="panel">
-          <h3 style={{ marginTop: 0 }}>{plan.opponent.name} <span className="small muted">expected {plan.opponent.expected} FP</span></h3>
-          <PlanTable data={data} rows={plan.opponent.players} open={open} />
+    <div className="panel matchup" data-testid="my-week">
+      <div className="mu-head">
+        <div className="mu-team">
+          <div className="mc-name">{plan.name} <span className="badge info">YOU</span></div>
+          <div className="mc-points">{fp(plan.points)}</div>
+          <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{plan.expected}</strong></span> · {plan.games_left} games left</div>
         </div>
-      )}
-    </>
+        <div className="mu-mid"><span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{plan.mode}</span></div>
+        <div className="mu-team right">
+          <div className="mc-name">{o ? o.name : "no opponent"}</div>
+          <div className="mc-points">{o ? fp(o.points) : ""}</div>
+          {o && <div className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} games left · {o.locked} locked</div>}
+        </div>
+      </div>
+      <div className="mu-grid">
+        {mine.map((line, i) => (
+          <React.Fragment key={`s${i}`}>
+            <PlayerCard data={data} r={line.r} open={open} setLock={setLock} mine side="left" />
+            <div className="mu-slot"><PosTag text={line.slot} /></div>
+            <PlayerCard data={data} r={theirs[i]?.r} open={open} side="right" />
+          </React.Fragment>
+        ))}
+        <div className="mu-divider">Bench</div>
+        {Array.from({ length: benchRows }, (_, i) => (
+          <React.Fragment key={`b${i}`}>
+            <PlayerCard data={data} r={myBench[i]?.r} open={open} setLock={setLock} mine side="left" />
+            <div className="mu-slot"><PosTag text={myBench[i]?.slot || theirBench[i]?.slot || "BN"} /></div>
+            <PlayerCard data={data} r={theirBench[i]?.r} open={open} side="right" />
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Another team's week (League tab): the same cards in one column.
+function TeamColumn({ data, team, open }) {
+  const [lines, bench] = bySlot(team.players, data.roster_positions);
+  return (
+    <div className="team-col">
+      {[...lines, ...bench].map((line, i) => (
+        <div key={i} className="team-col-row"><div className="mu-slot"><PosTag text={line.slot} /></div><PlayerCard data={data} r={line.r} open={open} side="left" /></div>
+      ))}
+    </div>
   );
 }
 
@@ -272,7 +290,7 @@ function LeagueView({ data, leagueId, open }) {
         <div className="panel" data-testid="team-roster">
           <h3 style={{ marginTop: 0 }}>{shown.name} <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
             <button className="small ghost" style={{ marginLeft: 8 }} onClick={() => setShown(null)}>close</button></h3>
-          <PlanTable data={data} rows={shown.players} open={open} />
+          <TeamColumn data={data} team={shown} open={open} />
         </div>
       )}
       <div className="panel">
