@@ -19,7 +19,7 @@ from nba_fantasy_shared.providers.sleeper_provider import SleeperProvider
 from nba_fantasy_shared.storage import JsonStore
 
 from . import config
-from .api import data, draft, leagues, players
+from .api import data, draft, leagues, players, season
 from .engine.draft_state import DraftError
 from .services.app_state import AppState, PullAlreadyRunning
 from .services.league_repository import LeagueNotFound
@@ -55,6 +55,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
     app.include_router(players.router, prefix="/api")
     app.include_router(leagues.router, prefix="/api")
     app.include_router(draft.router, prefix="/api")
+    app.include_router(season.router, prefix="/api")
 
     @app.get("/api/health")
     def health() -> dict:
