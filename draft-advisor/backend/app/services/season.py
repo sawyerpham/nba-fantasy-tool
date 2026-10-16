@@ -375,7 +375,30 @@ def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
     clean = lambda t: re.sub(r"<[^>]+>", " ", t or "").strip()   # noqa: E731 - some items carry raw HTML
     return [{"published": a.get("published"), "headline": clean(a.get("headline")), "story": clean(a.get("story") or a.get("description"))}
             for a in feed if a.get("headline") and last in normalize_name(a["headline"])   # notes about him, not league articles
-            and "Highlights" not in a["headline"]][:4]
+            and a.get("type") != "Media"][:4]   # Media = video clips / highlights, no note
+
+
+ESPN_NBA_NEWS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=30"
+
+
+def season_news(view: dict, fetch: Fetch) -> dict:
+    """The News tab: the fantasy notes on every player of yours (newest first; ESPN's notes feed only works per
+    player), then ESPN's NBA-wide headlines (there is no league-wide feed of fantasy notes)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    me = next(t for t in view["teams"] if t["is_user"])
+    players = view["players"]
+
+    def notes(sid: str) -> list[dict]:
+        p = players[sid]
+        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"]} for n in espn_news(fetch, p["name"], p["team"])]
+    with ThreadPoolExecutor(8) as ex:   # one request per player; cached NEWS_TTL, so only a Sync pays this
+        mine = [n for ns in ex.map(notes, [s for s in me["players"] if s in players]) for n in ns]
+    league = [{"published": a.get("published"), "headline": a.get("headline"), "story": a.get("description"),
+               "link": ((a.get("links") or {}).get("web") or {}).get("href")}
+              for a in (fetch(ESPN_NBA_NEWS, NEWS_TTL) or {}).get("articles", []) if a.get("headline") and a.get("type") != "Media"]
+    by_time = lambda n: n.get("published") or ""   # noqa: E731
+    return {"mine": sorted(mine, key=by_time, reverse=True), "league": sorted(league, key=by_time, reverse=True)}
 
 
 def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:

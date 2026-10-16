@@ -12,7 +12,7 @@ import { alarmSound } from "../components/sounds.js";
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
 // profile on the right. Data: backend services/season.py + engine/weekplan.py; refreshed every 2 minutes.
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
-const VIEWS = [["week", "This week"], ["today", "Today"], ["league", "League"], ["waivers", "Waivers"]];
+const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["waivers", "Waivers"]];
 
 export const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
@@ -20,7 +20,7 @@ const fp = (x) => (x == null ? "" : x.toFixed(1));
 
 
 export default function SeasonPage({ leagueId }) {
-  const [view, setView] = useState(() => localStorage.getItem("da.season.view") || "week");
+  const [view, setView] = useState(() => { const v = localStorage.getItem("da.season.view"); return VIEWS.some(([id]) => id === v) ? v : "week"; });
   const [week, setWeek] = useState(null);
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
@@ -49,7 +49,7 @@ export default function SeasonPage({ leagueId }) {
   const [syncing, setSyncing] = useState(false);
   const sync = () => {
     setSyncing(true);
-    api.post(`/leagues/${leagueId}/season/sync`, {}).then(load).catch((e) => setError(e.message)).finally(() => setSyncing(false));
+    api.post(`/leagues/${leagueId}/season/sync`, {}).then(() => setTick((t) => t + 1)).catch((e) => setError(e.message)).finally(() => setSyncing(false));
   };
 
   // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
@@ -130,7 +130,7 @@ export default function SeasonPage({ leagueId }) {
         ))}
         <RosterAlerts roster={plan.roster} />
         {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
-        {view === "today" && <TodayView data={data} plan={plan} open={open} />}
+        {view === "news" && <NewsView data={data} leagueId={leagueId} open={open} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
@@ -328,49 +328,47 @@ function TeamColumn({ data, team, open }) {
   );
 }
 
-function TodayView({ data, plan, open }) {
-  const t = plan.today;
-  if (!t) return <div className="panel muted">No games left this week. Next week's lineup shows Monday.</div>;
-  const name = (sid) => data.players[sid]?.name || sid;
+// News: your players' fantasy notes (collapsible, always starts open) and NBA-wide headlines under it.
+// Reloads on Sync (refreshKey); the backend caches both for 15 minutes otherwise.
+const newsTime = (iso) => (iso ? new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", minute: "2-digit" }) + " CT" : "");
+
+function NewsView({ data, leagueId, open, refreshKey }) {
+  const [news, setNews] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api.get(`/leagues/${leagueId}/season/news`).then((n) => { setNews(n); setError(""); }).catch((e) => setError(e.message));
+  }, [leagueId, refreshKey]);
+  if (error) return <div className="panel error">{error}</div>;
+  if (!news) return <div className="panel muted">Loading news…</div>;
   return (
     <>
-      <div className="panel" data-testid="today-moves">
-        <h3 style={{ marginTop: 0 }}>{t.date === data.today ? "Today's" : `${dayName(t.date)}'s`} moves in Sleeper <span className="small muted">{t.date.slice(5)}{data.now && ` · as of ${ctTime(data.now)} CT`}</span></h3>
-        {t.moves.length > 0 && (() => {
-          const first = t.moves.map((m) => m.by).filter(Boolean).sort()[0];
-          return first && <div className="warn-text" style={{ marginBottom: 6 }}>Make these before <strong>{ctTime(first)} CT</strong> (the first tip-off they depend on); rows with a later time can wait until then.</div>;
-        })()}
-        {t.moves.length ? (
-          <table className="small">
-            <thead><tr><th>Player</th><th>From</th><th></th><th>To</th><th>Before</th></tr></thead>
-            <tbody>{t.moves.map((m) => (
-              <tr key={m.sid}><td className="clickable" onClick={() => open(m.sid)}><strong>{m.name}</strong></td><td><PosTag text={m.from} /></td><td>→</td><td><PosTag text={m.to} /></td>
-                <td>{m.by ? `${ctTime(m.by)} CT` : <span className="muted">no game today: with the others</span>}</td></tr>))}</tbody>
-          </table>
-        ) : <div className="ok">Your lineup is already set for today.</div>}
-      </div>
-      {t.watch.length > 0 && (
-        <div className="panel" data-testid="today-watch">
-          <h3 style={{ marginTop: 0 }}>Watch tonight</h3>
-          {[...t.watch].sort((a, b) => (a.by || "~").localeCompare(b.by || "~")).map((w, i) => (
-            <div key={i} className={`watch-line ${w.kind}`}>
-              <span className={`verdict ${["gtd", "out"].includes(w.kind) || w.decision === "SWAP" ? "bad" : w.decision === "KEEP" || w.kind === "lock" ? "good" : "even"}`}>
-                {w.kind === "gtd" ? "GTD" : w.kind === "out" ? "OUT" : w.kind === "lock" ? "LOCK" : w.decision}</span>{" "}
-              {w.text} {w.by && <span className="muted">({w.kind === "swap" ? `${w.backup} tips` : "his tip"} {ctTime(w.by)} CT{w.alarm === "now" ? " · alarm now" : w.alarm ? ` · alarm ${ctTime(w.alarm)}` : ""})</span>}
+      <details className="panel news" open data-testid="news-mine">
+        <summary><h3>My team <span className="small muted">({news.mine.length})</span></h3></summary>
+        {news.mine.length ? news.mine.map((n, i) => (
+          <div key={i} className="news-item">
+            <div className="news-head">
+              <span className="clickable news-player" onClick={() => open(n.sid)}>
+                <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
+              </span>
+              <InjuryTag tag={data.players[n.sid]?.injury_tag} note={data.players[n.sid]?.injury_note} />
+              <span className="small muted news-time">{newsTime(n.published)}</span>
             </div>
-          ))}
-        </div>
-      )}
-      <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Today's lineup</h3>
-        <div className="today-seats">
-          {Object.entries(t.seats).flatMap(([slot, sids]) => sids.map((sid) => (
-            <div key={sid} className="today-seat clickable" onClick={() => open(sid)}>
-              <PosTag text={slot} /> <Headshot sleeperId={sid} name={name(sid)} size={26} /> {name(sid)}
-              {(() => { const g = data.players[sid]?.games.find((x) => x.date === t.date); return g ? <span className="small muted"> · {g.fp != null ? `${fp(g.fp)} FP` : `${ctTime(g.tip)} CT, proj ${fp(g.proj)}`}</span> : <span className="small muted"> · no game today</span>; })()}
+            <div className="news-title">{n.headline}</div>
+            {n.story && <div className="small news-story">{n.story}</div>}
+          </div>
+        )) : <div className="muted">No recent notes on your players.</div>}
+      </details>
+      <div className="panel news" data-testid="news-league">
+        <h3>League-wide</h3>
+        {news.league.map((n, i) => (
+          <div key={i} className="news-item">
+            <div className="news-head">
+              {n.link ? <a className="news-title" href={n.link} target="_blank" rel="noreferrer">{n.headline}</a> : <span className="news-title">{n.headline}</span>}
+              <span className="small muted news-time">{newsTime(n.published)}</span>
             </div>
-          )))}
-        </div>
+            {n.story && <div className="small news-story">{n.story}</div>}
+          </div>
+        ))}
       </div>
     </>
   );

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..services.app_state import AppState
-from ..services.season import _cache, http_fetch,read_locks, season_player, team_plan, waivers, week_view, write_lock
+from ..services.season import _cache, http_fetch,read_locks, season_news, season_player, team_plan, waivers, week_view, write_lock
 from .deps import get_state
 from .draft import _session
 
@@ -73,6 +73,16 @@ def player(league_id: str, player_id: int, week: int | None = Query(None, ge=1),
         return season_player(session, _fetch(state), player_id, week)
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@router.get("/news")
+def news(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    session = _session(state, league_id)
+    fetch = _fetch(state)
+    try:
+        return season_news(week_view(session, fetch), fetch)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.get("/waivers")
