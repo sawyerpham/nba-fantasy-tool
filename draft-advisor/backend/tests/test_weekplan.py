@@ -138,7 +138,7 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
         assert w["decision"] == want, (fp_now, w)
 
 
-def test_a_day_without_games_moves_nobody():
+def test_a_day_without_games_sets_the_week_plan_lineup():
     from app.engine.weekplan import plan_today
 
     a = pp("a", ["C"], "C", future(10))                       # no game on the 20th
@@ -146,7 +146,8 @@ def test_a_day_without_games_moves_nobody():
     players = [a, b]
     plan_week(players, {"C": 1})
     assert b.seat == "C"                                       # the week plan prefers b ...
-    assert plan_today(players, {"C": 1}, "2026-10-20").moves == []   # ... but nobody plays today: no churn
+    moves = {m["sid"]: m["to"] for m in plan_today(players, {"C": 1}, "2026-10-20").moves}
+    assert moves == {"b": "C", "a": "BN"}                      # ... so set it now, not on b's game day
 
 
 def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_check():
