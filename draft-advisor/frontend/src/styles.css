@@ -721,3 +721,4 @@ main:has(.season-grid) { padding: 12px 16px; }
 .game-chip.dim { opacity: 0.45; }
 .verdict.off { opacity: 0.6; font-weight: 600; }
 .day-pick { align-items: center; }
+.lineup-day { font-size: 13px; white-space: nowrap; margin-left: 6px; }

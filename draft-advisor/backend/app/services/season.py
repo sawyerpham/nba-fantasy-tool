@@ -109,6 +109,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     lg = session.league
     if not lg.sleeper_league_id:
         raise ValueError("league is not linked to Sleeper (Settings)")
+    preview = today is not None   # a fixed day (tests, previews): no wall clock
     year, today = lg.roster_season.split("-")[0], today or today_ct()
     schedule = fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
     weeks = week_dates(schedule)
@@ -186,7 +187,12 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     team_games: dict[str, int] = {}
     for (d, team) in plays:
         team_games[team] = team_games.get(team, 0) + 1
-    return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": today.isoformat(), "roster_positions": positions,
+    # The lineup day: today until all of today's games are over, then the next game day. The rules re-run on every
+    # request against the clock, so the page is always "what to do now".
+    iso = today.isoformat()
+    day = iso if preview else next((d for d in dates if d > iso or (d == iso and (not tips[d] or any(t["state"] != "post" for t in tips[d].values())))), None)
+    return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
+            "now": None if preview else datetime.now(CT).isoformat(), "roster_positions": positions,
             "reserve_slots": reserve_slots,
             "team_games": team_games,
             "teams": teams,
@@ -241,6 +247,9 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
     slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
     side = next((m for pair in view["matchups"] for m in pair if m["roster_id"] == team["roster_id"]), {}) or {}
     counted = side.get("players_points") or {}
+    now = datetime.fromisoformat(view["now"]) if view.get("now") else None
+    def tipped(g: dict) -> bool:   # the clock says he has tipped off (ESPN's state can lag a minute or two)
+        return bool(now and g["tip"] and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) <= now)
     out, locks = [], {}
     for sid in team["players"]:
         p = view["players"].get(sid)
@@ -251,8 +260,8 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
         status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
         locks[sid] = (status, when)
         locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status == "locked" else None
-        games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None,
-                      live=g["state"] == "in", tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
+        games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
+                      live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
                       proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0))
                  for g in p["games"]]
         out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
@@ -291,7 +300,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
 
-    today = view["today"]
+    today = view.get("day", view["today"])
     t = plan_today(players, counts, today) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
         swings = {q.name: q.swing for q in players}

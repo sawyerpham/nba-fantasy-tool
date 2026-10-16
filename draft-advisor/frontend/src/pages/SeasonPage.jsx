@@ -28,17 +28,21 @@ export default function SeasonPage({ leagueId }) {
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
 
-  const [pickedDay, setPickedDay] = useState(null);   // null = today on a game day, else the next game day
+  // The plan is "what to do now": the backend re-runs the rules against the clock on every load (today until its
+  // games are over, then the next game day), so reload every minute and whenever the tab comes back into view.
   const load = useCallback(() => {
     if (!leagueId) return;
-    api.get(`/leagues/${leagueId}/season/week` + qs({ week })).then((w) => {
-      const day = pickedDay && w.dates.includes(pickedDay) ? pickedDay
-        : w.dates.find((d) => d >= w.today) || w.dates[0];
-      return api.get(`/leagues/${leagueId}/season/plan` + qs({ week, today: day === w.today ? undefined : day }))
-        .then((p) => { setData({ ...w, day }); setPlan(p); setError(""); });
-    }).catch((e) => setError(e.message));
-  }, [leagueId, week, pickedDay]);
-  useEffect(() => { load(); const t = setInterval(load, REFRESH_MS); return () => clearInterval(t); }, [load, tick]);
+    Promise.all([api.get(`/leagues/${leagueId}/season/week` + qs({ week })), api.get(`/leagues/${leagueId}/season/plan` + qs({ week }))])
+      .then(([w, p]) => { setData(w); setPlan(p); setError(""); })
+      .catch((e) => setError(e.message));
+  }, [leagueId, week]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, REFRESH_MS);
+    const back = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", back);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", back); };
+  }, [load, tick]);
   useEffect(() => { try { localStorage.setItem("da.season.view", view); } catch { /* ignore */ } }, [view]);
 
   // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
@@ -116,7 +120,7 @@ export default function SeasonPage({ leagueId }) {
           </div>
         ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} setDay={setPickedDay} />}
+        {view === "week" && <WeekView data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
         {view === "today" && <TodayView data={data} plan={plan} open={open} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -242,7 +246,7 @@ const WIN_TIP = "Chance to win the week: your counted/locked points + what your 
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
-function WeekView({ data, plan, open, setLock, leagueId, setDay }) {
+function WeekView({ data, plan, open, setLock, leagueId }) {
   const moves = Object.fromEntries((plan.today?.moves || []).map((m) => [m.sid, m]));
   const seated = new Set(Object.values(plan.today?.seats || {}).flat());
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
@@ -290,14 +294,9 @@ function WeekView({ data, plan, open, setLock, leagueId, setDay }) {
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
           {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
-          {isMine && (
-            <span className="day-pick" data-tip="Which day's lineup the calls show: start whoever plays that day, earliest tip first.">
-              <span className="small muted">Lineup for</span>
-              {data.dates.map((d) => (
-                <button key={d} className={`tiny ${d === data.day ? "active" : ""} ${d === data.today ? "is-today" : ""}`} onClick={() => setDay(d)} data-testid={`day-${d}`}>
-                  {dayName(d)}
-                </button>
-              ))}
+          {isMine && data.day && (
+            <span className="lineup-day" data-tip="The calls are for this day: start whoever plays, earliest tip first. Updates on its own (every minute and when you open the page); after the day's last game it moves to the next game day.">
+              Lineup: <strong>{data.day === data.today ? "today" : dayName(data.day)}</strong>{data.now && <span className="muted"> · {ctTime(data.now)} CT</span>}
             </span>
           )}
         </div>
@@ -331,12 +330,12 @@ function TeamColumn({ data, team, open }) {
 
 function TodayView({ data, plan, open }) {
   const t = plan.today;
-  if (!t) return <div className="panel muted">No games for this week today ({data.today}). Today's lineup shows on game days.</div>;
+  if (!t) return <div className="panel muted">No games left this week. Next week's lineup shows Monday.</div>;
   const name = (sid) => data.players[sid]?.name || sid;
   return (
     <>
       <div className="panel" data-testid="today-moves">
-        <h3 style={{ marginTop: 0 }}>Today's moves in Sleeper <span className="small muted">{dayName(t.date)} {t.date.slice(5)}</span></h3>
+        <h3 style={{ marginTop: 0 }}>{t.date === data.today ? "Today's" : `${dayName(t.date)}'s`} moves in Sleeper <span className="small muted">{t.date.slice(5)}{data.now && ` · as of ${ctTime(data.now)} CT`}</span></h3>
         {t.moves.length > 0 && (() => {
           const first = t.moves.map((m) => m.by).filter(Boolean).sort()[0];
           return first && <div className="warn-text" style={{ marginBottom: 6 }}>Make these before <strong>{ctTime(first)} CT</strong> (the first tip-off they depend on); rows with a later time can wait until then.</div>;
