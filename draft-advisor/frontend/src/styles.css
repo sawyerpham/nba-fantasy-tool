@@ -33,7 +33,7 @@ body {
   cursor: default;   /* arrow over plain text, not the I-beam; typing fields keep theirs below */
 }
 input, textarea, select, [contenteditable] { cursor: text; }
-select, input[type="checkbox"], input[type="radio"], .clickable { cursor: pointer; }
+select, input[type="checkbox"], input[type="radio"] { cursor: pointer; }
 ::selection { background: var(--primary-soft); }
 
 /* ---------- top bar ---------- */
@@ -497,7 +497,10 @@ th.sorted { color: var(--primary); }
 /* vocabulary: dotted underline on defined terms, one fixed tooltip for every [data-tip] */
 .term { text-decoration: underline dotted; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-underline-offset: 3px; cursor: help; }
 [data-tip] { cursor: help; }
-button:not(:disabled)[data-tip], .clickable[data-tip] { cursor: pointer; }
+/* anything you can click shows the hand, tooltip or not (this comes after [data-tip] so it wins): buttons and arrows,
+   player names / cards that open a profile, the home logo */
+button:not(:disabled), .clickable, .clickable-name, .room-slot-player, .live-lot-name, .teammate:not(.self), .toast,
+header.top .brand { cursor: pointer; }
 .tip { position: fixed; z-index: 100; transform: translateX(-50%); max-width: 320px; width: max-content; padding: 8px 11px; border-radius: 10px;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 13px; font-weight: 500;
   line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: normal; text-align: left; pointer-events: none; }
