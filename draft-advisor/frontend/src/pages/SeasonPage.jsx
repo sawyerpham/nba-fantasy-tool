@@ -332,20 +332,21 @@ const ctLabel = (ms, opts) => new Date(ms).toLocaleString("en-US", { timeZone: "
 
 function Timeline({ tl, nowMs, atMs, following, setAt }) {
   const start = Date.parse(tl.start), end = Date.parse(tl.end);
-  const pct = (ms) => `${Math.min(100, Math.max(0, ((ms - start) / (end - start)) * 100))}%`;
+  const frac = (ms) => Math.min(1, Math.max(0, (ms - start) / (end - start)));
+  const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;   // where the 16px dot's centre sits for that time
   const days = Array.from({ length: 7 }, (_, i) => start + i * 86400000 + 12 * 3600000);   // noon of each day
   return (
     <div className="timeline" data-testid="timeline">
-      <div className="tl-days">{days.map((d) => <span key={d}>{ctLabel(d, { weekday: "short", month: "numeric", day: "numeric" })}</span>)}</div>
-      <div className="tl-bar">
-        <div className="tl-past" style={{ width: pct(nowMs) }} />
-        {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: pct(Date.parse(s.to)) }} data-tip={`${ctLabel(Date.parse(s.to), { weekday: "short", hour: "numeric", minute: "2-digit" })} CT: the lineup changes`} />)}
-        <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
-          onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
-      </div>
-      <div className="tl-at small">
-        Lineup at <strong>{ctLabel(atMs, { weekday: "short", month: "2-digit", day: "2-digit", year: "2-digit", hour: "numeric", minute: "2-digit" })} CT</strong>
-        {following ? <span className="muted"> · now</span> : <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAt(null)}>back to now</button>}
+      <div className="tl-back">{!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}</div>
+      <div className="tl-main">
+        <div className="tl-days">{days.map((d) => <span key={d}>{ctLabel(d, { weekday: "short" })} {ctLabel(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
+        <div className="tl-bar">
+          <div className="tl-past" style={{ width: at(nowMs) }} />
+          {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
+          <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
+            onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
+          <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{ctLabel(atMs, { hour: "numeric", minute: "2-digit" })}</span>
+        </div>
       </div>
     </div>
   );
