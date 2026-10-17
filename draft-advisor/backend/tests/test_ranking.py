@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.engine.ranking import age_multiplier, injury_multiplier, player_value, pool_values, rank_players
+from app.core.engine.ranking import age_multiplier, injury_multiplier, player_value, pool_values, rank_players
 from nba_fantasy_shared.models.draft import Pick
 from nba_fantasy_shared.models.league import RankingSettings
 from tests.factories import NOW, default_world, override, record, small_league, valuation

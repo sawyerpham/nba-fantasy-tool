@@ -1,8 +1,8 @@
 import pytest
 
 from app import config
-from app.services.pull_service import PullService
-from app.services.valuation_service import ValuationService
+from app.core.services.pull_service import PullService
+from app.core.services.valuation_service import ValuationService
 from nba_fantasy_shared.models.scoring import BaseScoring, ScoringSettings
 from nba_fantasy_shared.providers.fixture_provider import FixturePlatformProvider, FixtureStatsProvider
 from nba_fantasy_shared.storage import JsonStore

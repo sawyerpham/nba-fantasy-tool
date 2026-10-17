@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.engine.bidding import competitor_weight, recommend_bid, replacement_value
-from app.engine.draft_state import DraftEngine
-from app.engine.ranking import pool_values, rank_players
+from app.core.engine.bidding import competitor_weight, recommend_bid, replacement_value
+from app.core.engine.draft_state import DraftEngine
+from app.core.engine.ranking import pool_values, rank_players
 from nba_fantasy_shared.models.league import ManagerBehavior
 from tests.factories import NOW, default_world, fresh_draft, managers, small_league
 

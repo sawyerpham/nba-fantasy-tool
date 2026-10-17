@@ -2,10 +2,10 @@
 
 import pytest
 
-from app.engine.keepers import KeeperCandidate, evaluate_keepers, verdict_for
-from app.engine.session import DraftSession
-from app.services.pull_service import PullService, load_overrides, load_records
-from app.services.valuation_service import ValuationService
+from app.core.engine.keepers import KeeperCandidate, evaluate_keepers, verdict_for
+from app.core.engine.session import DraftSession
+from app.core.services.pull_service import PullService, load_overrides, load_records
+from app.core.services.valuation_service import ValuationService
 from nba_fantasy_shared.models.draft import DraftState, KeeperHistory
 from nba_fantasy_shared.models.league import KeeperEscalation, KeeperSettings, LeagueSettings, Manager
 from nba_fantasy_shared.models.scoring import ScoringSettings
@@ -59,6 +59,6 @@ def test_explicit_price_override_and_unaffordable_flag(session):
 
 
 def test_unknown_player_is_a_draft_error(session):
-    from app.engine.draft_state import DraftError
+    from app.core.engine.draft_state import DraftError
     with pytest.raises(DraftError):
         evaluate_keepers(session, [KeeperCandidate("m1", 1, 5)])

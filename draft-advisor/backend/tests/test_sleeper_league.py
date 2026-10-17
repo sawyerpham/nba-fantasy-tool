@@ -1,7 +1,7 @@
 """Sleeper league details cache and the league changelog."""
 
-from app.services.sleeper_changelog import noticed_entries, transaction_entries
-from app.services.sleeper_league import details_rel
+from app.core.services.sleeper_changelog import noticed_entries, transaction_entries
+from app.core.services.sleeper_league import details_rel
 
 
 def test_details_cache_does_not_share_a_file_with_the_providers_raw_league_cache():
@@ -47,7 +47,7 @@ def test_transactions_name_the_manager_and_skip_failed_waivers():
 def test_mock_draft_picks_are_matched_by_seat():
     from types import SimpleNamespace
 
-    from app.services.sleeper_league import sync_picks
+    from app.core.services.sleeper_league import sync_picks
 
     me = SimpleNamespace(manager_id="m4", name="me", sleeper_user_id="u4", sleeper_roster_id=4)
     other = SimpleNamespace(manager_id="m6", name="six", sleeper_user_id="u6x", sleeper_roster_id=6)

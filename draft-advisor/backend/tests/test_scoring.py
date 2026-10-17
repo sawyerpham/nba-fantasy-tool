@@ -242,7 +242,7 @@ def test_traded_player_has_two_teams_in_history(fixtures_dir):
 def test_three_season_availability_forgives_one_injured_season_but_not_chronic_ones():
     from types import SimpleNamespace
 
-    from app.services.app_state import AppState
+    from app.core.services.app_state import AppState
     from nba_fantasy_shared.models.players import PlayerValuation
     from nba_fantasy_shared.scoring import blend_availability, season_week_shares
 

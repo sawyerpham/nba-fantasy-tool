@@ -5,7 +5,7 @@ import json
 import pytest
 
 from app import config
-from app.services.pull_service import PullService, load_game_logs, load_overrides, load_records, save_overrides
+from app.core.services.pull_service import PullService, load_game_logs, load_overrides, load_records, save_overrides
 from nba_fantasy_shared.providers.fixture_provider import FixturePlatformProvider, FixtureStatsProvider
 from nba_fantasy_shared.storage import JsonStore
 

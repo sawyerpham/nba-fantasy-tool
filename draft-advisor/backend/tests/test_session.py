@@ -4,10 +4,10 @@ import json
 
 import pytest
 
-from app.engine.draft_state import DraftError, KeeperAssignment
-from app.engine.session import DraftSession
-from app.services.pull_service import PullService, load_overrides, load_records
-from app.services.valuation_service import ValuationService
+from app.core.engine.draft_state import DraftError, KeeperAssignment
+from app.core.engine.session import DraftSession
+from app.core.services.pull_service import PullService, load_overrides, load_records
+from app.core.services.valuation_service import ValuationService
 from nba_fantasy_shared.models.draft import DraftState, KeeperHistory
 from nba_fantasy_shared.models.export import SCHEMA_VERSION, DraftExport
 from nba_fantasy_shared.models.league import KeeperSettings, LeagueSettings, Manager
@@ -133,7 +133,7 @@ def test_export_round_trip(fixture_world):
 
 
 def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
-    from app.engine.fit import fit_scores, team_fit
+    from app.draft.fit import fit_scores, team_fit
 
     s = make_session(fixture_world)
     before = team_fit(s, "m1", JOKIC)
@@ -157,7 +157,7 @@ def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
     assert bench.score_lines[1].startswith("Role: bench only") and "bench only" in bench.headline
 
 def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
-    from app.engine.fit import fit_scores
+    from app.draft.fit import fit_scores
 
     s = make_session(fixture_world)
     rows = s.rankings("m1", 30)
@@ -175,7 +175,7 @@ def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
 
 
 def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixture_world):
-    from app.engine.room import room_board
+    from app.draft.room import room_board
 
     s = make_session(fixture_world)
     s.start([])
@@ -187,7 +187,7 @@ def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixtur
 
 
 def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(fixture_world):
-    from app.engine.market import market_board
+    from app.draft.market import market_board
 
     s = make_session(fixture_world)
     s.start([])
@@ -198,20 +198,20 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
     assert [p["pos"] for p in b["positions"]] == ["PG", "SG", "SF", "PF", "C"]
     per_team = next(x.count for x in s.league.roster_slots if x.slot == "C")
     assert c["need"] == 12 * per_team - 1 and c["my_open"] == per_team and c["status"] in {"scarce", "tight", "plenty"}
-    room_starters = sum(n for m in s.managers for sl, n in __import__("app.engine.roster", fromlist=["x"]).open_slots(s.league, s.engine.picks_for(m.manager_id)).items() if sl not in ("BN", "IR"))
+    room_starters = sum(n for m in s.managers for sl, n in __import__("app.core.engine.roster", fromlist=["x"]).open_slots(s.league, s.engine.picks_for(m.manager_id)).items() if sl not in ("BN", "IR"))
     assert sum(p["left"] for p in b["positions"]) <= room_starters   # each player counted once, where he is needed most
     assert c["cliff"]["left"] >= 1 and all(ch["name"] != s.managers[0].name for ch in c["chasers"])
     sale = b["sales"][0]
     assert sale["player_id"] == JOKIC and sale["price"] == 80 and sale["diff"] == 80 - sale["fair"] and sale["fair"] > 1
-    from app.engine.room import room_board
+    from app.draft.room import room_board
     jokic = next(p for m in room_board(s, "m1") for p in m["picks"] if p["player_id"] == JOKIC)
     assert jokic["worth"] == sale["fair"]
     assert b["sold"] == 1 and b["good_left"] >= 1 and b["spots_left"] == 12 * s.league.mandatory_slot_count() - 1   # the Managers page colours his price with the same Worth-at-sale
 
 
 def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(fixture_world):
-    from app.engine.fit import team_fit
-    from app.engine.keepers import keeper_outlook
+    from app.draft.fit import team_fit
+    from app.core.engine.keepers import keeper_outlook
 
     s = make_session(fixture_world)
     s.start([])
@@ -242,7 +242,7 @@ def test_pre_draft_worth_counts_keepers_and_matches_draft_start(fixture_world):
 
 
 def test_r_value_prices_sleeper_fpg_above_the_replacement_player(fixture_world):
-    from app.engine.ranking import projected_fpts
+    from app.core.engine.ranking import projected_fpts
 
     s = make_session(fixture_world, keeper=KeeperSettings(enabled=True))
     for pts, pid in zip((40, 30, 25, 20, 15, 10), list(s.players)[:6]):   # the fixture has no Sleeper projections
