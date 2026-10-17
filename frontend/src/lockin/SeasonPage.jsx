@@ -210,13 +210,13 @@ function PlayerCard({ data, r, open, setLock, mine, side, day }) {
         </div>
         </div>
         <GameChips games={p.games} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
-        <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
         {mine && (
           <span className="mu-call">
             {word && <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>}
             {r.win_lock != null && (word === "LOCK" || word === "PASS") && (
               <span className="small muted win-pair" data-tip={r.why}>lock {Math.round(r.win_lock * 100)}% · wait {Math.round(r.win_wait * 100)}%</span>
             )}
+        <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
             {starter && (r.lock_status === "locked"
               ? <span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span>
               : lastPlayed && <button className="tiny" onClick={() => setLock(r.sid, lastPlayed.date)}
@@ -253,11 +253,20 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const [at, setAt] = useState(null);   // ms; null = follow the clock
   const tl = plan.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
-  const seg = tl?.segments.find((s) => atMs < Date.parse(s.to)) || tl?.segments.at(-1);
+  const segIdx = tl ? Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to))) : -1;
+  const seg = tl?.segments[segIdx];
   const seats = seg ? seg.seats : plan.today?.seats;
   const best = {};
   for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
-  const bestRows = seats ? plan.players.map((r) => ({ ...r, sleeper_slot: r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
+  const [arrows, setArrows] = useState(() => { try { return localStorage.getItem("da.season.arrows") === "1"; } catch { return false; } });
+  const toggleArrows = () => setArrows((v) => { try { localStorage.setItem("da.season.arrows", v ? "0" : "1"); } catch { /* ignore */ } return !v; });
+  const gridRef = React.useRef(null);
+  const slotIn = (st, r) => Object.entries(st || {}).find(([, ids]) => ids.includes(r.sid))?.[0] || (r.slot === "IR" ? "IR" : "BN");
+  // With arrows on they show the changes (and the amber outlines go): on "now" from your Sleeper lineup, further
+  // along from the lineup just before this change point.
+  const bestRows = seats ? plan.players.map((r) => ({ ...r, sleeper_slot: arrows ? null : r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
+  const before = Object.fromEntries(plan.players.map((r) => [r.sid, at == null || segIdx <= 0 ? r.slot : slotIn(tl.segments[segIdx - 1].seats, r)]));
+  const pairs = arrows && seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -309,6 +318,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
               Best lineup: <strong>{(seg?.date || data.day) === data.today ? "today" : dayName(seg?.date || data.day)}</strong>
             </span>
           )}
+          {isMine && seats && <button className={`tiny ${arrows ? "primary" : ""}`} onClick={toggleArrows} data-testid="arrows-toggle"
+            data-tip="Arrows from each player going to the bench to the one taking his place, in that slot's colour. On now: the changes to make in Sleeper; further along the timeline: what changes at that tip-off.">Arrows</button>}
         </div>
         <div className="mu-team right">
           {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
@@ -317,12 +328,74 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
-      <div className="mu-grid">
+      <div className={`mu-grid ${isMine && arrows ? "with-arrows" : ""}`} ref={gridRef}>
+        {isMine && arrows && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
         {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
       </div>
     </div>
+  );
+}
+
+// Who replaces whom from lineup `before` to lineup `after` (sid -> slot): each player newly starting is paired with a
+// player leaving the lineup, the one from the same slot when there is one. Moves between starting slots aren't swaps.
+const isStarter = (slot) => slot && slot !== "BN" && slot !== "IR";
+function swapPairs(before, after, positions) {
+  const ins = Object.keys(after).filter((sid) => isStarter(after[sid]) && !isStarter(before[sid]))
+    .sort((a, b) => positions.indexOf(after[a]) - positions.indexOf(after[b]));
+  const outs = Object.keys(before).filter((sid) => isStarter(before[sid]) && !isStarter(after[sid]));
+  return ins.flatMap((sid) => {
+    if (!outs.length) return [];
+    const k = outs.findIndex((o) => before[o] === after[sid]);
+    return [{ in: sid, out: outs.splice(k < 0 ? 0 : k, 1)[0], slot: after[sid] }];
+  });
+}
+
+// The arrows, in a lane left of your cards: from the player going to the bench to the one taking his place,
+// coloured by that slot's position. Measured from the cards on screen; redrawn when the grid changes size.
+const ARROW_GUTTER = 80;
+function SwapArrows({ gridRef, pairs, names }) {
+  const [lines, setLines] = useState([]);
+  const key = pairs.map((p) => `${p.out}>${p.in}`).join(",");
+  React.useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return undefined;
+    const measure = () => {
+      const top = grid.getBoundingClientRect().top;
+      const mid = (sid) => {
+        const el = grid.querySelector(`.mu-card.left[data-testid="mu-${sid}"]`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return r.top + r.height / 2 - top;
+      };
+      // shortest arrows nearest the cards, longest outside: nested lines cross as little as possible
+      setLines(pairs.map((p) => ({ ...p, y1: mid(p.out), y2: mid(p.in) })).filter((l) => l.y1 != null && l.y2 != null)
+        .sort((a, b) => Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, [gridRef, key]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const step = Math.min(13, (ARROW_GUTTER - 24) / Math.max(1, lines.length));
+  const end = ARROW_GUTTER - 6;   // just left of the cards
+  return (
+    <svg className="swap-arrows" width={ARROW_GUTTER} data-testid="swap-arrows">
+      {lines.map((l, i) => {
+        const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
+        const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
+        const d = `M ${end} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
+        return (
+          <g key={`${l.out}>${l.in}`} style={{ color }}>
+            <title>{`${names(l.in)} takes the place of ${names(l.out)} at ${l.slot}`}</title>
+            <path d={d} className="swap-path" />
+            <circle cx={end} cy={l.y1} r="3" fill="currentColor" />
+            <polygon points={`${end - 6},${l.y2 - 5} ${end + 1},${l.y2} ${end - 6},${l.y2 + 5}`} fill="currentColor" />
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -342,7 +415,7 @@ function Timeline({ tl, nowMs, atMs, following, setAt }) {
         <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
         <div className="tl-bar">
           <div className="tl-past" style={{ width: at(nowMs) }} />
-          {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
+          {tl.segments.slice(0, -1).map((s) => <div key={s.to} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
           <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
             onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
           <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{fmt(atMs, { hour: "numeric", minute: "2-digit" })}</span>
