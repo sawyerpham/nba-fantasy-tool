@@ -138,6 +138,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     league = fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
     positions = league.get("roster_positions") or []
     reserve_slots = (league.get("settings") or {}).get("reserve_slots", 0)
+    faab_budget = (league.get("settings") or {}).get("waiver_budget", FAAB_TOTAL)   # the league's real FAAB (2026: $100)
     rosters = fetch(f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL) or []
     users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
     matchups = fetch(f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL) or []
@@ -196,7 +197,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
             "now": None if preview else datetime.now(CT).isoformat(), "roster_positions": positions,
             "reserve_slots": reserve_slots,
-            "team_games": team_games, "injury_tags": injury_tags,
+            "team_games": team_games, "injury_tags": injury_tags, "faab_budget": faab_budget,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
 
@@ -471,7 +472,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
 
 
 # ---- waivers ---------------------------------------------------------------------------------------------
-FAAB_TOTAL = 200
+FAAB_TOTAL = 100   # fallback only: the budget comes from the league's settings (waiver_budget)
 WAIVER_SHOW = 12
 # ponytail: bid = share of FAAB left that grows with the upgrade over your weakest player (8 value points = 60 %);
 # no data on rivals' bids, so it is a guide, not a price.
@@ -479,7 +480,7 @@ WAIVER_SHOW = 12
 
 def waivers(session, view: dict) -> dict:
     """Free agents worth claiming: rest-of-season value (the draft value: projection, Lock-In ceiling, availability),
-    this week's games, the player of yours to drop and a suggested blind bid. Claims process Saturday 2 AM."""
+    this week's games, the player of yours to drop and a suggested blind bid. Waivers run daily (league setting)."""
     me = next(t for t in view["teams"] if t["is_user"])
     rostered = {sid for t in view["teams"] for sid in t["players"]}
     by_sleeper = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
@@ -489,7 +490,8 @@ def waivers(session, view: dict) -> dict:
     mine = [by_sleeper[sid] for sid in me["players"] if sid in by_sleeper and sid not in me["reserve"]]
     rows = {r.player_id: r for r in session.rank([], fa_ids + mine)}
     drop = min((rows[pid] for pid in mine if pid in rows), key=lambda r: r.value, default=None)
-    faab_left = FAAB_TOTAL - (me.get("faab_used") or 0)
+    budget = view.get("faab_budget", FAAB_TOTAL)
+    faab_left = budget - (me.get("faab_used") or 0)
     out = []
     floor = drop.value if drop else 0.0   # only real upgrades over your weakest player
     for pid in sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]:
@@ -501,4 +503,4 @@ def waivers(session, view: dict) -> dict:
                     "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id),
                     "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
     return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "name": drop.full_name, "value": round(drop.value, 2)} if drop else None,
-            "claims": out, "process": "Saturday 2:00 AM"}
+            "claims": out, "budget": budget, "process": "daily"}
