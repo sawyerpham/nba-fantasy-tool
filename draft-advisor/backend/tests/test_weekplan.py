@@ -205,3 +205,14 @@ def test_late_scratch_alarms_now_and_close_projections_go_to_the_earlier_tip():
     b = pp("b", ["SG"], "BN", [Game(today, 12.8, tip="2026-10-21T23:10Z")])   # 10 min later, only 0.8 more
     plan_week([a, b], {"SG": 1})
     assert plan_today([a, b], {"SG": 1}, today).seats == {"SG": ["a"]}   # near tie: the earlier tip
+
+
+def test_an_idle_starter_who_already_played_keeps_his_slot_for_the_lock():
+    from app.engine.weekplan import plan_today
+
+    s = pp("s", ["PG"], "PG", [Game("2026-10-20", 15, tip="2026-10-21T01:30:00Z"), Game("2026-10-22", 15, tip="2026-10-23T01:30:00Z")])
+    h = pp("h", ["PG"], "BN", [Game("2026-10-22", 11, tip="2026-10-22T23:00:00Z")])   # tips first on the 22nd
+    plan_week([s, h], {"PG": 1})
+    assert plan_today([s, h], {"PG": 1}, "2026-10-21").moves == []   # nobody plays the 21st: s keeps the PG slot
+    moves = {m["sid"]: m["to"] for m in plan_today([s, h], {"PG": 1}, "2026-10-22").moves}
+    assert moves == {"h": "PG", "s": "BN"}                             # on game day the earlier tip starts (rule 1)

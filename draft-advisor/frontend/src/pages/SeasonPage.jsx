@@ -190,7 +190,7 @@ function lockCall(r) {
   return ["", "", ""];
 }
 
-function PlayerCard({ data, r, open, setLock, mine, side }) {
+function PlayerCard({ data, r, open, setLock, mine, side, day }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
@@ -208,7 +208,7 @@ function PlayerCard({ data, r, open, setLock, mine, side }) {
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
-        <GameChips games={p.games} today={data.today} day={mine ? data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
+        <GameChips games={p.games} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
         <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
         {mine && (
           <span className="mu-call">
@@ -247,10 +247,16 @@ const WIN_TIP = "Chance to win the week: your counted/locked points + what your 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
 function WeekView({ data, plan, open, setLock, leagueId }) {
-  // Your side shows the best lineup: everyone in the slot he should be in (from plan.today), not his Sleeper slot.
+  // Your side shows the best lineup at the timeline's time (default: now): everyone in the slot he should be in then,
+  // not his Sleeper slot. The timeline has one lineup per game day; locked players never move.
+  const [at, setAt] = useState(null);   // ms; null = follow the clock
+  const tl = plan.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
+  const atMs = Math.max(at ?? nowMs, nowMs);
+  const seg = tl?.segments.find((s) => atMs < Date.parse(s.to)) || tl?.segments.at(-1);
+  const seats = seg ? seg.seats : plan.today?.seats;
   const best = {};
-  for (const [slot, sids] of Object.entries(plan.today?.seats || {})) for (const sid of sids) best[sid] = slot;
-  const bestRows = plan.today ? plan.players.map((r) => ({ ...r, sleeper_slot: r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
+  for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
+  const bestRows = seats ? plan.players.map((r) => ({ ...r, sleeper_slot: r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -277,13 +283,14 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
   );
   return (
     <div className="panel matchup" data-testid="my-week">
+      {isMine && tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
@@ -296,9 +303,9 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
           {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
-          {isMine && data.day && (
-            <span className="lineup-day" data-tip="Your side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Updates on its own (every minute and when you open the page); after the day's last game it moves to the next game day.">
-              Best lineup: <strong>{data.day === data.today ? "today" : dayName(data.day)}</strong>{data.now && <span className="muted"> · {ctTime(data.now)} CT</span>}
+          {isMine && (seg?.date || data.day) && (
+            <span className="lineup-day" data-tip="Your side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Move the timeline above to see the lineup for a later time.">
+              Best lineup: <strong>{(seg?.date || data.day) === data.today ? "today" : dayName(seg?.date || data.day)}</strong>
             </span>
           )}
         </div>
@@ -313,6 +320,32 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
         {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
+      </div>
+    </div>
+  );
+}
+
+// The week as a line (Mon 12 AM to the next Mon), 15-minute steps; the dot picks the time whose best lineup shows.
+// The past is shaded and the dot can't go there (no lineup to set for it).
+const STEP_MS = 15 * 60000;
+const ctLabel = (ms, opts) => new Date(ms).toLocaleString("en-US", { timeZone: "America/Chicago", ...opts });
+
+function Timeline({ tl, nowMs, atMs, following, setAt }) {
+  const start = Date.parse(tl.start), end = Date.parse(tl.end);
+  const pct = (ms) => `${Math.min(100, Math.max(0, ((ms - start) / (end - start)) * 100))}%`;
+  const days = Array.from({ length: 7 }, (_, i) => start + i * 86400000 + 12 * 3600000);   // noon of each day
+  return (
+    <div className="timeline" data-testid="timeline">
+      <div className="tl-days">{days.map((d) => <span key={d}>{ctLabel(d, { weekday: "short", month: "numeric", day: "numeric" })}</span>)}</div>
+      <div className="tl-bar">
+        <div className="tl-past" style={{ width: pct(nowMs) }} />
+        {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: pct(Date.parse(s.to)) }} data-tip={`${ctLabel(Date.parse(s.to), { weekday: "short", hour: "numeric", minute: "2-digit" })} CT: the lineup changes`} />)}
+        <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
+          onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
+      </div>
+      <div className="tl-at small">
+        Lineup at <strong>{ctLabel(atMs, { weekday: "short", month: "2-digit", day: "2-digit", year: "2-digit", hour: "numeric", minute: "2-digit" })} CT</strong>
+        {following ? <span className="muted"> · now</span> : <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAt(null)}>back to now</button>}
       </div>
     </div>
   );

@@ -273,6 +273,44 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
 
 
 LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
+GAME_HOURS = 3           # a game day's lineup holds until its last tip + this (games run ~2.5 h)
+
+
+def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict | None) -> dict:
+    """The best lineup at every moment from now to the end of the week, for the timeline slider: one lineup per game
+    day, each planned with today's rules (plan_today) starting from the day before's lineup, so the moves chain.
+    Locked players are pinned by plan_today, so their slot never changes. A day's lineup holds from the end of the
+    previous game day (its last tip + GAME_HOURS) until its own end; off days belong to the next game day."""
+    from ..engine.weekplan import plan_today
+
+    first = date.fromisoformat(view["dates"][0])
+    start = datetime.combine(first - timedelta(days=first.weekday()), datetime.min.time(), CT)   # Monday 12 AM CT
+    end = start + timedelta(days=7)
+    day = view.get("day")
+    if not day or not view["dates"]:
+        return {"start": start.isoformat(), "end": end.isoformat(), "segments": []}
+
+    def day_end(d: str) -> str:
+        tips = [g["tip"] for p in view["players"].values() for g in p["games"] if g["date"] == d and g["tip"]]
+        last = max((datetime.fromisoformat(t.replace("Z", "+00:00")) for t in tips), default=None)
+        return (last + timedelta(hours=GAME_HOURS)).astimezone(CT).isoformat() if last else end.isoformat()
+
+    slots = {p.sid: p.slot for p in players}
+    segments, prev = [], None
+    for d in (x for x in view["dates"] if x >= day):
+        if d == day and today_seats is not None:
+            seats = today_seats
+        else:
+            for p in players:   # start from the previous day's lineup
+                if p.slot != "IR" and p.locked is None:
+                    p.slot = next((s for s, ids in prev.items() if p.sid in ids), "BN") if prev else p.slot
+            seats = plan_today(players, counts, d).seats
+        segments.append({"date": d, "to": day_end(d), "seats": seats})
+        prev = seats
+    for p in players:
+        p.slot = slots[p.sid]
+    segments[-1]["to"] = end.isoformat()   # the last game day's lineup stands until the week is over
+    return {"start": start.isoformat(), "end": end.isoformat(), "segments": segments}
 
 
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
@@ -323,6 +361,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                 reminders.append({"kind": "lock", "sid": q.sid, "name": q.name, "slot": q.seat, "by": nxt.tip,
                                   "alarm": _minus_minutes(nxt.tip, LOCK_REMINDER_MIN), "decision": "LOCK",
                                   "text": f"Lock {q.name} ({q.x:.1f}) in the {q.seat} slot before his next tip: {q.why}."})
+    timeline = week_timeline(players, counts, view, t.seats if t else None) if roster_id is None and view["dates"] else None
     out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)
     active = [q for q in players if q.slot != "IR"]
     healthy_ir = [q.name for q in players if q.slot == "IR" and q.injury not in out_now]
@@ -337,7 +376,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
             "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": reminders + t.watch} if t else
                      ({"date": today, "seats": {}, "moves": [], "watch": reminders} if reminders else None),
-            "roster": roster_state,
+            "roster": roster_state, "timeline": timeline,
             "opponent": opp}
 
 
