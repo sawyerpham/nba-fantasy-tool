@@ -34,7 +34,7 @@ class TeamFit:
     headline: str
     score_lines: list[str] = field(default_factory=list)   # the three parts of the score
     notes: list[str] = field(default_factory=list)          # context, not in the score
-    reasons: list[str] = field(default_factory=list)        # score_lines + notes (for Copy for Claude)
+    reasons: list[str] = field(default_factory=list)        # score_lines + notes
     keeper: dict | None = None                              # next year's keep call if bought now (never in the score)
 
 

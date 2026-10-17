@@ -156,18 +156,6 @@ def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
     bench = team_fit(s, "m1", JOKIC)
     assert bench.score_lines[1].startswith("Role: bench only") and "bench only" in bench.headline
 
-def test_draft_context_has_rules_state_managers_and_the_player_on_the_block(fixture_world):
-    from app.engine.context import draft_context
-
-    s = make_session(fixture_world)
-    s.start([])
-    s.engine.nominate(JOKIC)
-    text = draft_context(s, "m1", top=10)
-    for heading in ("## League rules", "## Draft so far", "## Managers", "## My money vs the room", "## Best available", "## Player in question"):
-        assert heading in text
-    assert "I am **Team 1**" in text and "On the block now: Nikola Joki" in text and "### Team 12" in text
-
-
 def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
     from app.engine.fit import fit_scores
 
