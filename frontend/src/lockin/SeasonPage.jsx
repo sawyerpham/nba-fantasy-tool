@@ -197,15 +197,13 @@ function PlayerCard({ data, r, open, setLock, mine, side, day }) {
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
   const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
   const starter = r.slot !== "BN" && r.slot !== "IR";
-  const misplaced = mine && r.sleeper_slot && r.sleeper_slot !== r.slot;   // Sleeper's lineup differs from the best one
   return (
-    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${misplaced ? "misplaced" : ""}`} data-testid={`mu-${r.sid}`}>
+    <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
-          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} />
-            {misplaced && <span className="move-tag" data-tip={`Sleeper has him at ${r.sleeper_slot}: move him to ${r.slot}.`}>now {r.sleeper_slot}</span>}</div>
+          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
@@ -258,15 +256,13 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const seats = seg ? seg.seats : plan.today?.seats;
   const best = {};
   for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
-  const [arrows, setArrows] = useState(() => { try { return localStorage.getItem("da.season.arrows") === "1"; } catch { return false; } });
-  const toggleArrows = () => setArrows((v) => { try { localStorage.setItem("da.season.arrows", v ? "0" : "1"); } catch { /* ignore */ } return !v; });
   const gridRef = React.useRef(null);
   const slotIn = (st, r) => Object.entries(st || {}).find(([, ids]) => ids.includes(r.sid))?.[0] || (r.slot === "IR" ? "IR" : "BN");
-  // With arrows on they show the changes (and the amber outlines go): on "now" from your Sleeper lineup, further
-  // along from the lineup just before this change point.
-  const bestRows = seats ? plan.players.map((r) => ({ ...r, sleeper_slot: arrows ? null : r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
+  // The arrows show the changes: on "now" from your Sleeper lineup, further along from the lineup just before this
+  // change point.
+  const bestRows = seats ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
   const before = Object.fromEntries(plan.players.map((r) => [r.sid, at == null || segIdx <= 0 ? r.slot : slotIn(tl.segments[segIdx - 1].seats, r)]));
-  const pairs = arrows && seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
+  const pairs = seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -318,8 +314,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
               Best lineup: <strong>{(seg?.date || data.day) === data.today ? "today" : dayName(seg?.date || data.day)}</strong>
             </span>
           )}
-          {isMine && seats && <button className={`tiny ${arrows ? "primary" : ""}`} onClick={toggleArrows} data-testid="arrows-toggle"
-            data-tip="Arrows from each player going to the bench to the one taking his place, in that slot's colour. On now: the changes to make in Sleeper; further along the timeline: what changes at that tip-off.">Arrows</button>}
         </div>
         <div className="mu-team right">
           {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
@@ -328,8 +322,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
-      <div className={`mu-grid ${isMine && arrows ? "with-arrows" : ""}`} ref={gridRef}>
-        {isMine && arrows && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
+      <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
+        {isMine && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
         {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
