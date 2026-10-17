@@ -49,7 +49,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <span className="brand" onClick={() => setTab("season")} title="Home (Season)" data-testid="home"><span className="logo">🏀</span>Draft Advisor</span>
+        <span className="brand" onClick={() => setTab("season")} title="Home (Season)" data-testid="home"><span className="logo">🏀</span>NBA Fantasy Tool</span>
         <nav>
           {TABS.map(([id, label]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`tab-${id}`}>

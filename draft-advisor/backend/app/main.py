@@ -46,7 +46,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
             log.info("AppState initialised from %s", app.state.app_state.store.root)
         yield
 
-    app = FastAPI(title="Draft Advisor API", version=API_VERSION, lifespan=lifespan)
+    app = FastAPI(title="NBA Fantasy Tool API", version=API_VERSION, lifespan=lifespan)
     app.state.app_state = state
     app.add_middleware(CORSMiddleware, allow_origins=DEFAULT_ORIGINS, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
