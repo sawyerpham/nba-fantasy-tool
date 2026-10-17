@@ -19,4 +19,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import sys
+
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # accented names on a Windows console
     main()
