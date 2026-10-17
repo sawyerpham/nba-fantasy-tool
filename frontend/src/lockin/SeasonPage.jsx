@@ -191,22 +191,21 @@ function lockCall(r) {
   return ["", "", ""];
 }
 
-function PlayerCard({ data, r, open, setLock, mine, side, day, change }) {
+function PlayerCard({ data, r, open, setLock, mine, side, day }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
   const lastPlayed = [...p.games].reverse().find((g) => g.fp != null);
   const starter = r.slot !== "BN" && r.slot !== "IR";
-  const swap = change?.n ? change : null;   // { n, kind: "in" | "out", tip } or { shift: "PG→SG", tip }
+  const misplaced = mine && r.sleeper_slot && r.sleeper_slot !== r.slot;   // Sleeper's lineup differs from the best one
   return (
-    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${swap ? `swap-${swap.kind}` : ""}`} data-testid={`mu-${r.sid}`}>
+    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${misplaced ? "misplaced" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
           <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} />
-            {swap && <span className={`swap-tag ${swap.kind}`} data-tip={swap.tip} data-testid={`swap-${r.sid}`}>{swap.n}</span>}
-            {change?.shift && <span className="shift-tag" data-tip={change.tip}>{change.shift}</span>}</div>
+            {misplaced && <span className="move-tag" data-tip={`Sleeper has him at ${r.sleeper_slot}: move him to ${r.slot}.`}>now {r.sleeper_slot}</span>}</div>
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
@@ -254,19 +253,11 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const [at, setAt] = useState(null);   // ms; null = follow the clock
   const tl = plan.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
-  const segIdx = tl ? Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to))) : -1;
-  const seg = tl?.segments[segIdx];
+  const seg = tl?.segments.find((s) => atMs < Date.parse(s.to)) || tl?.segments.at(-1);
   const seats = seg ? seg.seats : plan.today?.seats;
-  const slotsOf = (st) => Object.fromEntries(plan.players.map((r) => [r.sid,
-    Object.entries(st || {}).find(([, ids]) => ids.includes(r.sid))?.[0] || (r.slot === "IR" ? "IR" : "BN")]));
-  const best = slotsOf(seats);
-  const bestRows = seats ? plan.players.map((r) => ({ ...r, slot: best[r.sid] })) : plan.players;
-  // Changes to show: on "now", from your Sleeper lineup (what to do now); further along, from the lineup just before
-  // this change point (what changes at that tip-off).
-  const vsSleeper = at == null || segIdx <= 0;
-  const base = vsSleeper ? Object.fromEntries(plan.players.map((r) => [r.sid, r.slot])) : slotsOf(tl.segments[segIdx - 1].seats);
-  const changes = seats ? lineupChanges(base, best, data.roster_positions, (sid) => shortName(data.players[sid]?.name || sid)) : { swaps: [], cards: {} };
-  const changeAt = vsSleeper ? null : Date.parse(tl.segments[segIdx - 1].to);
+  const best = {};
+  for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
+  const bestRows = seats ? plan.players.map((r) => ({ ...r, sleeper_slot: r.slot, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -293,7 +284,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} change={isMine ? changes.cards[l?.r?.sid] : null} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
@@ -301,7 +292,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   return (
     <div className="panel matchup" data-testid="my-week">
       {isMine && tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
-      {isMine && seats && <SwapStrip changes={changes} changeAt={changeAt} />}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
@@ -336,60 +326,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
 }
 
-// "Jaime Jaquez Jr." -> "Jaquez": last names keep the swap strip short.
-const shortName = (name) => name.split(" ").filter((w) => !/^(Jr\.?|Sr\.?|II|III|IV)$/.test(w)).at(-1) || name;
-const starting = (slot) => slot && slot !== "BN" && slot !== "IR";
-
-// What changes from lineup `base` to lineup `next` (sid -> slot): swaps, each the player going out and the one taking
-// his slot (matched by slot where possible), numbered so both cards carry the same tag; and starters who only move
-// to another starting slot (free in Sleeper, shown as a grey "PG→SG" tag).
-function lineupChanges(base, next, positions, name) {
-  const order = (slot) => positions.indexOf(slot);
-  const ins = Object.keys(next).filter((sid) => starting(next[sid]) && !starting(base[sid])).sort((a, b) => order(next[a]) - order(next[b]));
-  const outs = Object.keys(base).filter((sid) => starting(base[sid]) && !starting(next[sid]));
-  const swaps = [];
-  for (const i of ins) {
-    const k = outs.findIndex((o) => base[o] === next[i]);
-    const o = outs.length ? outs.splice(k < 0 ? 0 : k, 1)[0] : null;
-    swaps.push({ slot: next[i], in: i, out: o });
-  }
-  for (const o of outs) swaps.push({ slot: base[o], in: null, out: o });
-  const cards = {};
-  swaps.forEach((s, j) => {
-    s.n = j + 1;
-    s.outName = s.out ? name(s.out) : null;
-    s.outSlot = s.out ? base[s.out] : null;
-    s.inName = s.in ? name(s.in) : null;
-    if (s.in) cards[s.in] = { n: s.n, kind: "in", tip: `Swap ${s.n}: starts at ${s.slot}${s.out ? ` for ${name(s.out)}` : ""}.` };
-    if (s.out) cards[s.out] = { n: s.n, kind: "out", tip: `Swap ${s.n}: to the bench${s.in ? `, ${name(s.in)} takes his ${base[s.out]} slot` : ""}.` };
-  });
-  for (const sid of Object.keys(next)) {
-    if (starting(base[sid]) && starting(next[sid]) && base[sid] !== next[sid]) {
-      cards[sid] = { shift: `${base[sid]}→${next[sid]}`, tip: `Moves from ${base[sid]} to ${next[sid]} (free: he stays in the lineup).` };
-    }
-  }
-  return { swaps, cards, shifts: Object.values(cards).filter((c) => c.shift).length };
-}
-
-// The swaps as one line under the timeline: on "now" what to do in Sleeper, further along what changes at that tip-off.
-function SwapStrip({ changes, changeAt }) {
-  const { swaps, shifts } = changes;
-  return (
-    <div className="swap-strip" data-testid="swap-strip">
-      <span className="swap-when">{changeAt ? `At ${fmt(changeAt, { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "To do now"}</span>
-      {swaps.length ? swaps.map((s) => (
-        <span key={s.n} className="swap">
-          <span className="swap-n">{s.n}</span>
-          {(!s.in || !s.out || s.outSlot === s.slot) ? <PosTag text={s.slot} /> : <PosTag text={s.outSlot} />}
-          <span className="out-name">{s.outName || "empty"}</span>→<span className="in-name">{s.inName || "bench"}</span>
-          {s.in && s.out && s.outSlot !== s.slot && <PosTag text={s.slot} />}
-        </span>
-      )) : <span className="muted">{changeAt ? "no changes" : "nothing: Sleeper already matches the best lineup"}</span>}
-      {shifts > 0 && <span className="muted small">+ {shifts} slot {shifts === 1 ? "move" : "moves"} (grey tags)</span>}
-    </div>
-  );
-}
-
 // The week as a line (Mon 12 AM to the next Mon), 15-minute steps; the dot picks the time whose best lineup shows.
 // The past is shaded and the dot can't go there (no lineup to set for it).
 const STEP_MS = 15 * 60000;
@@ -406,7 +342,7 @@ function Timeline({ tl, nowMs, atMs, following, setAt }) {
         <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
         <div className="tl-bar">
           <div className="tl-past" style={{ width: at(nowMs) }} />
-          {tl.segments.slice(0, -1).map((s) => <div key={s.to} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
+          {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
           <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
             onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
           <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{fmt(atMs, { hour: "numeric", minute: "2-digit" })}</span>
