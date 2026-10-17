@@ -247,9 +247,9 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     def nxt(p: PlanPlayer) -> Game | None:
         return next((g for g in p.games if g.date > today and not g.started), None)
     rest = [p for p in free if p not in tier1 and p not in tier2]
-    # ...except a starter who already played this week (unlocked): benching him gives up locking that game, and on a
+    # ...except a starter who already played this week, today included (unlocked): benching him gives up locking that game, and on a
     # day neither plays nothing is gained, so he holds his slot (anyone who plays today can still take it, above).
-    held = sorted((p for p in rest if p.slot in slot_counts and any(g.date < today for g in p.games)
+    held = sorted((p for p in rest if p.slot in slot_counts and any(g.date < today or g.started for g in p.games)
                    and p.injury not in OUT), key=lambda p: -p.value)
     tier3 = held + _by_tip([p for p in rest if p not in held and nxt(p) and p.injury not in OUT], nxt)
     tier3 += sorted((p for p in rest if p not in tier3 and p.slot in slot_counts), key=lambda p: -p.value)

@@ -146,3 +146,18 @@ def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
     from app.lockin.service import waivers
 
     assert waivers(None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
+
+
+def test_timeline_changes_at_each_tip_so_a_later_player_can_take_the_slot():
+    from app.lockin.service import week_timeline
+    from app.lockin.weekplan import Game, PlanPlayer, plan_week
+
+    shai = PlanPlayer(sid="s", name="s", eligibility=["PG"], slot="PG", games=[Game("2026-10-20", 15, tip="2026-10-21T01:30:00Z")])
+    reav = PlanPlayer(sid="r", name="r", eligibility=["PG"], slot="BN", games=[Game("2026-10-21", 12, tip="2026-10-22T02:00:00Z")])
+    plan_week([shai, reav], {"PG": 1})
+    view = {"tz": "America/Chicago", "dates": ["2026-10-20", "2026-10-21"], "day": "2026-10-20"}
+    segs = week_timeline([shai, reav], {"PG": 1}, view, None)["segments"]
+    assert [(x["seats"]["PG"], x["to"][:16]) for x in segs] == [
+        (["s"], "2026-10-20T20:30"),    # Shai starts until his 8:30 PM CT tip ...
+        (["r"], "2026-10-26T00:00")]    # ... then the slot goes to the player who still has a game (Shai can be locked)
+    assert shai.slot == "PG" and not shai.games[0].started   # the simulation leaves the real state alone
