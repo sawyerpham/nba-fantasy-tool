@@ -1,4 +1,4 @@
-# Draft Advisor backend
+# NBA Fantasy Tool backend
 
 Python 3.13 + FastAPI. Shared models/providers live in `../../shared` (installed editable).
 
