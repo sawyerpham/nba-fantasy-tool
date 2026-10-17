@@ -6,6 +6,7 @@ import { PosList, PosTag } from "../components/Pos.jsx";
 import PlayerSidebar from "../components/PlayerSidebar.jsx";
 import PlayerSearch from "../components/PlayerSearch.jsx";
 import InjuryTag from "../components/InjuryTag.jsx";
+import { fmt, setZone, timeOf, tzAbbr } from "../tz.js";
 import { alarmSound } from "../components/sounds.js";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
@@ -14,7 +15,6 @@ import { alarmSound } from "../components/sounds.js";
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["waivers", "Waivers"]];
 
-export const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 const fp = (x) => (x == null ? "" : x.toFixed(1));
 
@@ -35,7 +35,7 @@ export default function SeasonPage({ leagueId }) {
   const load = useCallback(() => {
     if (!leagueId) return;
     Promise.all([api.get(`/leagues/${leagueId}/season/week` + qs({ week })), api.get(`/leagues/${leagueId}/season/plan` + qs({ week }))])
-      .then(([w, p]) => { setData(w); setPlan(p); setError(""); })
+      .then(([w, p]) => { setZone(w.tz); setData(w); setPlan(p); setError(""); })
       .catch((e) => setError(e.message));
   }, [leagueId, week]);
   useEffect(() => {
@@ -169,8 +169,8 @@ function GameChips({ games, today, lockDate, day }) {   // day: the lineup day s
         const played = g.fp != null, live = g.state === "in";
         return (
           <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""}`}
-            data-tip={`${dayName(g.date)} ${g.date.slice(5)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${ctTime(g.tip)} CT · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
-            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : ctTime(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            data-tip={`${dayName(g.date)} ${g.date.slice(5)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
+            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
           </span>
         );
@@ -328,7 +328,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
 // The week as a line (Mon 12 AM to the next Mon), 15-minute steps; the dot picks the time whose best lineup shows.
 // The past is shaded and the dot can't go there (no lineup to set for it).
 const STEP_MS = 15 * 60000;
-const ctLabel = (ms, opts) => new Date(ms).toLocaleString("en-US", { timeZone: "America/Chicago", ...opts });
 
 function Timeline({ tl, nowMs, atMs, following, setAt }) {
   const start = Date.parse(tl.start), end = Date.parse(tl.end);
@@ -339,13 +338,13 @@ function Timeline({ tl, nowMs, atMs, following, setAt }) {
     <div className="timeline" data-testid="timeline">
       <div className="tl-back">{!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}</div>
       <div className="tl-main">
-        <div className="tl-days">{days.map((d) => <span key={d}>{ctLabel(d, { weekday: "short" })} {ctLabel(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
+        <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
         <div className="tl-bar">
           <div className="tl-past" style={{ width: at(nowMs) }} />
           {tl.segments.map((s) => <div key={s.date} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
           <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
             onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
-          <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{ctLabel(atMs, { hour: "numeric", minute: "2-digit" })}</span>
+          <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{fmt(atMs, { hour: "numeric", minute: "2-digit" })}</span>
         </div>
       </div>
     </div>
@@ -372,7 +371,7 @@ const newsTime = (iso) => {
   const t = new Date(iso), mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60);
   const ago = mins < 60 ? `${mins}m` : d ? `${d}d ${h}h` : `${h}h`;
-  return `${ago} ago · ${t.toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "2-digit", day: "2-digit", year: "2-digit" })}`;
+  return `${ago} ago · ${fmt(t, { month: "2-digit", day: "2-digit", year: "2-digit" })}`;
 };
 
 // One note: who (opens his profile), his injury tag, the fantasy team that has him (league-wide), when, the note.
@@ -455,7 +454,7 @@ function LeagueView({ data, leagueId, open }) {
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
             <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}>{t.name}</td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
-              <td className="num">{fp(t.fpts)}</td><td className="num">${(data.faab_budget ?? 100) - (t.faab_used || 0)}</td></tr>))}</tbody>
+              <td className="num">{fp(t.fpts)}</td><td className="num">{data.waiver ? `$${(data.faab_budget ?? 100) - (t.faab_used || 0)}` : "?"}</td></tr>))}</tbody>
         </table>
       </div>
     </>
@@ -466,9 +465,11 @@ function WaiversView({ leagueId, onSelect }) {
   const [w, setW] = useState(null);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/waivers`).then(setW).catch(() => setW(null)); }, [leagueId]);
   if (!w) return <div className="panel">Loading free agents…</div>;
+  if (w.error) return <div className="panel warn-text" data-testid="waivers-error">{w.error}</div>;
+  const faab = w.type === "FAAB";
   return (
     <div className="panel" data-testid="waivers">
-      <h3 style={{ marginTop: 0 }}>Waiver claims <span className="small muted">blind bids · process {w.process} · ${w.faab_left} FAAB left of ${w.budget}</span></h3>
+      <h3 style={{ marginTop: 0 }}>Waiver claims <span className="small muted">{faab ? <>blind FAAB bids · process {w.process} · ${w.faab_left} left of ${w.budget}</> : <>{w.type} waiver priority · process {w.process}</>}</span></h3>
       {w.drop && <div className="small" style={{ marginBottom: 8 }}>Drop candidate: <strong className="clickable" onClick={() => onSelect(w.drop.player_id)}>{w.drop.name}</strong> <span className="muted">(value {w.drop.value}, your weakest)</span></div>}
       {w.claims.length ? (
         <table className="small">
@@ -477,7 +478,7 @@ function WaiversView({ leagueId, onSelect }) {
           <tbody>{w.claims.map((c) => (
             <tr key={c.player_id}><td className="clickable" onClick={() => onSelect(c.player_id)}><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /></td>
               <td>{c.team}</td><td><PosList list={c.pos} /></td><td className="num">{c.value}</td><td className="num ok">+{c.upgrade}</td>
-              <td className="num">{c.games_this_week}</td><td className="num"><strong>${c.bid}</strong></td></tr>))}</tbody>
+              <td className="num">{c.games_this_week}</td><td className="num">{c.bid != null ? <strong>${c.bid}</strong> : <span className="muted">-</span>}</td></tr>))}</tbody>
         </table>
       ) : <div className="muted">No free agent is an upgrade over your weakest player.</div>}
     </div>

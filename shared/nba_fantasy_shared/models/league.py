@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .players import InjuryStatus, SlotType
 from .scoring import ScoringSettings
@@ -136,6 +136,7 @@ class LeagueSettings(BaseModel):
     roster_season: str = "2026-27"
     stats_season: str = "2025-26"
     game_mode: GameMode = "lock_in"
+    timezone: str = "America/Chicago"   # IANA zone every in-season time is shown in (and "today" is judged by)
     scoring_format: ScoringFormat = "h2h_points"
     draft_type: DraftType = "auction"
     nomination_order_type: NominationOrder = "fixed_rotation"
@@ -147,6 +148,17 @@ class LeagueSettings(BaseModel):
     keeper: KeeperSettings = Field(default_factory=KeeperSettings)
     scoring: ScoringSettings = Field(default_factory=ScoringSettings)
     ranking: RankingSettings = Field(default_factory=RankingSettings)
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_zone(cls, v: str) -> str:
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except Exception as exc:   # ZoneInfoNotFoundError is not a ValueError: make it a validation error (400)
+            raise ValueError(f"unknown time zone {v!r}") from exc
+        return v
 
     @model_validator(mode="after")
     def _check_budget(self) -> "LeagueSettings":
