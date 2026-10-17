@@ -285,44 +285,58 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
 
 
 LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
-GAME_HOURS = 3           # a game day's lineup holds until its last tip + this (games run ~2.5 h)
-
-
 def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict | None) -> dict:
-    """The best lineup at every moment from now to the end of the week, for the timeline slider: one lineup per game
-    day, each planned with today's rules (plan_today) starting from the day before's lineup, so the moves chain.
-    Locked players are pinned by plan_today, so their slot never changes. A day's lineup holds from the end of the
-    previous game day (its last tip + GAME_HOURS) until its own end; off days belong to the next game day."""
+    """The best lineup at every moment from now to the end of the week, for the timeline slider. The lineup changes
+    at every tip-off on the roster: once a player's game has started, the next segment plans the games still to come
+    (plan_today for the next game's day), so his slot can go to someone who plays later; he keeps it if nobody later
+    needs it (he can still be locked). Each segment starts from the previous one's lineup, so the moves chain.
+    Locked players are pinned by plan_today, so their slot never changes."""
     from .weekplan import plan_today
 
     tz = ZoneInfo(view.get("tz") or "America/Chicago")
     first = date.fromisoformat(view["dates"][0])
     start = datetime.combine(first - timedelta(days=first.weekday()), datetime.min.time(), tz)   # Monday 12 AM, league time
     end = start + timedelta(days=7)
-    day = view.get("day")
-    if not day or not view["dates"]:
+    if not view.get("day") or not view["dates"]:
         return {"start": start.isoformat(), "end": end.isoformat(), "segments": []}
 
-    def day_end(d: str) -> str:
-        tips = [g["tip"] for p in view["players"].values() for g in p["games"] if g["date"] == d and g["tip"]]
-        last = max((datetime.fromisoformat(t.replace("Z", "+00:00")) for t in tips), default=None)
-        return (last + timedelta(hours=GAME_HOURS)).astimezone(tz).isoformat() if last else end.isoformat()
+    def at(iso: str) -> datetime:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    active = [p for p in players if p.slot != "IR"]
+    tips = sorted({at(g.tip) for p in active for g in p.games if g.tip and not g.started})
 
+    def starters(seats: dict) -> set[str]:
+        return {sid for ids in seats.values() for sid in ids}
+
+    def next_day() -> str | None:   # the date of the next game still to tip
+        g = min((g for p in active for g in p.games if not g.started), key=lambda g: (g.date, g.tip or "~"), default=None)
+        return g.date if g else None
+    saved = {id(g): (g.started, g.live) for p in players for g in p.games}
     slots = {p.sid: p.slot for p in players}
-    segments, prev = [], None
-    for d in (x for x in view["dates"] if x >= day):
-        if d == day and today_seats is not None:
-            seats = today_seats
+    seats = today_seats if today_seats is not None else plan_today(players, counts, next_day() or view["day"]).seats
+    segments = [{"date": view["day"], "to": (tips[0] if tips else end).astimezone(tz).isoformat(), "seats": seats}]
+    for i, t in enumerate(tips):
+        for p in players:   # time moves past this tip: those games have started (not pinned: the plan may move them)
+            for g in p.games:
+                if g.tip and at(g.tip) <= t:
+                    g.started, g.live = True, False
+            if p.slot != "IR" and p.locked is None:   # start from the previous segment's lineup
+                p.slot = next((s for s, ids in seats.items() if p.sid in ids), "BN")
+        d = next_day()
+        if d is None:
+            break
+        nxt = plan_today(players, counts, d).seats
+        to = (tips[i + 1] if i + 1 < len(tips) else end).astimezone(tz).isoformat()
+        if starters(nxt) == starters(seats):   # same players in (moving between starting slots changes nothing)
+            segments[-1]["to"] = to
         else:
-            for p in players:   # start from the previous day's lineup
-                if p.slot != "IR" and p.locked is None:
-                    p.slot = next((s for s, ids in prev.items() if p.sid in ids), "BN") if prev else p.slot
-            seats = plan_today(players, counts, d).seats
-        segments.append({"date": d, "to": day_end(d), "seats": seats})
-        prev = seats
+            seats = nxt
+            segments.append({"date": d, "to": to, "seats": seats})
     for p in players:
         p.slot = slots[p.sid]
-    segments[-1]["to"] = end.isoformat()   # the last game day's lineup stands until the week is over
+        for g in p.games:
+            g.started, g.live = saved[id(g)]
+    segments[-1]["to"] = end.isoformat()   # the last lineup stands until the week is over
     return {"start": start.isoformat(), "end": end.isoformat(), "segments": segments}
 
 
