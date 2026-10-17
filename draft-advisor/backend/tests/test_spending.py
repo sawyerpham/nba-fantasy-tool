@@ -2,10 +2,10 @@
 
 import pytest
 
-from app.engine.bidding import market_rate
-from app.engine.draft_state import DraftEngine, KeeperAssignment
-from app.engine.ranking import pool_values, rank_players
-from app.engine.spending import ordinal, spending_guide
+from app.core.engine.bidding import market_rate
+from app.core.engine.draft_state import DraftEngine, KeeperAssignment
+from app.core.engine.ranking import pool_values, rank_players
+from app.core.engine.spending import ordinal, spending_guide
 from tests.factories import NOW, default_world, fresh_draft, managers, small_league
 
 

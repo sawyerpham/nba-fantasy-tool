@@ -3,8 +3,8 @@
 from nba_fantasy_shared.models.league import LeagueSettings, RosterSlotSpec
 from nba_fantasy_shared.providers.nba_api_provider import games_per_week
 
-from app.engine.ranking import scarcity_bonus, schedule_factors
-from app.services.sleeper_league import fantasy_weeks
+from app.core.engine.ranking import scarcity_bonus, schedule_factors
+from app.core.services.sleeper_league import fantasy_weeks
 
 
 def test_games_per_week_counts_regular_season_games_with_known_teams():

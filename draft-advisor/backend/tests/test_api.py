@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.services.app_state import AppState
+from app.core.services.app_state import AppState
 from nba_fantasy_shared.models.export import DraftExport
 from nba_fantasy_shared.providers.fixture_provider import FixturePlatformProvider, FixtureStatsProvider
 from nba_fantasy_shared.storage import JsonStore
@@ -399,7 +399,7 @@ def test_gate_export_round_trips_with_no_data_loss(pulled):
     assert restored.engine.budget("m1").remaining == 105 and restored.engine.next_nominator() == "m5"
     assert restored.rankings()[0].player_id not in {JOKIC, DONCIC}
     # and the snapshot alone (no pool) still restores the drafted players
-    from app.engine.session import DraftSession
+    from app.core.engine.session import DraftSession
     lonely = DraftSession.from_export(exported, {}, {}, {})
     assert {p.player_id for p in lonely.draft.picks} <= set(lonely.players)
     assert lonely.engine.budget("m3").remaining == 150

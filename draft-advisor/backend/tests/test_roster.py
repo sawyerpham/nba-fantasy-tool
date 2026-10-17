@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from app.engine import roster
+from app.core.engine import roster
 from nba_fantasy_shared.models.draft import Pick
 from nba_fantasy_shared.models.league import LeagueSettings, RosterSlotSpec
 from tests.factories import default_world, small_league

@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.engine.bidding import market_rate
-from app.engine.ranking import expected_fpts, player_value
+from app.core.engine.bidding import market_rate
+from app.core.engine.ranking import expected_fpts, player_value
 from nba_fantasy_shared.models.league import RankingSettings
 from nba_fantasy_shared.models.scoring import ScoringSettings
 from tests.factories import managers, override, record, small_league, valuation
@@ -47,7 +47,7 @@ def test_fewer_priced_bench_slots_raise_the_price_of_value():
 
 
 def test_tiers_break_on_a_relative_drop_from_the_tier_top():
-    from app.engine.ranking import tiers
+    from app.core.engine.ranking import tiers
 
     t = tiers({1: 100.0, 2: 96.0, 3: 93.0, 4: 90.0, 5: 50.0})
     assert t == {1: 1, 2: 1, 3: 2, 4: 2, 5: 3}

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
-import DataPage from "./pages/DataPage.jsx";
-import LeaguePage from "./pages/LeaguePage.jsx";
-import SettingsPage from "./pages/SettingsPage.jsx";
-import DraftPage from "./pages/DraftPage.jsx";
-import SeasonPage from "./pages/SeasonPage.jsx";
-import { TipLayer } from "./components/Terms.jsx";
+import DataPage from "./core/DataPage.jsx";
+import LeaguePage from "./core/LeaguePage.jsx";
+import SettingsPage from "./core/SettingsPage.jsx";
+import DraftPage from "./draft/DraftPage.jsx";
+import SeasonPage from "./lockin/SeasonPage.jsx";
+import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
   ["data", "Data"],

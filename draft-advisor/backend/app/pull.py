@@ -21,7 +21,7 @@ from nba_fantasy_shared.providers.sleeper_provider import SleeperProvider
 from nba_fantasy_shared.storage import JsonStore
 
 from . import config
-from .services.pull_service import PullService
+from .core.services.pull_service import PullService
 
 
 def build_service(

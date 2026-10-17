@@ -17,8 +17,8 @@ from nba_fantasy_shared.scoring import blended_value, confidence_factor
 from nba_fantasy_shared.storage import JsonStore
 
 from . import config
-from .services.pull_service import load_records
-from .services.valuation_service import ValuationService
+from .core.services.pull_service import load_records
+from .core.services.valuation_service import ValuationService
 
 
 def main(argv: list[str] | None = None) -> int:

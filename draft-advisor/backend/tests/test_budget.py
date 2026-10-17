@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.engine.budget import discretionary_dollars, manager_budget, max_bid, validate_bid
+from app.core.engine.budget import discretionary_dollars, manager_budget, max_bid, validate_bid
 from nba_fantasy_shared.models.draft import Pick
 from nba_fantasy_shared.models.league import LeagueSettings, Manager
 

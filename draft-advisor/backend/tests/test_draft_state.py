@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.engine.draft_state import DraftEngine, DraftError, KeeperAssignment
+from app.core.engine.draft_state import DraftEngine, DraftError, KeeperAssignment
 from nba_fantasy_shared.models.league import KeeperSettings
 from tests.factories import NOW, default_world, fresh_draft, managers, override, record, small_league
 
@@ -328,7 +328,7 @@ def test_remove_pick_renumbers_frees_the_player_and_steps_the_pointer_back():
 
 
 def test_make_room_slides_a_multi_position_player_to_the_open_slot():
-    from app.engine import roster
+    from app.core.engine import roster
     from nba_fantasy_shared.models.draft import Pick
     from nba_fantasy_shared.models.league import RosterSlotSpec
 
@@ -343,7 +343,7 @@ def test_make_room_slides_a_multi_position_player_to_the_open_slot():
 
 
 def test_make_room_chains_moves_and_benches_the_newcomer_first():
-    from app.engine import roster
+    from app.core.engine import roster
     from nba_fantasy_shared.models.draft import Pick
     from nba_fantasy_shared.models.league import RosterSlotSpec
 
