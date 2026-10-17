@@ -405,8 +405,8 @@ th.sorted { color: var(--primary); }
 .room-slot-price { min-width: 2.6em; text-align: right; }
 
 /* position colours, used everywhere a position is shown (components/Pos.jsx) */
-:root { --pos-PG: #60a5fa; --pos-SG: #2dd4bf; --pos-SF: #fbbf24; --pos-PF: #fb923c; --pos-C: #c084fc; }
-[data-theme="light"] { --pos-PG: #2563eb; --pos-SG: #0d9488; --pos-SF: #b45309; --pos-PF: #c2410c; --pos-C: #7e22ce; }
+:root { --pos-PG: #ff2c6d; --pos-SG: #ff7a00; --pos-SF: #00ffc6; --pos-PF: #00d7ff; --pos-C: #c96cff; }   /* Sleeper's position colours */
+[data-theme="light"] { --pos-PG: #d6134f; --pos-SG: #c25e00; --pos-SF: #00a383; --pos-PF: #0089ad; --pos-C: #8f35d6; }   /* the same hues, darker for white backgrounds */
 .pos-c { font-weight: 600; }
 .pos-PG { color: var(--pos-PG) !important; } .pos-SG { color: var(--pos-SG) !important; } .pos-SF { color: var(--pos-SF) !important; }
 .pos-PF { color: var(--pos-PF) !important; } .pos-C { color: var(--pos-C) !important; }
