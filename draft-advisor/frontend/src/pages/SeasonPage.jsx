@@ -16,6 +16,7 @@ const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP ca
 const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["waivers", "Waivers"]];
 
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
+const md = (d) => d.slice(5).replace("-", "/");   // "2026-10-20" -> "10/20"
 const fp = (x) => (x == null ? "" : x.toFixed(1));
 
 
@@ -101,7 +102,7 @@ export default function SeasonPage({ leagueId }) {
   const bar = (
         <div className="season-bar">
           <strong className="season-week">Week {data.week}</strong>
-          <span className="muted small">{data.dates.length ? `${dayName(data.dates[0])} ${data.dates[0].slice(5)} – ${dayName(data.dates.at(-1))} ${data.dates.at(-1).slice(5)}` : ""}</span>
+          <span className="muted small">{data.dates.length ? `${dayName(data.dates[0])} ${md(data.dates[0])} – ${dayName(data.dates.at(-1))} ${md(data.dates.at(-1))}` : ""}</span>
           <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
           <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
           {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
@@ -169,7 +170,7 @@ function GameChips({ games, today, lockDate, day }) {   // day: the lineup day s
         const played = g.fp != null, live = g.state === "in";
         return (
           <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""}`}
-            data-tip={`${dayName(g.date)} ${g.date.slice(5)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
+            data-tip={`${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
           </span>

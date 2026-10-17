@@ -20,7 +20,7 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
         "stats/nba/2026/1": [{"player_id": "999", "date": "2026-10-20", "stats": box}],
         "league/L1/rosters": [{"roster_id": 1, "owner_id": "u1", "players": ["999"], "starters": ["999"],
                                "settings": {"wins": 1, "losses": 0, "fpts": 50, "fpts_decimal": 25}}],
-        "league/L1/users": [{"user_id": "u1", "display_name": "spham5"}],
+        "league/L1/users": [{"user_id": "u1", "display_name": "me"}],
         "league/L1/matchups/1": [{"roster_id": 1, "matchup_id": 1, "points": 31.5}, {"roster_id": 2, "matchup_id": 1, "points": 20}],
         "scoreboard?dates=20261020": {"events": [{"date": "2026-10-21T02:00Z", "status": {"type": {"state": "post", "shortDetail": "Final"}},
                                                   "competitions": [{"competitors": [{"homeAway": "home", "team": {"abbreviation": "DEN"}},
@@ -31,7 +31,7 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
     w = week_view(s, fetch, today=date(2026, 10, 21))
     assert w["week"] == 1 and w["dates"] == ["2026-10-20", "2026-10-22"]
     team = w["teams"][0]
-    assert team["name"] == "spham5" and team["is_user"] and team["fpts"] == 50.25 and team["wins"] == 1
+    assert team["name"] == "me" and team["is_user"] and team["fpts"] == 50.25 and team["wins"] == 1
     assert [len(m) for m in w["matchups"]] == [2]
     g1, g2 = w["players"]["999"]["games"]
     assert g1["opp"] == "LAL" and g1["state"] == "post" and g1["min"] == 36.0
