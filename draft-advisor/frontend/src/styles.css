@@ -550,29 +550,24 @@ header.top .brand { cursor: pointer; }
 .keeper-line { margin: 8px 0 2px; line-height: 1.6; }
 .keeper-line .verdict { font-size: 11.5px; padding: 1px 7px; }
 
-/* ---------- glass over the wallpaper (public/wallpaper.jpg) ----------
+/* ---------- panels over a plain black page ----------
    Panels are translucent with a background blur; things that sit on top of other content (sticky table
    headers, dropdowns, modals, tooltips, toasts) use the near-opaque --panel-solid so text stays readable. */
 :root {
   --panel: rgba(18, 22, 28, 0.22); --panel-2: rgba(255, 255, 255, 0.06); --border: rgba(255, 255, 255, 0.14);
   --header: rgba(10, 12, 16, 0.45); --input-bg: rgba(10, 12, 16, 0.65); --panel-solid: rgba(16, 20, 26, 0.94);
-  --glass: none;   /* no blur: the wallpaper stays sharp; text shadow + near-solid overlays keep things readable */
+  --glass: none;
 }
 [data-theme="light"] {
   --panel: rgba(255, 255, 255, 0.4); --panel-2: rgba(255, 255, 255, 0.35); --border: rgba(255, 255, 255, 0.6);
   --header: rgba(255, 255, 255, 0.6); --input-bg: rgba(255, 255, 255, 0.78); --panel-solid: rgba(255, 255, 255, 0.96);
 }
-/* the wallpaper is dimmed to near-black (85%): the art is a faint ghost behind the panels */
-body { background: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)), #000 url("/wallpaper.jpg") center / cover no-repeat fixed; }
+body { background: #000; }
 .panel, .room-card, .block-bar, .sticky-bar, .sticky-block, header.top { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
-/* light theme: wash the dark wallpaper so dark text that sits directly on it stays readable */
-[data-theme="light"] body { background: linear-gradient(rgba(246, 247, 251, 0.74), rgba(246, 247, 251, 0.74)), #f6f7fb url("/wallpaper.jpg") center / cover no-repeat fixed; }
-/* dark theme: a soft shadow keeps text readable where it crosses the wallpaper's white lines */
-:root:not([data-theme="light"]) body { text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.5); }
-[data-theme="light"] body { text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.6); }
-/* the sharp wallpaper behind small pills and inputs: give them a darker backing so their colours stay legible */
+[data-theme="light"] body { background: #f6f7fb; }
+/* small pills and inputs: a darker backing so their colours stay legible */
 :root:not([data-theme="light"]) :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: inset 0 0 0 999px rgba(10, 12, 16, 0.45); }
 .tip, .dropdown, .modal, .toast, input, select, textarea { text-shadow: none; }
 /* the white high-bid card: dark text needs no outline */

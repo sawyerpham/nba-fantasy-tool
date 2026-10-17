@@ -199,18 +199,6 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
-  // Everything about the draft as Markdown on the clipboard, to paste into a chat with Claude.
-  const copyContext = async () => {
-    setError(""); setNotice("");
-    try {
-      const text = await api.get(`/leagues/${leagueId}/context` + qs({ player_id: selected }));
-      await navigator.clipboard.writeText(text);
-      setNotice(`Copied the draft (${Math.round(text.length / 1000)}k characters) — paste it into Claude and ask your question.`);
-    } catch (e) {
-      setError(`Copy failed: ${e.message}`);
-    }
-  };
-
   const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : (["rank", "full_name", "team_abbr", "injury_status", "pos"].includes(key) ? "asc" : "desc") }));
   const onOverridesChanged = () => { loadRankings(); loadView(); };
   const nominated = view.current_nomination;
@@ -270,8 +258,6 @@ export default function DraftPage({ leagueId }) {
           {view.status === "setup" && <button className="primary" onClick={() => setStartOpen(true)} data-testid="btn-start">Start draft…</button>}
           {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo">↶ Undo</button>}
           {live && <button onClick={() => window.confirm("Complete the draft?") && act("complete")} data-testid="btn-complete">Complete</button>}
-          <button onClick={copyContext} data-testid="btn-copy-context"
-            title="copy the rules, the draft so far, every manager's money, roster and habits, your money, the best available players and the selected player, ready to paste into Claude">Copy for Claude</button>
           <button className="ghost" onClick={exportLeague} data-testid="btn-export">Export</button>
           {view.status !== "setup" && <button className="danger" onClick={() => window.confirm("Reset the draft? All picks are removed.") && act("reset")} data-testid="btn-reset">Reset</button>}
         </div>

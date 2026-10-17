@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import PlainTextResponse
 
 from ..engine.draft_state import DraftError, KeeperAssignment
 from ..services.app_state import AppState
@@ -257,19 +256,6 @@ def market(league_id: str, manager_id: str | None = Query(None), state: AppState
     session = _session(state, league_id)
     try:
         return market_board(session, manager_id or session.user_manager_id())
-    except DraftError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-
-
-@router.get("/context", response_class=PlainTextResponse)
-def context(league_id: str, manager_id: str | None = Query(None), player_id: int | None = Query(None),
-            top: int = Query(60, ge=10, le=300), state: AppState = Depends(get_state)) -> str:
-    """Everything about the draft as Markdown, to paste into a chat with Claude."""
-    from ..engine.context import draft_context
-
-    session = _session(state, league_id)
-    try:
-        return draft_context(session, manager_id or session.user_manager_id(), player_id, top)
     except DraftError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
