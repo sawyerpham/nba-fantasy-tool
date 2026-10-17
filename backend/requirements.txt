@@ -5,4 +5,4 @@ requests
 httpx
 nba_api
 pytest
--e ../../shared
+-e ../shared

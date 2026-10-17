@@ -59,12 +59,10 @@ pnpm-debug.log*
 Thumbs.db
 
 # ---------- Pulled / generated data (not source) ----------
-# JSON store and provider caches for every app backend (draft-advisor now, fantasy-tracker later).
+# JSON store and provider caches.
 # tests/fixtures/ is source and stays tracked.
-draft-advisor/backend/data/
-draft-advisor/backend/cache/
-fantasy-tracker/backend/data/
-fantasy-tracker/backend/cache/
+backend/data/
+backend/cache/
 **/backend/data/
 **/backend/cache/
 
@@ -73,10 +71,10 @@ fantasy-tracker/backend/cache/
 !README.md
 
 # ---------- Frontend build / e2e output ----------
-draft-advisor/frontend/dist/
-draft-advisor/frontend/e2e/screenshots/
-draft-advisor/frontend/e2e/last-run.json
-draft-advisor/frontend/e2e/*.log
+frontend/dist/
+frontend/e2e/screenshots/
+frontend/e2e/last-run.json
+frontend/e2e/*.log
 
 # ---------- Local scratch ----------
 *.csv
