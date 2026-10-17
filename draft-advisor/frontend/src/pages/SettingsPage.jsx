@@ -12,6 +12,14 @@ function Num({ value, onChange, step = "any", ...rest }) {
   return <input type="number" step={step} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} {...rest} />;
 }
 
+const TIMEZONES = [
+  ["America/New_York", "Eastern (ET)"], ["America/Chicago", "Central (CT)"], ["America/Denver", "Mountain (MT)"],
+  ["America/Phoenix", "Arizona (MST)"], ["America/Los_Angeles", "Pacific (PT)"], ["America/Anchorage", "Alaska (AKT)"],
+  ["Pacific/Honolulu", "Hawaii (HT)"], ["America/Toronto", "Toronto (ET)"], ["America/Vancouver", "Vancouver (PT)"],
+  ["Europe/London", "London (UK)"], ["Europe/Berlin", "Central Europe (CET)"], ["Asia/Manila", "Manila (PHT)"],
+  ["Asia/Tokyo", "Tokyo (JST)"], ["Australia/Sydney", "Sydney (AET)"],
+];
+
 export default function SettingsPage({ leagueId }) {
   const [s, setS] = useState(null);
   const [saved, setSaved] = useState(null);
@@ -20,6 +28,13 @@ export default function SettingsPage({ leagueId }) {
   const [sleeperId, setSleeperId] = useState("");
   const [preview, setPreview] = useState(null);
   const [applyFields, setApplyFields] = useState({ name: false, scoring: true, roster_slots: true, num_managers: false, keepers: true });
+  const [managers, setManagers] = useState([]);
+  const loadManagers = useCallback(() => {
+    if (leagueId) api.get(`/leagues/${leagueId}/managers`).then(setManagers).catch(() => setManagers([]));
+  }, [leagueId]);
+  useEffect(() => { loadManagers(); }, [loadManagers]);
+  // which manager you are: saved at once (the PATCH un-marks everyone else)
+  const markMe = (id) => api.patch(`/leagues/${leagueId}/managers/${id}`, { is_user: true }).then(() => { loadManagers(); setMsg("Saved: that manager is you."); }).catch((e) => setError(e.message));
 
   const load = useCallback(() => {
     if (!leagueId) return;
@@ -94,7 +109,14 @@ export default function SettingsPage({ leagueId }) {
           <label>Name <input type="text" value={s.name} onChange={(e) => set({ name: e.target.value })} /></label>
           <label>Roster season <input type="text" value={s.roster_season} onChange={(e) => set({ roster_season: e.target.value })} /></label>
           <label>Stats season <input type="text" value={s.stats_season} onChange={(e) => set({ stats_season: e.target.value })} /></label>
-          <label>Game mode <select value={s.game_mode} onChange={(e) => set({ game_mode: e.target.value })}><option value="lock_in">Lock-In</option><option value="standard">Standard</option></select></label>
+          <label>Game mode <select value={s.game_mode} onChange={(e) => set({ game_mode: e.target.value })}><option value="lock_in">Lock-In</option><option value="standard">Standard</option></select>
+            <span className="muted small">The Season tab works for Sleeper Lock-In leagues only (for now).</span></label>
+          <label>Time zone <select value={s.timezone || "America/Chicago"} onChange={(e) => set({ timezone: e.target.value })} data-testid="timezone">
+            {TIMEZONES.map(([z, label]) => <option key={z} value={z}>{label}</option>)}</select>
+            <span className="muted small">Every in-season time (tips, alarms, news, the timeline) and when "today" ends.</span></label>
+          <label>You are <select value={managers.find((m) => m.is_user)?.manager_id || ""} onChange={(e) => markMe(e.target.value)} data-testid="you-are">
+            {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name}</option>)}</select>
+            <span className="muted small">Your team: your side of the matchup, waivers, news. Saves at once.</span></label>
           <label>Draft type <select value={s.draft_type} onChange={(e) => set({ draft_type: e.target.value })}><option value="auction">Auction</option><option value="snake">Snake</option></select></label>
           <label>Nomination order <select value={s.nomination_order_type} onChange={(e) => set({ nomination_order_type: e.target.value })}><option value="fixed_rotation">Fixed rotation</option><option value="snake">Snake</option></select></label>
           <label>Scoring format <select value={s.scoring_format} onChange={(e) => set({ scoring_format: e.target.value })}><option value="h2h_points">H2H points</option></select></label>

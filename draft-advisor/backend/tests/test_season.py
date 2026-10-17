@@ -40,7 +40,7 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
 
     from app.services import season
     real = season.today_ct
-    season.today_ct = lambda: date(2026, 10, 20)   # live mode: today's only game is over -> the lineup moves to the next game day
+    season.today_ct = lambda *_: date(2026, 10, 20)   # live mode: today's only game is over -> the lineup moves to the next game day
     try:
         assert week_view(s, fetch)["day"] == "2026-10-22"
     finally:
@@ -140,3 +140,9 @@ def test_acquisitions_draft_price_then_moves_in_order():
     view = {"week": 1, "teams": [{"roster_id": 1, "name": "me"}, {"roster_id": 2, "name": "rival"}, {"roster_id": 3, "name": "other"}]}
     assert [(a["kind"], a["team"], a["price"]) for a in acquisitions(session, fetch, view, "9")] == [
         ("drafted", "me", 24), ("dropped", "me", None), ("claimed", "rival", 7)]   # failed claim skipped
+
+
+def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
+    from app.services.season import waivers
+
+    assert waivers(None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}

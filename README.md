@@ -2,8 +2,10 @@
 
 Two independent apps for a Sleeper NBA fantasy league, sharing one Python package:
 
-- `draft-advisor/` — Phase 1: pre-draft rankings and live auction assistant (backend: Python + FastAPI, frontend: React).
-- `fantasy-tracker/` — Phase 2: in-season tracker (not started).
+- `draft-advisor/` — the NBA Fantasy Tool: pre-draft rankings and live auction assistant, plus the in-season Season tab (backend: Python + FastAPI, frontend: React).
+- `fantasy-tracker/` — Phase 2: in-season tracker (not started; the Season tab covers it for now).
+
+**Supported leagues:** Sleeper NBA leagues. The Season tab is built for **Lock-In** leagues only (for now); the Draft tab for **auction** drafts. Set your time zone and which manager you are under Settings > General.
 - `shared/nba_fantasy_shared` — models, data providers (`nba_api`, Sleeper public API), player reconciliation, JSON storage, scoring.
 
 Data sources are free and need no keys: the `nba_api` package (NBA.com stats) for per-game logs and bios, and Sleeper's public API for fantasy position eligibility and injury status. All persistence is flat JSON under `draft-advisor/backend/data/` (gitignored).

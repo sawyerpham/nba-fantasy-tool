@@ -5,6 +5,7 @@ import { api, qs } from "../api.js";
 import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
 import InjuryTag from "./InjuryTag.jsx";
+import { fmt, timeOf, tzAbbr } from "../tz.js";
 
 
 // season: the in-season profile (Season tab): no draft parts (Fit, Worth, bid guide, keeper outlook, tier); adds the
@@ -263,7 +264,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   );
 }
 
-const ctTime = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }) : "");
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 
 // Season profile: owner, your call on him this week, his games this week, game log and news.
@@ -282,7 +282,7 @@ function SeasonBlock({ sea, plan }) {
               <span className="muted">{a.kind[0].toUpperCase() + a.kind.slice(1)}</span>{" "}
               {a.kind !== "traded to" && "by "}<strong>{a.team || "?"}</strong>
               {a.price != null && <> for <strong>${a.price}</strong></>}
-              {a.when && <span className="muted"> · {new Date(a.when).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "2-digit", day: "2-digit", year: "2-digit" })}</span>}
+              {a.when && <span className="muted"> · {fmt(a.when, { month: "2-digit", day: "2-digit", year: "2-digit" })}</span>}
             </div>
           ))}
         </div>
@@ -295,10 +295,10 @@ function SeasonBlock({ sea, plan }) {
       <div className="bid-label">Week {sea.week} games</div>
       {sea.games.length ? (
         <table className="small">
-          <thead><tr><th>Day</th><th>Opp</th><th>Tip (CT)</th><th className="num">Proj</th><th className="num">FP</th><th className="num">Min</th></tr></thead>
+          <thead><tr><th>Day</th><th>Opp</th><th>Tip ({tzAbbr()})</th><th className="num">Proj</th><th className="num">FP</th><th className="num">Min</th></tr></thead>
           <tbody>{sea.games.map((g) => (
             <tr key={g.date} className={g.date === sea.today ? "you-need" : ""}><td>{dayName(g.date)} {g.date.slice(5)}</td><td>{g.home ? "vs" : "@"} {g.opp}</td>
-              <td>{g.state === "in" ? <span className="warn-text">live</span> : g.state === "post" ? "final" : ctTime(g.tip)}</td>
+              <td>{g.state === "in" ? <span className="warn-text">live</span> : g.state === "post" ? "final" : timeOf(g.tip)}</td>
               <td className="num">{g.proj != null ? g.proj.toFixed(1) : ""}</td><td className="num"><strong>{g.fp != null ? g.fp.toFixed(1) : ""}</strong></td>
               <td className="num">{g.min ?? ""}</td></tr>))}</tbody>
         </table>

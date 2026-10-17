@@ -20,7 +20,14 @@ from nba_fantasy_shared.models.players import GameLine
 from nba_fantasy_shared.scoring import base_points
 from nba_fantasy_shared.scoring.formula import score_game
 
-CT = ZoneInfo("America/Chicago")
+CT = ZoneInfo("America/Chicago")   # default; each league picks its own (LeagueSettings.timezone)
+
+
+def league_tz(lg) -> ZoneInfo:
+    try:
+        return ZoneInfo(getattr(lg, "timezone", None) or "America/Chicago")
+    except Exception:   # an unknown zone name: fall back rather than break the page
+        return CT
 SLEEPER = "https://api.sleeper.app"
 ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={}"
 LIVE_TTL, WEEK_TTL, DAY_TTL = 90, 30 * 60, 6 * 3600    # seconds: game-day data / projections / schedule
@@ -57,8 +64,8 @@ def http_fetch(platform: Any) -> Fetch:
     return fetch
 
 
-def today_ct() -> date:
-    return datetime.now(CT).date()
+def today_ct(tz: ZoneInfo = CT) -> date:
+    return datetime.now(tz).date()
 
 
 def projected_fp(stats: dict, scoring, bonus_per_game: float = 0.0) -> float:
@@ -111,7 +118,8 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     if not lg.sleeper_league_id:
         raise ValueError("league is not linked to Sleeper (Settings)")
     preview = today is not None   # a fixed day (tests, previews): no wall clock
-    year, today = lg.roster_season.split("-")[0], today or today_ct()
+    tz = league_tz(lg)
+    year, today = lg.roster_season.split("-")[0], today or today_ct(tz)
     schedule = fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
     weeks = week_dates(schedule)
     week = week or current_week(weeks, today)
@@ -138,7 +146,11 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     league = fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
     positions = league.get("roster_positions") or []
     reserve_slots = (league.get("settings") or {}).get("reserve_slots", 0)
-    faab_budget = (league.get("settings") or {}).get("waiver_budget", FAAB_TOTAL)   # the league's real FAAB (2026: $100)
+    ls = league.get("settings") or {}
+    # The league's waiver rules, from Sleeper; None when Sleeper didn't send them (the Waivers tab says so).
+    waiver = {"type": WAIVER_TYPES.get(ls["waiver_type"], "unknown"), "budget": ls.get("waiver_budget"),
+              "min_bid": ls.get("waiver_bid_min", 1), "daily": bool(ls.get("daily_waivers"))} if "waiver_type" in ls else None
+    faab_budget = (waiver or {}).get("budget") or FAAB_TOTAL
     rosters = fetch(f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL) or []
     users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
     matchups = fetch(f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL) or []
@@ -195,9 +207,9 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     iso = today.isoformat()
     day = iso if preview else next((d for d in dates if d > iso or (d == iso and (not tips[d] or any(t["state"] != "post" for t in tips[d].values())))), None)
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
-            "now": None if preview else datetime.now(CT).isoformat(), "roster_positions": positions,
+            "now": None if preview else datetime.now(tz).isoformat(), "tz": tz.key, "roster_positions": positions,
             "reserve_slots": reserve_slots,
-            "team_games": team_games, "injury_tags": injury_tags, "faab_budget": faab_budget,
+            "team_games": team_games, "injury_tags": injury_tags, "faab_budget": faab_budget, "waiver": waiver,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
 
@@ -283,8 +295,9 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     previous game day (its last tip + GAME_HOURS) until its own end; off days belong to the next game day."""
     from ..engine.weekplan import plan_today
 
+    tz = ZoneInfo(view.get("tz") or "America/Chicago")
     first = date.fromisoformat(view["dates"][0])
-    start = datetime.combine(first - timedelta(days=first.weekday()), datetime.min.time(), CT)   # Monday 12 AM CT
+    start = datetime.combine(first - timedelta(days=first.weekday()), datetime.min.time(), tz)   # Monday 12 AM, league time
     end = start + timedelta(days=7)
     day = view.get("day")
     if not day or not view["dates"]:
@@ -293,7 +306,7 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     def day_end(d: str) -> str:
         tips = [g["tip"] for p in view["players"].values() for g in p["games"] if g["date"] == d and g["tip"]]
         last = max((datetime.fromisoformat(t.replace("Z", "+00:00")) for t in tips), default=None)
-        return (last + timedelta(hours=GAME_HOURS)).astimezone(CT).isoformat() if last else end.isoformat()
+        return (last + timedelta(hours=GAME_HOURS)).astimezone(tz).isoformat() if last else end.isoformat()
 
     slots = {p.sid: p.slot for p in players}
     segments, prev = [], None
@@ -512,6 +525,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
 
 # ---- waivers ---------------------------------------------------------------------------------------------
 FAAB_TOTAL = 100   # fallback only: the budget comes from the league's settings (waiver_budget)
+WAIVER_TYPES = {0: "rolling", 1: "reverse standings", 2: "FAAB"}   # Sleeper settings.waiver_type
 WAIVER_SHOW = 12
 # ponytail: bid = share of FAAB left that grows with the upgrade over your weakest player (8 value points = 60 %);
 # no data on rivals' bids, so it is a guide, not a price.
@@ -520,6 +534,9 @@ WAIVER_SHOW = 12
 def waivers(session, view: dict) -> dict:
     """Free agents worth claiming: rest-of-season value (the draft value: projection, Lock-In ceiling, availability),
     this week's games, the player of yours to drop and a suggested blind bid. Waivers run daily (league setting)."""
+    waiver = view.get("waiver")
+    if waiver is None:
+        return {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
     me = next(t for t in view["teams"] if t["is_user"])
     rostered = {sid for t in view["teams"] for sid in t["players"]}
     by_sleeper = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
@@ -530,16 +547,18 @@ def waivers(session, view: dict) -> dict:
     rows = {r.player_id: r for r in session.rank([], fa_ids + mine)}
     drop = min((rows[pid] for pid in mine if pid in rows), key=lambda r: r.value, default=None)
     budget = view.get("faab_budget", FAAB_TOTAL)
+    faab = waiver["type"] == "FAAB"
     faab_left = budget - (me.get("faab_used") or 0)
     out = []
     floor = drop.value if drop else 0.0   # only real upgrades over your weakest player
     for pid in sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]:
         r = rows[pid]
         up = r.value - (drop.value if drop else 0)
-        bid = max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1
+        bid = (max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1) if faab else None
         out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
                     "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id),
                     "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
     return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "name": drop.full_name, "value": round(drop.value, 2)} if drop else None,
-            "claims": out, "budget": budget, "process": "daily"}
+            "claims": out, "budget": budget if faab else None, "type": waiver["type"],
+            "process": "daily" if waiver["daily"] else "weekly"}
