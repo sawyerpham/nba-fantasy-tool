@@ -421,7 +421,7 @@ function LeagueView({ data, leagueId, open }) {
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
             <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}>{t.name}</td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
-              <td className="num">{fp(t.fpts)}</td><td className="num">${200 - (t.faab_used || 0)}</td></tr>))}</tbody>
+              <td className="num">{fp(t.fpts)}</td><td className="num">${(data.faab_budget ?? 100) - (t.faab_used || 0)}</td></tr>))}</tbody>
         </table>
       </div>
     </>
@@ -434,7 +434,7 @@ function WaiversView({ leagueId, onSelect }) {
   if (!w) return <div className="panel">Loading free agents…</div>;
   return (
     <div className="panel" data-testid="waivers">
-      <h3 style={{ marginTop: 0 }}>Waiver claims <span className="small muted">blind bids · process {w.process} · ${w.faab_left} FAAB left of $200</span></h3>
+      <h3 style={{ marginTop: 0 }}>Waiver claims <span className="small muted">blind bids · process {w.process} · ${w.faab_left} FAAB left of ${w.budget}</span></h3>
       {w.drop && <div className="small" style={{ marginBottom: 8 }}>Drop candidate: <strong className="clickable" onClick={() => onSelect(w.drop.player_id)}>{w.drop.name}</strong> <span className="muted">(value {w.drop.value}, your weakest)</span></div>}
       {w.claims.length ? (
         <table className="small">
