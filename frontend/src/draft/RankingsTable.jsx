@@ -1,5 +1,5 @@
 import React from "react";
-import { PosList, posClass } from "../core/Pos.jsx";
+import { PosList, posClass, tierHue } from "../core/Pos.jsx";
 import { Term, TERMS } from "../core/Terms.jsx";
 import Headshot from "../core/Headshot.jsx";
 
