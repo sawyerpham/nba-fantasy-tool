@@ -760,4 +760,9 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 /* lineup-change arrows: a lane left of your cards */
 .mu-grid.with-arrows { position: relative; padding-left: 80px; }
 .swap-arrows { position: absolute; left: 0; top: 0; height: 100%; overflow: visible; pointer-events: none; }
+/* your game chips as a timeline (x from laneXs) and the time line through them; the line sits under the chips */
+.chips-lane { position: relative; flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; }
+.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 86px; min-width: 0; box-sizing: border-box; transform-origin: left center; }
+.chips-lane > .chips-row { flex-wrap: nowrap; }   /* too narrow for the timeline: one plain row, as before */
+.time-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary); opacity: 0.85; pointer-events: none; }
 .swap-path { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; pointer-events: visibleStroke; }
