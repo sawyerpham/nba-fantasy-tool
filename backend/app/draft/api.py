@@ -163,8 +163,7 @@ def rankings(
 
     fits = fit_scores(session, manager_id or session.user_manager_id(), rows, calls)
     pos_rank, pos_ranks = _sleeper_pos_ranks(session)
-    r_values = session.r_values()
-    return [{**asdict(r), "r_value": r_values.get(r.player_id), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
+    return [{**asdict(r), "tier": tier.get(r.player_id), "tier_left": left[tier.get(r.player_id)], "tier_size": size[tier.get(r.player_id)],
              **(_call_fields(calls.get(r.player_id)) if live else {"worth": session.start_worth(r.value), "max": None, "call": None}),
              "fpg_reason": reasons.get(str(r.player_id)), "fit": fits.get(r.player_id),
              "pos_rank": pos_rank.get(r.player_id), "pos_ranks": pos_ranks.get(r.player_id, {})}
