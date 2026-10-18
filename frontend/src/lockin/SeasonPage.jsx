@@ -413,7 +413,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
       <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
-        {isMine && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
+        {isMine && <SwapArrows pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
           <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, lineMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
@@ -442,11 +442,13 @@ function swapPairs(before, after, positions) {
 // The arrows, in a lane left of your cards: from the player going to the bench to the one taking his place,
 // coloured by that slot's position. Measured from the cards on screen; redrawn when the grid changes size.
 const ARROW_GUTTER = 80;
-function SwapArrows({ gridRef, pairs, names }) {
+function SwapArrows({ pairs, names }) {
+  const svgRef = React.useRef(null);
   const [lines, setLines] = useState([]);
   const key = pairs.map((p) => `${p.out}>${p.in}`).join(",");
   React.useLayoutEffect(() => {
-    const grid = gridRef.current;
+    // the grid through our own svg: on mount the grid's ref isn't attached yet when this runs (children first)
+    const grid = svgRef.current?.parentElement;
     if (!grid) return undefined;
     const measure = () => {
       const top = grid.getBoundingClientRect().top;
@@ -464,11 +466,11 @@ function SwapArrows({ gridRef, pairs, names }) {
     const ro = new ResizeObserver(measure);
     ro.observe(grid);
     return () => ro.disconnect();
-  }, [gridRef, key]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
   const step = Math.min(13, (ARROW_GUTTER - 24) / Math.max(1, lines.length));
   const end = ARROW_GUTTER - 6;   // just left of the cards
   return (
-    <svg className="swap-arrows" width={ARROW_GUTTER} data-testid="swap-arrows">
+    <svg ref={svgRef} className="swap-arrows" width={ARROW_GUTTER} data-testid="swap-arrows">
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
