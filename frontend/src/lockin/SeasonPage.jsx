@@ -183,30 +183,31 @@ function GameChips({ games, today, lockDate, day, lane }) {   // day: the lineup
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
 // A matchup's chips as a timeline: one x per distinct tip on both rosters, the earliest at the lane's left edge, spaced in
-// proportion to time but pushed right wherever a player's chip would overlap his previous one. The time scale is
-// the largest that still fits the last chip in the lane, so a week with 4-game players spreads less than one with 3.
-// Too narrow even packed tight: the chips shrink (scale) until they fit, down to 80%; narrower than that, xs is null
-// and the chips sit in a plain row (no time line).
+// proportion to time, and each game day starts clear of the previous day's chips (so the time line never sits on an
+// earlier day's chips, and no player's chips overlap). The time scale is the largest that still fits the last chip in
+// the lane. Too narrow even packed tight (one column per day): the chips shrink (scale) until they fit, down to 70%;
+// narrower than that, xs is null and the chips sit in a plain row (no time line).
 const CHIP_W = 86, CHIP_GAP = 6;
-function laneXs(rows, width) {   // rows: each player's tip ms, sorted
-  const tips = [...new Set(rows.flat())].sort((a, b) => a - b);
+function laneXs(games, width) {   // games: [tip ms, game date] for every chip in the matchup
+  const day = new Map(games);
+  const tips = [...day.keys()].sort((a, b) => a - b);
   if (!tips.length || !width) return { xs: new Map(), scale: 1 };
   const t0 = tips[0], span = Math.max(1, tips.at(-1) - t0);
   const place = (s, cw) => {
     const x = new Map();
-    let prev = 0;
+    let prev = 0, dayStart = 0, last = null;
     for (const t of tips) {
-      let v = Math.max(prev, (s * (t - t0) / span) * (width - cw));
-      for (const r of rows) { const i = r.indexOf(t); if (i > 0) v = Math.max(v, x.get(r[i - 1]) + cw + CHIP_GAP); }
-      x.set(t, v); prev = v;
+      if (last != null && day.get(t) !== day.get(last)) dayStart = prev + cw + CHIP_GAP;
+      const v = Math.max(prev, dayStart, (s * (t - t0) / span) * (width - cw));
+      x.set(t, v); prev = v; last = t;
     }
     return x;
   };
   const fits = (s) => place(s, CHIP_W).get(tips.at(-1)) <= width - CHIP_W;
   if (!fits(0)) {
-    const k = Math.round(place(0, CHIP_W).get(tips.at(-1)) / (CHIP_W + CHIP_GAP));   // chips packed end to end
+    const k = new Set(day.values()).size - 1;   // day columns packed end to end
     const cw = (width - k * CHIP_GAP) / (k + 1);
-    return cw < 0.8 * CHIP_W ? { xs: null } : { xs: place(0, cw), scale: cw / CHIP_W };   // unreadable smaller: plain row
+    return cw < 0.7 * CHIP_W ? { xs: null } : { xs: place(0, cw), scale: cw / CHIP_W };   // unreadable smaller: plain row
   }
   let lo = 0, hi = 1;
   if (fits(1)) lo = 1;
@@ -351,8 +352,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const o = shown.opponent;
   const L = bySlot(isMine ? bestRows : shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
-  const tips = (players) => players.map((r) => (data.players[r.sid]?.games || []).map(tipMs).sort((a, b) => a - b));
-  const xs = laneXs([...tips(shown.players), ...tips(o?.players || [])], lane?.w);
+  const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
+  const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
   const lineMs = isMine ? atMs : nowMs;   // the slider only shows on your matchup
   const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
