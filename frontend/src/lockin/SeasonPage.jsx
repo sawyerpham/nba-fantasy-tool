@@ -162,22 +162,67 @@ function RosterAlerts({ roster }) {
 }
 
 // One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
-function GameChips({ games, today, lockDate, day }) {   // day: the lineup day shown (its chip lights up, the rest dim)
-  if (!games.length) return <span className="muted small">no games</span>;
-  return (
-    <span className="chips-row">
-      {games.map((g) => {
+// lane (your side): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
+function GameChips({ games, today, lockDate, day, lane }) {   // day: the lineup day shown (its chip lights up, the rest dim)
+  if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
+  const chips = games.map((g) => {
         const played = g.fp != null, live = g.state === "in";
         return (
-          <span key={g.date} className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""}`}
+          <span key={g.date} style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
+            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""}`}
             data-tip={`${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}`}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
           </span>
         );
-      })}
-    </span>
-  );
+      });
+  if (!lane) return <span className="chips-row">{chips}</span>;
+  return <span className="chips-lane">{lane.xs ? chips : <span className="chips-row">{chips}</span>}</span>;
+}
+
+const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
+
+// Your chips as a timeline: one x per distinct tip on your roster, the earliest at the lane's left edge, spaced in
+// proportion to time but pushed right wherever a player's chip would overlap his previous one. The time scale is
+// the largest that still fits the last chip in the lane, so a week with 4-game players spreads less than one with 3.
+// Too narrow even packed tight: the chips shrink (scale) until they fit, down to 80%; narrower than that, xs is null
+// and the chips sit in a plain row (no time line).
+const CHIP_W = 86, CHIP_GAP = 6;
+function laneXs(rows, width) {   // rows: each player's tip ms, sorted
+  const tips = [...new Set(rows.flat())].sort((a, b) => a - b);
+  if (!tips.length || !width) return { xs: new Map(), scale: 1 };
+  const t0 = tips[0], span = Math.max(1, tips.at(-1) - t0);
+  const place = (s, cw) => {
+    const x = new Map();
+    let prev = 0;
+    for (const t of tips) {
+      let v = Math.max(prev, (s * (t - t0) / span) * (width - cw));
+      for (const r of rows) { const i = r.indexOf(t); if (i > 0) v = Math.max(v, x.get(r[i - 1]) + cw + CHIP_GAP); }
+      x.set(t, v); prev = v;
+    }
+    return x;
+  };
+  const fits = (s) => place(s, CHIP_W).get(tips.at(-1)) <= width - CHIP_W;
+  if (!fits(0)) {
+    const k = Math.round(place(0, CHIP_W).get(tips.at(-1)) / (CHIP_W + CHIP_GAP));   // chips packed end to end
+    const cw = (width - k * CHIP_GAP) / (k + 1);
+    return cw < 0.8 * CHIP_W ? { xs: null } : { xs: place(0, cw), scale: cw / CHIP_W };   // unreadable smaller: plain row
+  }
+  let lo = 0, hi = 1;
+  if (fits(1)) lo = 1;
+  else for (let k = 0; k < 20; k++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+  return { xs: place(lo, CHIP_W), scale: 1 };
+}
+
+// The time line's x: between tips it moves at an even pace from one chip's left edge (its tip) to the next.
+function laneAt(xs, ms, start, end, width) {
+  const pts = [[start, -8], ...xs, [Math.max(end, start + 1), width]];
+  if (ms <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    const [t1, x1] = pts[i], [t0, x0] = pts[i - 1];
+    if (ms <= t1) return t1 === t0 ? x1 : x0 + ((ms - t0) / (t1 - t0)) * (x1 - x0);
+  }
+  return width;
 }
 
 const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
@@ -191,7 +236,7 @@ function lockCall(r) {
   return ["", "", ""];
 }
 
-function PlayerCard({ data, r, open, setLock, mine, side, day }) {
+function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
@@ -207,7 +252,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day }) {
           <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
         </div>
         </div>
-        <GameChips games={p.games} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
+        <GameChips games={p.games} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
         {mine && (
           <span className="mu-call">
             {word && <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>}
@@ -272,6 +317,24 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     const rid = data.matchups[idx]?.[0]?.roster_id;
     api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
   }, [idx, isMine, leagueId, data.week, data.matchups]);
+  // Your chip lanes share one left edge and width (the narrowest), measured from the cards on screen.
+  const [lane, setLane] = useState(null);
+  React.useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || !isMine) return undefined;
+    const measure = () => {
+      const els = [...grid.querySelectorAll(".mu-card.left .chips-lane")];
+      if (!els.length) return;
+      const w = Math.min(...els.map((e) => e.getBoundingClientRect().width));
+      const left = els[0].getBoundingClientRect().left - grid.getBoundingClientRect().left;
+      setLane((o) => (o && o.w === w && o.left === left ? o : { w, left }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  });
+  const xs = isMine ? laneXs(plan.players.map((r) => (data.players[r.sid]?.games || []).map(tipMs).sort((a, b) => a - b)), lane?.w) : null;
   const shown = isMine ? plan : other;
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
@@ -289,7 +352,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
     </React.Fragment>
@@ -324,6 +387,9 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
       </div>
       <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
         {isMine && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
+        {isMine && tl && lane && xs.xs?.size > 0 && (
+          <div className="time-line" data-testid="time-line" style={{ left: lane.left + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
+        )}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
         {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
