@@ -117,6 +117,10 @@ export default function SettingsPage({ leagueId }) {
           <label>You are <select value={managers.find((m) => m.is_user)?.manager_id || ""} onChange={(e) => markMe(e.target.value)} data-testid="you-are">
             {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name}</option>)}</select>
             <span className="muted small">Your team: your side of the matchup, waivers, news. Saves at once.</span></label>
+          <label>Player nicknames <select defaultValue={(() => { try { return localStorage.getItem("da.nicks") || "on"; } catch { return "on"; } })()}
+              onChange={(e) => { try { localStorage.setItem("da.nicks", e.target.value); setMsg("Saved."); } catch { /* ignore */ } }} data-testid="nicks">
+            <option value="on">Show</option><option value="off">Hide</option></select>
+            <span className="muted small">The nicknames managers gave their players on Sleeper, under each name on the Season tab. Saves at once (this browser).</span></label>
           <label>Draft type <select value={s.draft_type} onChange={(e) => set({ draft_type: e.target.value })}><option value="auction">Auction</option><option value="snake">Snake</option></select></label>
           <label>Nomination order <select value={s.nomination_order_type} onChange={(e) => set({ nomination_order_type: e.target.value })}><option value="fixed_rotation">Fixed rotation</option><option value="snake">Snake</option></select></label>
           <label>Scoring format <select value={s.scoring_format} onChange={(e) => set({ scoring_format: e.target.value })}><option value="h2h_points">H2H points</option></select></label>

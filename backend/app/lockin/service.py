@@ -152,15 +152,23 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
               "min_bid": ls.get("waiver_bid_min", 1), "daily": bool(ls.get("daily_waivers"))} if "waiver_type" in ls else None
     faab_budget = (waiver or {}).get("budget") or FAAB_TOTAL
     rosters = fetch(f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL) or []
-    users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
+    users = {u["user_id"]: u for u in fetch(f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL) or []}
     matchups = fetch(f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL) or []
     by_roster = {m.sleeper_roster_id: m for m in session.managers if m.sleeper_roster_id is not None}
 
-    teams = []
+    teams, nicks = [], {}   # nicks: sid -> the nickname his manager gave him on Sleeper
     for r in rosters:
         s, m = r.get("settings") or {}, by_roster.get(r["roster_id"])
+        u = users.get(r.get("owner_id")) or {}
+        um = u.get("metadata") or {}
+        own = set(r.get("players") or [])
+        nicks.update({k[7:]: v.strip() for k, v in (r.get("metadata") or {}).items()
+                      if k.startswith("p_nick_") and k[7:] in own and isinstance(v, str) and v.strip()})
         teams.append({"roster_id": r["roster_id"], "manager_id": m.manager_id if m else None,
-                      "name": users.get(r.get("owner_id")) or (m.name if m else f"Team {r['roster_id']}"),
+                      # the Sleeper team name when the manager set one, else his username
+                      "name": um.get("team_name") or u.get("display_name") or (m.name if m else f"Team {r['roster_id']}"),
+                      "user": u.get("display_name"),
+                      "avatar": um.get("avatar") or (f"https://sleepercdn.com/avatars/thumbs/{u['avatar']}" if u.get("avatar") else None),
                       "is_user": bool(m and m.is_user), "wins": s.get("wins", 0), "losses": s.get("losses", 0),
                       "ties": s.get("ties", 0), "fpts": round(s.get("fpts", 0) + s.get("fpts_decimal", 0) / 100, 2),
                       "faab_used": s.get("waiver_budget_used", 0),
@@ -197,7 +205,8 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
-                        "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games}
+                        "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games,
+                        "nick": nicks.get(sid)}
 
     team_games: dict[str, int] = {}
     for (d, team) in plays:
@@ -363,7 +372,8 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         theirs = team_total(oplayers)
         chance = decide_by_win_chance(players, theirs)   # LOCK / PASS by the chance to win, not expected points
         mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
-        opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "expected": oplan.expected,
+        opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "user": oteam.get("user"), "avatar": oteam.get("avatar"),
+               "expected": oplan.expected,
                "points": other.get("points") or 0, "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
@@ -397,7 +407,8 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     # a healthy player on IR counts as a 16th man: Sleeper freezes the lineup and locks until you drop
                     "illegal": healthy_ir if len(active) + len(healthy_ir) > len(view["roster_positions"]) else [],
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
-    return {"roster_id": team["roster_id"], "name": team["name"], "expected": plan.expected, "slots": counts,
+    return {"roster_id": team["roster_id"], "name": team["name"], "user": team.get("user"), "avatar": team.get("avatar"),
+            "expected": plan.expected, "slots": counts,
             "points": side.get("points") or 0, "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],

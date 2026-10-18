@@ -18,6 +18,19 @@ const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 const md = (d) => d.slice(5).replace("-", "/");   // "2026-10-20" -> "10/20"
 const fp = (x) => (x == null ? "" : x.toFixed(1));
+// Player nicknames the managers set on Sleeper: shown unless switched off (Settings > General, this browser only).
+const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off"; } catch { return true; } };
+
+// A fantasy team: its Sleeper avatar, its team name, and the manager's username when that differs.
+function TeamName({ t, cls = "", size = 24 }) {
+  return (
+    <span className="team-name-tag">
+      {t.avatar && <img className="team-avatar" src={t.avatar} width={size} height={size} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+      <span className={cls}>{t.name}</span>
+      {t.user && t.user !== t.name && <span className="small muted">{t.user}</span>}
+    </span>
+  );
+}
 
 
 export default function SeasonPage({ leagueId }) {
@@ -256,7 +269,8 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
           <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
-          <div className="small muted">{p.team || "FA"} · <PosList list={r.pos} /></div>
+          <div className="small muted mu-sub">{p.team || "FA"} · <PosList list={r.pos} />
+            {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
         <GameChips games={p.games} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
@@ -376,7 +390,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
-          <span className="mc-name">{shown.name}</span>{isMine && <span className="badge info">YOU</span>}
+          <TeamName t={shown} cls="mc-name" size={34} />{isMine && <span className="badge info">YOU</span>}
           <span className="mc-points">{fp(shown.points)}</span>
           <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{shown.expected}</strong></span> · {shown.games_left} left</span>
         </div>
@@ -394,7 +408,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         <div className="mu-team right">
           {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
           <span className="mc-points">{o ? fp(o.points) : ""}</span>
-          <span className="mc-name">{o ? o.name : "no opponent"}</span>
+          {o ? <TeamName t={o} cls="mc-name" size={34} /> : <span className="mc-name">no opponent</span>}
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
@@ -580,7 +594,7 @@ function LeagueView({ data, leagueId, open }) {
                 return (
                   <div key={m.roster_id} className={`lm-row clickable ${t.is_user ? "me" : ""} ${other && (m.points || 0) > (other.points || 0) ? "lead" : ""}`}
                     onClick={() => show(m.roster_id)} data-tip="Show this team's roster and games">
-                    <span>{t.name}</span><strong>{fp(m.points || 0)}</strong>
+                    <TeamName t={t} size={22} /><strong>{fp(m.points || 0)}</strong>
                   </div>
                 );
               })}
@@ -590,7 +604,7 @@ function LeagueView({ data, leagueId, open }) {
       </div>
       {shown && (
         <div className="panel" data-testid="team-roster">
-          <h3 style={{ marginTop: 0 }}>{shown.name} <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
+          <h3 style={{ marginTop: 0 }}><TeamName t={shown} size={28} /> <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
             <button className="small ghost" style={{ marginLeft: 8 }} onClick={() => setShown(null)}>close</button></h3>
           <TeamColumn data={data} team={shown} open={open} />
         </div>
@@ -600,7 +614,7 @@ function LeagueView({ data, leagueId, open }) {
         <table className="small" data-testid="standings">
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
-            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}>{t.name}</td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
+            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}><TeamName t={t} size={22} /></td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
               <td className="num">{fp(t.fpts)}</td><td className="num">{data.waiver ? `$${(data.faab_budget ?? 100) - (t.faab_used || 0)}` : "?"}</td></tr>))}</tbody>
         </table>
       </div>
