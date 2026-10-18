@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 // and hovering it shows the definition. Any element with data-tip gets the same tooltip.
 export const TERMS = {
   worth: ["Worth", "What he's actually worth in this room: $1 + his value above a replacement player × the room's dollars per point of value. The same for every manager. It moves during the draft as money and talent leave the room. Bid up to this with no doubts."],
-  r_value: ["R value", "Your formula, from Sleeper's projected FP/G only: player #180 on the board (keepers excluded) is replacement level; value above replacement = FP/G - his FP/G; the $1903 in the room is split by each player's share of the top 180's value above replacement. At or below replacement: $1. Fixed for the whole draft."],
   max: ["Max", "Worth plus up to 15% when rivals can afford him and have a spot for him: where the bidding will likely end. Past his Max, someone is overpaying; don't let it be you."],
   comfort: ["Comfort limit", "Pay up to this and you still have at least 80% of the room's average $ per open starting spot for the rest of your team."],
   walk: ["Walk-away", "Never pay more. Past this you'd have under half the room's average $ per open starting spot for the rest of your team."],

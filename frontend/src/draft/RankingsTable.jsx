@@ -10,7 +10,7 @@ const INJ = { healthy: "", day_to_day: "DTD", out_short_term: "OUT", out_long_te
 const COLS = [
   ["rank", "rank", "num"], ["full_name", "Player"], ["team_abbr", "Tm", "col-narrow-hide"], ["pos", "pos_rank"],
   ["avg_fpts", "fpg", "num"], ["owned_pct", "rost", "num col-narrow-hide"], ["availability", "avail", "num"],
-  ["min", "min", "num col-narrow-hide"], ["fit", "fit", "num"], ["worth", "worth", "num"], ["max", "max", "num"], ["r_value", "r_value", "num"],
+  ["min", "min", "num col-narrow-hide"], ["fit", "fit", "num"], ["worth", "worth", "num"], ["max", "max", "num"],
 ];
 const HEAD = { rank: "#", pos_rank: "Pos" };
 
@@ -105,7 +105,6 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               <td className="num" data-tip={r.call ? `${TERMS[r.call][0]}: ${TERMS[r.call][1]}` : "Shows once the draft is live."}>
                 {r.max != null ? <strong className={`call-${r.call}`} data-testid="your-max">${r.max}</strong> : <span className="muted">{r.call === "cannot" ? "CAN'T" : "—"}</span>}
               </td>
-              <td className="num" data-testid="r-value">{r.r_value != null ? `$${r.r_value}` : <span className="muted">—</span>}</td>
             </tr>
           );
         })}

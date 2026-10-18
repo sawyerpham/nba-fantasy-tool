@@ -239,22 +239,3 @@ def test_pre_draft_worth_counts_keepers_and_matches_draft_start(fixture_world):
     s.engine.reset()
     assert s.draft.status == "setup" and s.start_worth(luka()) == live   # same number before the draft, from the keeper rows
     assert s.keeper_start_rate().free_dollars == no_keepers - 9   # his $10 is spent, $1 of it on a spot that no longer needs reserving
-
-
-def test_r_value_prices_sleeper_fpg_above_the_replacement_player(fixture_world):
-    from app.core.engine.ranking import projected_fpts
-
-    s = make_session(fixture_world, keeper=KeeperSettings(enabled=True))
-    for pts, pid in zip((40, 30, 25, 20, 15, 10), list(s.players)[:6]):   # the fixture has no Sleeper projections
-        s.players[pid] = s.players[pid].model_copy(update={"projection": {"pts": pts}})
-    fpg = {pid: projected_fpts(rec, s.valuations.get(pid), s.league.scoring) for pid, rec in s.players.items()}
-    board = sorted((f for f in fpg.values() if f is not None), reverse=True)
-    n = 5   # player #5 of the six projected is replacement
-    r = s.r_values(replacement_rank=n, total_dollars=100)
-    repl = board[n - 1]
-    top = sorted((pid for pid in fpg if fpg[pid] is not None), key=lambda pid: -fpg[pid])
-    assert r[top[0]] == round((fpg[top[0]] - repl) * 100 / sum(f - repl for f in board[:n]))
-    assert all(r[pid] == 1 for pid in top[n - 1:]) and all(v >= 1 for v in r.values())
-    assert sum(r[pid] for pid in top[: n - 1]) == pytest.approx(100, abs=n)   # the top players split the money
-    s.engine.start([KeeperAssignment("m2", top[0], 10)])
-    assert top[0] not in s.r_values(replacement_rank=n, total_dollars=100)   # keepers are off the board
