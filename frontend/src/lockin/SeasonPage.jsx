@@ -162,7 +162,7 @@ function RosterAlerts({ roster }) {
 }
 
 // One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
-// lane (your side): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
+// lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
 function GameChips({ games, today, lockDate, day, lane }) {   // day: the lineup day shown (its chip lights up, the rest dim)
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g) => {
@@ -182,7 +182,7 @@ function GameChips({ games, today, lockDate, day, lane }) {   // day: the lineup
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
-// Your chips as a timeline: one x per distinct tip on your roster, the earliest at the lane's left edge, spaced in
+// A matchup's chips as a timeline: one x per distinct tip on both rosters, the earliest at the lane's left edge, spaced in
 // proportion to time but pushed right wherever a player's chip would overlap his previous one. The time scale is
 // the largest that still fits the last chip in the lane, so a week with 4-game players spreads less than one with 3.
 // Too narrow even packed tight: the chips shrink (scale) until they fit, down to 80%; narrower than that, xs is null
@@ -317,24 +317,27 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     const rid = data.matchups[idx]?.[0]?.roster_id;
     api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
   }, [idx, isMine, leagueId, data.week, data.matchups]);
-  // Your chip lanes share one left edge and width (the narrowest), measured from the cards on screen.
+  // Both teams' chip lanes share one width (the narrowest) and one time axis; each column has its own left edge.
+  // Measured from the cards on screen.
   const [lane, setLane] = useState(null);
   React.useLayoutEffect(() => {
     const grid = gridRef.current;
-    if (!grid || !isMine) return undefined;
+    if (!grid) return undefined;
     const measure = () => {
-      const els = [...grid.querySelectorAll(".mu-card.left .chips-lane")];
-      if (!els.length) return;
-      const w = Math.min(...els.map((e) => e.getBoundingClientRect().width));
-      const left = els[0].getBoundingClientRect().left - grid.getBoundingClientRect().left;
-      setLane((o) => (o && o.w === w && o.left === left ? o : { w, left }));
+      const g = grid.getBoundingClientRect().left;
+      const side = (s) => [...grid.querySelectorAll(`.mu-card.${s} .chips-lane`)];
+      const L = side("left"), R = side("right");
+      if (!L.length && !R.length) return;
+      const w = Math.min(...[...L, ...R].map((e) => e.getBoundingClientRect().width));
+      const edge = (els) => (els.length ? els[0].getBoundingClientRect().left - g : null);
+      const l = edge(L), r = edge(R);
+      setLane((o) => (o && o.w === w && o.l === l && o.r === r ? o : { w, l, r }));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(grid);
     return () => ro.disconnect();
   });
-  const xs = isMine ? laneXs(plan.players.map((r) => (data.players[r.sid]?.games || []).map(tipMs).sort((a, b) => a - b)), lane?.w) : null;
   const shown = isMine ? plan : other;
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
@@ -348,13 +351,16 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const o = shown.opponent;
   const L = bySlot(isMine ? bestRows : shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
+  const tips = (players) => players.map((r) => (data.players[r.sid]?.games || []).map(tipMs).sort((a, b) => a - b));
+  const xs = laneXs([...tips(shown.players), ...tips(o?.players || [])], lane?.w);
+  const lineMs = isMine ? atMs : nowMs;   // the slider only shows on your matchup
   const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" lane={xs} /></div>
     </React.Fragment>
   );
   return (
@@ -387,9 +393,9 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
       </div>
       <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
         {isMine && <SwapArrows gridRef={gridRef} pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
-        {isMine && tl && lane && xs.xs?.size > 0 && (
-          <div className="time-line" data-testid="time-line" style={{ left: lane.left + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
-        )}
+        {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
+          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, lineMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
+        ))}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
         {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
