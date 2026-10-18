@@ -484,7 +484,7 @@ def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:
     """How he changed hands this season: the draft (auction price, keeper flag) from Sleeper's draft picks, then every
     completed transaction in order: waiver claims (FAAB bid), free-agent pickups, trades (to whom) and drops."""
     lid = session.league.sleeper_league_id
-    team = {t["roster_id"]: t["name"] for t in view["teams"]}
+    team = {t["roster_id"]: t.get("user") or t["name"] for t in view["teams"]}   # usernames, not team names
     out = []
     draft_id = (fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}).get("draft_id")
     for pk in (fetch(f"{SLEEPER}/v1/draft/{draft_id}/picks", DAY_TTL) or []) if draft_id else []:
