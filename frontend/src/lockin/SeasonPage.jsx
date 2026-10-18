@@ -182,37 +182,43 @@ function GameChips({ games, today, lockDate, day, lane }) {   // day: the lineup
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
-// A matchup's chips as a timeline: one x per distinct tip on both rosters, the earliest at the lane's left edge, spaced in
-// proportion to time, and each game day starts clear of the previous day's chips (so the time line never sits on an
-// earlier day's chips, and no player's chips overlap). The time scale is the largest that still fits the last chip in
-// the lane. Too narrow even packed tight (one column per day): the chips shrink (scale) until they fit, down to 70%;
-// narrower than that, xs is null and the chips sit in a plain row (no time line).
-const CHIP_W = 86, CHIP_GAP = 6;
+// A matchup's chips as a timeline: one x per distinct tip on both rosters, the earliest at the lane's left edge.
+// Each game day starts clear of the previous day's chips (so the time line never sits on an earlier day's chips);
+// within a day the tips spread by the hour (4-12 px an hour, as much as fits); room left over spaces the days in
+// proportion to time. Too narrow even at 4 px an hour: the chips shrink (scale) down to 65%; narrower than that, xs is
+// null and the chips sit in a plain row (no time line).
+const CHIP_W = 86, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
 function laneXs(games, width) {   // games: [tip ms, game date] for every chip in the matchup
   const day = new Map(games);
   const tips = [...day.keys()].sort((a, b) => a - b);
   if (!tips.length || !width) return { xs: new Map(), scale: 1 };
   const t0 = tips[0], span = Math.max(1, tips.at(-1) - t0);
-  const place = (s, cw) => {
+  const place = (s, h, cw) => {   // s: share of the lane spaced by time; h: px an hour within a day; cw: chip width
     const x = new Map();
-    let prev = 0, dayStart = 0, last = null;
+    let prev = 0, start = 0, first = t0, last = t0;
     for (const t of tips) {
-      if (last != null && day.get(t) !== day.get(last)) dayStart = prev + cw + CHIP_GAP;
-      const v = Math.max(prev, dayStart, (s * (t - t0) / span) * (width - cw));
+      const lin = (s * (t - t0) / span) * (width - cw);
+      let v;
+      if (day.get(t) !== day.get(last)) { v = Math.max(prev + cw + CHIP_GAP, lin); start = v; first = t; }
+      else v = Math.max(prev, start + ((t - first) / 3600e3) * h, lin);
       x.set(t, v); prev = v; last = t;
     }
     return x;
   };
-  const fits = (s) => place(s, CHIP_W).get(tips.at(-1)) <= width - CHIP_W;
-  if (!fits(0)) {
-    const k = new Set(day.values()).size - 1;   // day columns packed end to end
-    const cw = (width - k * CHIP_GAP) / (k + 1);
-    return cw < 0.7 * CHIP_W ? { xs: null } : { xs: place(0, cw), scale: cw / CHIP_W };   // unreadable smaller: plain row
+  const ok = (s, h, cw) => place(s, h, cw).get(tips.at(-1)) + cw <= width;
+  const most = (lo, hi, f) => {   // the largest value in [lo, hi] that f accepts (f grows with it), or null
+    if (f(hi)) return hi;
+    if (!f(lo)) return null;
+    for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; if (f(m)) lo = m; else hi = m; }
+    return lo;
+  };
+  const h = most(HOUR_MIN, HOUR_MAX, (v) => ok(0, v, CHIP_W));
+  if (h == null) {
+    const cw = most(0.65 * CHIP_W, CHIP_W, (v) => ok(0, HOUR_MIN, v));
+    return cw == null ? { xs: null } : { xs: place(0, HOUR_MIN, cw), scale: cw / CHIP_W };
   }
-  let lo = 0, hi = 1;
-  if (fits(1)) lo = 1;
-  else for (let k = 0; k < 20; k++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
-  return { xs: place(lo, CHIP_W), scale: 1 };
+  const s = most(0, 1, (v) => ok(v, h, CHIP_W));
+  return { xs: place(s, h, CHIP_W), scale: 1 };
 }
 
 // The time line's x: between tips it moves at an even pace from one chip's left edge (its tip) to the next.
