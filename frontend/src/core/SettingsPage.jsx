@@ -219,7 +219,7 @@ export default function SettingsPage({ leagueId }) {
       </div>
 
       <div className="panel">
-        <h3>Sleeper league (optional) <span className="muted small">— pulls the live league's scoring and roster; NBA scoring key names are provisional until verified</span></h3>
+        <h3>Sleeper league (optional) <span className="muted small">— pulls the live league's scoring and roster</span></h3>
         <div className="row">
           <input type="text" placeholder="sleeper league id" value={sleeperId} onChange={(e) => setSleeperId(e.target.value)} data-testid="sleeper-league-id" />
           <button onClick={doPreview} disabled={!sleeperId.trim()} data-testid="sleeper-preview">Preview</button>
@@ -239,7 +239,6 @@ export default function SettingsPage({ leagueId }) {
         {preview && (
           <div>
             <p className="small">{preview.league.name} · {preview.league.sport} · season {preview.league.season} · {preview.league.total_rosters} rosters · status {preview.league.status}</p>
-            {preview.scoring_map.provisional && <p className="small badge warn">provisional key map: {preview.scoring_map.note}</p>}
             <p className="small">Unknown keys: {preview.scoring_map.unknown_keys.join(", ") || "none"} · unsupported non-zero: {JSON.stringify(preview.scoring_map.unsupported_nonzero)} · missing expected: {preview.scoring_map.missing_expected.join(", ") || "none"}</p>
             <table>
               <thead><tr><th>field</th><th>current</th><th>Sleeper</th></tr></thead>

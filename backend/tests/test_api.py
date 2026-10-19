@@ -203,7 +203,7 @@ def test_sleeper_preview_and_apply(pulled):
     r = client.post("/api/leagues/lg-sleeper/sleeper/preview", json={"sleeper_league_id": PROVISIONAL_LEAGUE})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["scoring_map"]["provisional"] is True and body["scoring_map"]["unknown_keys"] == []
+    assert body["scoring_map"]["provisional"] is False and body["scoring_map"]["unknown_keys"] == []
     assert [d["field"] for d in body["diffs"]] == ["name"]  # provisional fixture mirrors SPEC defaults exactly
     r = client.post("/api/leagues/lg-sleeper/sleeper/apply", json={"sleeper_league_id": PROVISIONAL_LEAGUE, "apply": ["name", "scoring", "roster_slots", "keepers"]})
     assert r.status_code == 200

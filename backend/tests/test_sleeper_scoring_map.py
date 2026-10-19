@@ -1,4 +1,4 @@
-"""Provisional Sleeper scoring-key map: mapped values, unknown/unsupported/missing reporting."""
+"""Sleeper scoring-key map: mapped values, unknown/unsupported/missing reporting."""
 
 import json
 
@@ -20,7 +20,7 @@ def test_provisional_nba_fixture_maps_exactly_onto_spec_defaults(fixtures_dir):
     assert league.sport == "nba" and league.roster_positions.count("BN") == 8 and league.roster_positions.count("IR") == 2
 
     result = map_sleeper_scoring(league.scoring_settings)
-    assert result.provisional is True
+    assert result.provisional is False
     assert result.clean, (result.unknown_keys, result.unsupported_nonzero, result.missing_expected)
     assert result.settings.source == "sleeper"
     assert result.settings.base == BaseScoring()
@@ -29,6 +29,16 @@ def test_provisional_nba_fixture_maps_exactly_onto_spec_defaults(fixtures_dir):
         [(r.id, r.kind, r.stat, r.threshold, r.bonus) for r in default.bonuses]
     assert result.settings.scoring_hash() == default.scoring_hash()  # identical values -> identical valuation cache
     assert result.applied["to"] == "base.tov" and result.applied["tpm"] == "base.fg3m" and result.applied["td"] == "bonus.triple_double"
+
+
+def test_real_nba_league_keys_map_cleanly():
+    # the real league's scoring_settings (2026-10-19): bonuses carry a "p" suffix; ff / tf are fouls scored 0
+    real = {"ast": 0.5, "blk": 0.75, "bonus_ast_15p": 4.0, "bonus_pt_40p": 4.0, "bonus_pt_50p": 1.0, "bonus_reb_20p": 4.0,
+            "fga": -0.1, "fgm": 0.25, "ftm": 0.05, "pts": 0.25, "reb": 0.4, "stl": 0.75, "td": 2.0, "to": -0.5, "tpm": 0.3,
+            "ff": 0.0, "tf": 0.0}
+    result = map_sleeper_scoring(real)
+    assert result.clean, (result.unknown_keys, result.unsupported_nonzero, result.missing_expected)
+    assert result.settings.scoring_hash() == ScoringSettings().scoring_hash()   # same as the SPEC defaults
 
 
 def test_unknown_keys_are_reported_not_ignored():

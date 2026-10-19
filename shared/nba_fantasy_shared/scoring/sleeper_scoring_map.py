@@ -1,8 +1,8 @@
 """Map a Sleeper league's flat `scoring_settings` dict onto ScoringSettings.
 
-PROVISIONAL: the NBA key names below are Sleeper's conventional names as best known; they have NOT
-been verified against a real NBA league (no sleeper_league_id was available, decision 11). Sleeper's
-docs and the only public example league are NFL. Every key that is not recognised is reported in
+Verified 2026-10-19 against a real Sleeper NBA league: every base key, `td` and the bonus keys (named with a
+"p" suffix there: bonus_pt_40p ...) map as below; its only other keys are ff / tf (flagrant / technical
+fouls, scored 0). Every key that is not recognised is reported in
 `unknown_keys`; recognised-but-unsupported categories with a non-zero value are reported in
 `unsupported_nonzero`; expected keys that are absent are reported in `missing_expected`.
 Nothing is silently ignored.
@@ -16,9 +16,9 @@ from typing import Mapping
 
 from ..models.scoring import BaseScoring, BonusRule, ScoringSettings
 
-PROVISIONAL = True
+PROVISIONAL = False   # verified on a real NBA league (see module doc)
 
-# Sleeper key -> BaseScoring field. All provisional.
+# Sleeper key -> BaseScoring field.
 BASE_KEYS: dict[str, str] = {
     "pts": "pts",
     "reb": "reb",
@@ -34,7 +34,7 @@ BASE_KEYS: dict[str, str] = {
 
 # Recognised Sleeper NBA categories that ScoringSettings does not model (SPEC.md scores 10 base stats).
 UNSUPPORTED_KEYS: frozenset[str] = frozenset(
-    {"fta", "tpa", "oreb", "dreb", "pf", "min", "fgmi", "ftmi", "tpmi", "dd", "qd", "ejection", "tech", "flagrant"}
+    {"fta", "tpa", "oreb", "dreb", "pf", "min", "fgmi", "ftmi", "tpmi", "dd", "qd", "ejection", "tech", "flagrant", "ff", "tf"}
 )
 
 TRIPLE_DOUBLE_KEY = "td"
@@ -62,8 +62,8 @@ class SleeperScoringMapResult:
     missing_expected: list[str] = field(default_factory=list)
     provisional: bool = PROVISIONAL
     note: str = (
-        "Sleeper NBA scoring key names are provisional: not yet verified against a real NBA league. "
-        "Review 'applied', 'unknown_keys' and 'unsupported_nonzero' before trusting the mapped values."
+        "Sleeper NBA scoring keys verified against a real NBA league. "
+        "'unknown_keys' and 'unsupported_nonzero' list anything a league scores that the tool doesn't."
     )
 
     @property
@@ -103,7 +103,8 @@ def map_sleeper_scoring(scoring_settings: Mapping[str, float]) -> SleeperScoring
             continue
         result.unknown_keys.append(key)
 
-    result.missing_expected = [k for k in EXPECTED_KEYS if k not in scoring_settings]
+    # a real league names the bonuses bonus_pt_40p ...: either spelling counts
+    result.missing_expected = [k for k in EXPECTED_KEYS if k not in scoring_settings and f"{k}p" not in scoring_settings]
     # Keep the SPEC rule order for the well-known bonuses so hashes stay stable across sources.
     order = {"triple_double": 0, "pts_40": 1, "pts_50": 2, "ast_15": 3, "reb_20": 4}
     bonuses.sort(key=lambda r: (order.get(r.id, 99), r.id))
