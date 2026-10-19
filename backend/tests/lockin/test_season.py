@@ -162,7 +162,7 @@ def test_timeline_hands_the_slot_to_a_later_player_at_his_check_in():
     view = {"tz": "America/Chicago", "dates": ["2026-10-20", "2026-10-21"], "day": "2026-10-20"}
     segs = week_timeline([shai, reav], {"PG": 1}, view, None)["segments"]
     assert [(x["seats"]["PG"], x["to"][:16]) for x in segs] == [
-        (["s"], "2026-10-21T20:55"),    # Shai (Tue 8:30 PM) holds the slot until the check 5 min before Reaves's Wed tip ...
+        (["s"], "2026-10-21T20:45"),    # Shai (Tue 8:30 PM) holds the slot until the check 15 min before Reaves's Wed tip ...
         (["r"], "2026-10-26T00:00")]    # ... then the slot goes to the player who still has a game (Shai can be locked)
     assert shai.slot == "PG" and not shai.games[0].started   # the simulation leaves the real state alone
 
@@ -180,5 +180,5 @@ def test_timeline_does_a_nights_swaps_at_one_check_in_and_never_moves_a_player_m
     view = {"tz": "America/Chicago", "dates": ["2026-10-21"], "day": "2026-10-21"}
     segs = week_timeline(ps, {"C": 3}, view, None)["segments"]
     assert [(sorted(x["seats"]["C"]), x["to"][:16]) for x in segs] == [
-        (["6:00", "6:30", "7:00"], "2026-10-21T20:55"),   # the early games start; one check at 8:55 PM ...
+        (["6:00", "6:30", "7:00"], "2026-10-21T20:45"),   # the early games start; one check at 8:45 PM ...
         (["7:00", "9:00", "9:30"], "2026-10-26T00:00")]   # ... swaps in the 9:00 AND 9:30 games; 7:00 is still playing
