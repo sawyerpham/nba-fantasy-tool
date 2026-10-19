@@ -798,7 +798,8 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .gc-time { font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .gc-fp { font-size: 16px; font-weight: 700; color: var(--muted); }
 .game-cell.done { background: transparent; } .game-cell.done .gc-fp { color: var(--text); font-weight: 800; }   /* final: actual FP */
-.game-cell.past { opacity: 0.4; }                                   /* over by the line's time */
+.game-cell.past { opacity: 0.6; background: transparent; }         /* over by the line's time */
+.gc-day { font-size: 12.5px; font-weight: 700; color: var(--text); white-space: nowrap; }   /* opponent's cells: no day header there */
 .game-cell.on { border-color: var(--danger); }                      /* under way at the line's time */
 .game-cell.live .gc-time { color: var(--danger); font-weight: 800; }
 .game-cell.locked { border: 2px solid var(--ok); background: var(--good); opacity: 1; }

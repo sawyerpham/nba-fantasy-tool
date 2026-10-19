@@ -232,7 +232,7 @@ function WeekCells({ games, week, lockDate, team }) {
           onClick={href ? (e) => e.stopPropagation() : undefined}
           className={`game-cell ${state} ${live ? "live" : ""} ${lockDate === g.date ? "locked" : ""} ${week.day === g.date ? "pick" : ""} ${href ? "watch" : ""}`}
           data-tip={gameTip(g, played, live, lockDate, href)}>
-          <span className="gc-time">{played && !live ? "final" : live ? "LIVE" : shortTime(g.tip)}</span>
+          <span>{week.showDay && <span className="gc-day">{dayName(g.date)} </span>}<span className="gc-time">{played && !live ? "final" : live ? "LIVE" : shortTime(g.tip)}</span></span>
           <span className="gc-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
         </Tag>
       );
@@ -357,7 +357,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     <React.Fragment key={key}>
       <div className={`mu-cell ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: "1 / span 3" }}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" week={week} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: 4 }}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: "5 / span 3" }}><PlayerCard data={data} r={r?.r} open={open} side="right" week={week} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: "5 / span 3" }}><PlayerCard data={data} r={r?.r} open={open} side="right" week={{ ...week, showDay: true }} /></div>
     </React.Fragment>
   );
   const nBench = Math.max(L.bench.length, R.bench.length), nIr = Math.max(L.ir.length, R.ir.length);
@@ -404,7 +404,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
           <WeekAxis monday={week.monday} day={isMine ? week.day : null} today={data.today}
             slider={isMine && tl?.segments.length > 0 ? { tl, nowMs, atMs, setAt } : null} />
         </div>
-        {o && <div style={{ gridColumn: 6, gridRow: 1 }}><WeekAxis monday={week.monday} today={data.today} /></div>}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot, false, i))}
         {Array.from({ length: nBench }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0, L.lines.length + i))}
         {Array.from({ length: nIr }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0, L.lines.length + nBench + i))}
