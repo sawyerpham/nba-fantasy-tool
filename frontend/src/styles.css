@@ -633,17 +633,13 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .wv-player { display: flex; align-items: center; gap: 10px; }
 .wv-up { display: flex; align-items: center; gap: 10px; } .wv-bar { width: 90px; } .wv-bar > span { display: block; height: 100%; background: var(--ok); }
 .wv-bid { display: inline-block; min-width: 40px; text-align: center; padding: 3px 10px; border-radius: 999px; font-weight: 700; background: var(--primary-soft); color: var(--info-t); }
-/* week timeline: "back to now" on the left, then the week as a line with a dot; the dot's time rides under it;
-   past shaded; ticks where the lineup changes */
-.timeline { display: flex; align-items: flex-start; gap: 10px; margin: 0 4px 22px; }
-.tl-back { flex: none; width: 92px; padding-top: 24px; text-align: right; }
+/* week timeline (the matchup grid's header): the week as a line with a dot over your day lane; the dot's time rides
+   under it; past shaded; ticks at check-ins */
 .tl-next { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; text-align: left;
   border: 1px solid var(--primary-border); border-left-width: 3px; border-radius: 10px; background: var(--primary-soft); }
 .tl-next:disabled { opacity: 0.6; cursor: default; }
 .tl-next-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--info-t); }
 .tl-next strong { white-space: nowrap; }
-.tl-main { flex: 1; min-width: 0; }
-.tl-days { display: grid; grid-template-columns: repeat(7, 1fr); font-size: 14px; font-weight: 600; color: var(--text); text-align: center; }
 .tl-bar { position: relative; height: 22px; }
 .tl-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 2px; background: var(--border); }
 .tl-past { position: absolute; left: 0; top: 9px; height: 4px; border-radius: 2px; background: var(--muted); opacity: 0.45; }
@@ -771,8 +767,6 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .day-pick button.is-today { font-weight: 800; }
 .win-chance { font-size: 15px; white-space: nowrap; }
 .win-pair { white-space: nowrap; font-size: 12px; }
-.game-chip.pick { border: 2px solid var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
-.game-chip.dim { opacity: 0.45; }
 .verdict.off { opacity: 0.6; font-weight: 600; }
 .day-pick { align-items: center; }
 .lineup-day { font-size: 13px; white-space: nowrap; margin-left: 6px; }
@@ -781,11 +775,45 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-grid { position: relative; }   /* holds the time lines */
 .mu-grid.with-arrows { padding-left: 80px; }
 .swap-arrows { position: absolute; left: 0; top: 0; height: 100%; overflow: visible; pointer-events: none; }
-/* your game chips as a timeline (x from laneXs) and the time line through them; the line sits under the chips */
-.chips-lane { position: relative; flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; }
-.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 86px; min-width: 0; box-sizing: border-box; transform-origin: left center; }
-.chips-lane > .chips-row { flex-wrap: nowrap; }   /* too narrow for the timeline: one plain row, as before */
-.time-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary); opacity: 0.85; pointer-events: none; }
+/* the matchup as one grid: name | Mon-Sun | call, slot, name | Mon-Sun | call. Every card is a subgrid of it, so the
+   day lanes line up with each other and with the timeline header; day cells and the axis are inset 8px (lanePos) */
+.mu-grid.week { grid-template-columns: auto minmax(0, 1fr) auto 46px auto minmax(0, 1fr) auto; grid-template-rows: auto; }
+.mu-grid.week > .mu-cell { grid-column: span 3; display: grid; grid-template-columns: subgrid; }
+.mu-grid.week .mu-card { grid-column: 1 / -1; }
+.mu-grid.week .mu-card:not(.empty) { display: grid; grid-template-columns: subgrid; align-items: center; }
+.mu-grid.week .mu-top { display: contents; }
+.mu-grid.week .mu-call { justify-self: end; }
+.wk-head-left { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 6px; }
+.wk-head-left .tl-next { padding: 4px 10px; }
+.tl-next-in { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.gc-fp { white-space: nowrap; }
+.wk-axis { padding-bottom: 6px; }
+.wk-axis:has(.tl-bar) { padding-bottom: 22px; }   /* room for the time under the dot */
+.wk-days, .week-cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 0 8px; }
+.wk-days { font-size: 14px; font-weight: 600; color: var(--muted); text-align: center; white-space: nowrap; }
+.wk-days .today { color: var(--text); } .wk-days .pick { color: var(--primary); }
+.week-cells { align-self: stretch; align-items: center; min-width: 0; }
+.game-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; margin: 0 3px; padding: 3px 0;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--panel); line-height: 1.15; overflow: hidden; color: inherit; text-decoration: none; }
+.gc-time { font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.gc-fp { font-size: 16px; font-weight: 700; color: var(--muted); }
+.game-cell.done { background: transparent; } .game-cell.done .gc-fp { color: var(--text); font-weight: 800; }   /* final: actual FP */
+.game-cell.past { opacity: 0.4; }                                   /* over by the line's time */
+.game-cell.on { border-color: var(--danger); }                      /* under way at the line's time */
+.game-cell.live .gc-time { color: var(--danger); font-weight: 800; }
+.game-cell.locked { border: 2px solid var(--ok); background: var(--good); opacity: 1; }
+.game-cell.pick { box-shadow: inset 0 0 0 2px var(--primary); }    /* the game the shown lineup is for */
+a.game-cell.watch { cursor: pointer; } a.game-cell.watch:hover { box-shadow: inset 0 0 0 1px var(--primary), 0 0 0 3px var(--primary-soft); }
+a.game-cell.watch .gc-fp::after { content: " ▶"; font-size: .72em; opacity: .85; }
+/* narrow lanes: dates and tip times go (they're in each cell's tooltip), FP stays; a narrower name column below 2000px */
+.week-cells, .wk-axis { container-type: inline-size; }
+@container (max-width: 520px) { .wk-md { display: none; } }
+@container (max-width: 400px) { .gc-time { display: none; } .gc-fp { font-size: 14px; } .game-cell { margin: 0 1px; padding: 4px 0; } }
+@media (max-width: 2000px) { .mu-grid.week .mu-id { width: 230px; } }
+/* over each day lane, every row: the past shaded and the time line */
+.lane-over { position: relative; pointer-events: none; z-index: 2; }
+.lane-past { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.time-line { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--primary); opacity: 0.85; pointer-events: none; }
 /* fantasy teams: Sleeper avatar + team name (+ username); player nicknames on the cards */
 .team-name-tag { display: inline-flex; align-items: center; gap: 8px; min-width: 0; vertical-align: middle; }
 .team-name-tag > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

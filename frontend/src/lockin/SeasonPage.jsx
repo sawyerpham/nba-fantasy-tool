@@ -175,82 +175,69 @@ function RosterAlerts({ roster }) {
   );
 }
 
+const gameTip = (g, played, live, lockDate, href) =>
+  `${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}${href ? " · ▶ opens streamed.pk" : ""}`;
+const shortTime = (iso) => timeOf(iso).replace(":00", "").replace(" PM", "p").replace(" AM", "a");
+
 // One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
-// lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-function GameChips({ games, today, lockDate, day, lane, team }) {
+// Used outside the matchup (League tab); the matchup lays games out by day (WeekCells).
+function GameChips({ games, today, lockDate, team }) {
   const { list: matches } = useNBAMatches();
-  if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
-  const chips = games.map((g) => {
-        const played = g.fp != null, live = g.state === "in";
-        const m = findMatch(matches, g, team);
-        const href = m ? watchUrl(m) : null;
-        const Tag = href ? "a" : "span";
-        const tip = `${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}${href ? " · ▶ opens streamed.pk" : ""}`;
-        return (
-          <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
-            onClick={href ? (e) => e.stopPropagation() : undefined}
-            style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""} ${href ? "watch" : ""}`}
-            data-tip={tip}>
-            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
-            <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
-          </Tag>
-        );
-      });
-  if (!lane) return <span className="chips-row">{chips}</span>;
-  return <span className="chips-lane">{lane.xs ? chips : <span className="chips-row">{chips}</span>}</span>;
+  if (!games.length) return <span className="muted small">no games</span>;
+  return (
+    <span className="chips-row">{games.map((g) => {
+      const played = g.fp != null, live = g.state === "in";
+      const m = findMatch(matches, g, team);
+      const href = m ? watchUrl(m) : null;
+      const Tag = href ? "a" : "span";
+      return (
+        <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
+          onClick={href ? (e) => e.stopPropagation() : undefined}
+          className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${href ? "watch" : ""}`}
+          data-tip={gameTip(g, played, live, lockDate, href)}>
+          <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : shortTime(g.tip)}</span></span>
+          <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
+        </Tag>
+      );
+    })}</span>
+  );
 }
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
+const GAME_MS = 135 * 60000;   // a game's length (tip to final), as the backend's timeline assumes
+const dayIdx = (date, monday) => Math.round((Date.parse(date) - Date.parse(monday)) / 864e5);   // 0 = Monday
+const mondayOf = (iso) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
 
-// A matchup's chips as a timeline: one x per distinct tip on both rosters, the earliest at the lane's left edge.
-// Each game day starts clear of the previous day's chips (so the time line never sits on an earlier day's chips);
-// within a day the tips spread by the hour (4-12 px an hour, as much as fits); room left over spaces the days in
-// proportion to time. Too narrow even at 4 px an hour: the chips shrink (scale) down to 65%; narrower than that, xs is
-// null and the chips sit in a plain row (no time line).
-const CHIP_W = 86, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
-function laneXs(games, width) {   // games: [tip ms, game date] for every chip in the matchup
-  const day = new Map(games);
-  const tips = [...day.keys()].sort((a, b) => a - b);
-  if (!tips.length || !width) return { xs: new Map(), scale: 1 };
-  const t0 = tips[0], span = Math.max(1, tips.at(-1) - t0);
-  const place = (s, h, cw) => {   // s: share of the lane spaced by time; h: px an hour within a day; cw: chip width
-    const x = new Map();
-    let prev = 0, start = 0, first = t0, last = t0;
-    for (const t of tips) {
-      const lin = (s * (t - t0) / span) * (width - cw);
-      let v;
-      if (day.get(t) !== day.get(last)) { v = Math.max(prev + cw + CHIP_GAP, lin); start = v; first = t; }
-      else v = Math.max(prev, start + ((t - first) / 3600e3) * h, lin);
-      x.set(t, v); prev = v; last = t;
-    }
-    return x;
-  };
-  const ok = (s, h, cw) => place(s, h, cw).get(tips.at(-1)) + cw <= width;
-  const most = (lo, hi, f) => {   // the largest value in [lo, hi] that f accepts (f grows with it), or null
-    if (f(hi)) return hi;
-    if (!f(lo)) return null;
-    for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; if (f(m)) lo = m; else hi = m; }
-    return lo;
-  };
-  const h = most(HOUR_MIN, HOUR_MAX, (v) => ok(0, v, CHIP_W));
-  if (h == null) {
-    const cw = most(0.65 * CHIP_W, CHIP_W, (v) => ok(0, HOUR_MIN, v));
-    return cw == null ? { xs: null } : { xs: place(0, HOUR_MIN, cw), scale: cw / CHIP_W };
-  }
-  const s = most(0, 1, (v) => ok(v, h, CHIP_W));
-  return { xs: place(s, h, CHIP_W), scale: 1 };
-}
-
-// The time line's x: between tips it moves at an even pace from one chip's left edge (its tip) to the next.
-function laneAt(xs, ms, start, end, width) {
-  const pts = [[start, -8], ...xs, [Math.max(end, start + 1), width]];
-  if (ms <= pts[0][0]) return pts[0][1];
-  for (let i = 1; i < pts.length; i++) {
-    const [t1, x1] = pts[i], [t0, x0] = pts[i - 1];
-    if (ms <= t1) return t1 === t0 ? x1 : x0 + ((ms - t0) / (t1 - t0)) * (x1 - x0);
-  }
-  return width;
+// A player's week in the matchup: 7 day cells (Mon-Sun), the same columns as the timeline header above, so the
+// time line runs straight down through them. Each game shows its state at the line's time (lineMs):
+// done (final, or tipped more than a game's length before), on (tipped, still going) or still to come.
+function WeekCells({ games, week, lockDate, team }) {
+  const { list: matches } = useNBAMatches();
+  const cells = Array(7).fill(null);
+  for (const g of games) { const i = dayIdx(g.date, week.monday); if (i >= 0 && i < 7) cells[i] = g; }
+  return (
+    <div className="week-cells">{cells.map((g, i) => {
+      if (!g) return <span key={i} />;
+      const played = g.fp != null, live = g.state === "in", t = tipMs(g);
+      const state = played && !live ? "done" : week.lineMs >= t + GAME_MS ? "past" : live || week.lineMs >= t ? "on" : "";
+      const m = findMatch(matches, g, team);
+      const href = m ? watchUrl(m) : null;
+      const Tag = href ? "a" : "span";
+      return (
+        <Tag key={i} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
+          onClick={href ? (e) => e.stopPropagation() : undefined}
+          className={`game-cell ${state} ${live ? "live" : ""} ${lockDate === g.date ? "locked" : ""} ${week.day === g.date ? "pick" : ""} ${href ? "watch" : ""}`}
+          data-tip={gameTip(g, played, live, lockDate, href)}>
+          <span className="gc-time">{played && !live ? "final" : live ? "LIVE" : shortTime(g.tip)}</span>
+          <span className="gc-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
+        </Tag>
+      );
+    })}</div>
+  );
 }
 
 const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
@@ -264,7 +251,7 @@ function lockCall(r) {
   return ["", "", ""];
 }
 
-function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
+function PlayerCard({ data, r, open, setLock, mine, side, week }) {   // week: the matchup's day lane (WeekCells)
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const [cls, word, tip] = mine ? lockCall(r) : ["", "", ""];
@@ -281,7 +268,9 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
+        {week
+          ? <WeekCells games={p.games} team={p.team} week={mine ? week : { ...week, day: null }} lockDate={r.lock_status === "locked" ? r.lock_date : null} />
+          : <GameChips games={p.games} team={p.team} today={data.today} lockDate={r.lock_status === "locked" ? r.lock_date : null} />}
         {mine && (
           <span className="mu-call">
             {word && <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>}
@@ -330,7 +319,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const seats = seg ? seg.seats : plan.today?.seats;
   const best = {};
   for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
-  const gridRef = React.useRef(null);
   // The arrows show the changes from your Sleeper lineup as it is right now, at any point of the timeline (not from
   // the previous check-in's planned lineup), so they're the moves you'd make in Sleeper from where you are.
   const bestRows = seats ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
@@ -345,27 +333,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     const rid = data.matchups[idx]?.[0]?.roster_id;
     api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
   }, [idx, isMine, leagueId, data.week, data.matchups]);
-  // Both teams' chip lanes share one width (the narrowest) and one time axis; each column has its own left edge.
-  // Measured from the cards on screen.
-  const [lane, setLane] = useState(null);
-  React.useLayoutEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return undefined;
-    const measure = () => {
-      const g = grid.getBoundingClientRect().left;
-      const side = (s) => [...grid.querySelectorAll(`.mu-card.${s} .chips-lane`)];
-      const L = side("left"), R = side("right");
-      if (!L.length && !R.length) return;
-      const w = Math.min(...[...L, ...R].map((e) => e.getBoundingClientRect().width));
-      const edge = (els) => (els.length ? els[0].getBoundingClientRect().left - g : null);
-      const l = edge(L), r = edge(R);
-      setLane((o) => (o && o.w === w && o.l === l && o.r === r ? o : { w, l, r }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(grid);
-    return () => ro.disconnect();
-  });
   const shown = isMine ? plan : other;
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
@@ -379,21 +346,30 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const o = shown.opponent;
   const L = bySlot(isMine ? bestRows : shown.players, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
-  const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
-  const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
   const lineMs = isMine ? atMs : nowMs;   // the slider only shows on your matchup
+  // One grid for the whole matchup (subgrid columns: name | Mon-Sun | call · slot · name | Mon-Sun | call): the header
+  // row holds the timeline (days, check-in ticks, slider) over the day lanes, and the time line runs down through them.
+  const week = { monday: tl ? tl.start.slice(0, 10) : mondayOf(data.dates[0] || data.today), lineMs, day: seg?.date || data.day };
+  const span = tl ? [Date.parse(tl.start), Date.parse(tl.end)] : null;
   const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
-  const row = (l, r, key, slot, first) => (
+  const row = (l, r, key, slot, first, i) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
-      <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: "1 / span 3" }}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" week={week} /></div>
+      <div className={`mu-slot ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: 4 }}><PosTag text={slot} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`} style={{ gridRow: i + 2, gridColumn: "5 / span 3" }}><PlayerCard data={data} r={r?.r} open={open} side="right" week={week} /></div>
     </React.Fragment>
+  );
+  const nBench = Math.max(L.bench.length, R.bench.length), nIr = Math.max(L.ir.length, R.ir.length);
+  const nRows = L.lines.length + nBench + nIr;
+  const overlay = (col) => span && (   // the past shaded and the time line, over one side's day lane, every row
+    <div className="lane-over" style={{ gridColumn: col, gridRow: `2 / span ${nRows}` }}>
+      <div className="lane-past" style={{ width: lanePos(span, nowMs) }} />
+      <div className="time-line" data-testid={`time-line-${col}`} style={{ left: lanePos(span, lineMs) }} />
+    </div>
   );
   return (
     <div className="panel matchup" data-testid="my-week">
-      {isMine && tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
@@ -419,14 +395,21 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
-      <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
+      <div className={`mu-grid week ${isMine ? "with-arrows" : ""}`}>
         {isMine && <SwapArrows pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
-        {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
-          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, lineMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
-        ))}
-        {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
-        {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
-        {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
+        <div className="wk-head-left" style={{ gridColumn: 1, gridRow: 1 }}>
+          {isMine && tl?.segments.length > 0 && <NextCheck tl={tl} nowMs={nowMs} following={at == null} setAt={setAt} />}
+        </div>
+        <div style={{ gridColumn: 2, gridRow: 1 }}>
+          <WeekAxis monday={week.monday} day={isMine ? week.day : null} today={data.today}
+            slider={isMine && tl?.segments.length > 0 ? { tl, nowMs, atMs, setAt } : null} />
+        </div>
+        {o && <div style={{ gridColumn: 6, gridRow: 1 }}><WeekAxis monday={week.monday} today={data.today} /></div>}
+        {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot, false, i))}
+        {Array.from({ length: nBench }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0, L.lines.length + i))}
+        {Array.from({ length: nIr }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0, L.lines.length + nBench + i))}
+        {overlay(2)}
+        {o && overlay(6)}
       </div>
     </div>
   );
@@ -495,43 +478,51 @@ function SwapArrows({ pairs, names }) {
   );
 }
 
-// The week as a line (Mon 12 AM to the next Mon), 15-minute steps; the dot picks the time whose best lineup shows.
-// The past is shaded and the dot can't go there (no lineup to set for it).
+// The week (Mon 12 AM to the next Mon) across a day lane: a time's x in it. The lane and the day cells are inset 8px
+// on each side, where the slider's 16px dot can't reach, so the dot, the day columns and the time line all agree.
 const STEP_MS = 15 * 60000;
+const lanePos = ([start, end], ms) => `calc(${Math.min(1, Math.max(0, (ms - start) / (end - start)))} * (100% - 16px) + 8px)`;
 
-function Timeline({ tl, nowMs, atMs, following, setAt }) {
-  const start = Date.parse(tl.start), end = Date.parse(tl.end);
-  const frac = (ms) => Math.min(1, Math.max(0, (ms - start) / (end - start)));
-  const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;   // where the 16px dot's centre sits for that time
-  const days = Array.from({ length: 7 }, (_, i) => start + i * 86400000 + 12 * 3600000);   // noon of each day
-  // the next purple mark still ahead: when to open Sleeper next ("in 1 day, 4 hours")
+// The header over a day lane: Mon-Sun (the lineup's day lit), and on your side the timeline: check-in ticks and the
+// dot that picks the time whose best lineup shows (15-minute steps; the past is shaded and out of reach).
+function WeekAxis({ monday, day, today, slider }) {
+  const dates = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(monday) + i * 864e5).toISOString().slice(0, 10));
+  const s = slider, span = s && [Date.parse(s.tl.start), Date.parse(s.tl.end)];
+  return (
+    <div className="wk-axis" data-testid={s ? "timeline" : undefined}>
+      <div className="wk-days">{dates.map((d) => (
+        <span key={d} className={`${d === day ? "pick" : ""} ${d === today ? "today" : ""}`}>{dayName(d)} <span className="wk-md">{md(d)}</span></span>
+      ))}</div>
+      {s && (
+        <div className="tl-bar">
+          <div className="tl-past" style={{ width: lanePos(span, s.nowMs) }} />
+          {s.tl.segments.slice(0, -1).map((x) => <div key={x.to} className="tl-mark" style={{ left: lanePos(span, Date.parse(x.to)) }} />)}
+          <input type="range" min={span[0]} max={span[1]} step={STEP_MS} value={Math.round((s.atMs - span[0]) / STEP_MS) * STEP_MS + span[0]}
+            onChange={(e) => s.setAt(Math.max(Number(e.target.value), s.nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
+          <span className="tl-time" style={{ left: lanePos(span, s.atMs) }} data-testid="timeline-time">{fmt(s.atMs, { hour: "numeric", minute: "2-digit" })}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The next purple tick still ahead: when to open Sleeper next ("in 1 day, 4 hours"); click to show that lineup.
+function NextCheck({ tl, nowMs, following, setAt }) {
   const next = tl.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
   const mins = next ? Math.ceil((next - nowMs) / 60000) : 0;
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
   const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
   const until = d ? `${plural(d, "day")}, ${plural(h, "hour")}` : h ? `${plural(h, "hour")}, ${plural(m, "minute")}` : plural(m, "minute");
   return (
-    <div className="timeline" data-testid="timeline">
-      <div className="tl-back">{!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}</div>
-      <div className="tl-main">
-        <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
-        <div className="tl-bar">
-          <div className="tl-past" style={{ width: at(nowMs) }} />
-          {tl.segments.slice(0, -1).map((s) => <div key={s.to} className="tl-mark" style={{ left: at(Date.parse(s.to)) }} />)}
-          <input type="range" min={start} max={end} step={STEP_MS} value={Math.round((atMs - start) / STEP_MS) * STEP_MS + start}
-            onChange={(e) => setAt(Math.max(Number(e.target.value), nowMs))} aria-label="Lineup time" data-testid="timeline-slider" />
-          <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{fmt(atMs, { hour: "numeric", minute: "2-digit" })}</span>
-        </div>
-      </div>
+    <>
       <button className="tl-next" onClick={() => next && setAt(next)} disabled={!next} data-testid="next-check"
         data-tip="The next time the lineup changes: open Sleeper then and make every swap at once. Click to show that lineup.">
-        <span className="tl-next-label">Next check-in</span>
-        {next ? <>
-          <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
-          <span className="small muted">in {until}</span>
-        </> : <span className="small muted">none left this week</span>}
+        <span className="tl-next-label">Next check-in{next && <span className="tl-next-in"> · in {until}</span>}</span>
+        {next ? <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
+          : <span className="small muted">none left this week</span>}
       </button>
-    </div>
+      {!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}
+    </>
   );
 }
 
