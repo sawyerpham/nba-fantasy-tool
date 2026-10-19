@@ -650,21 +650,43 @@ function LeagueView({ data, leagueId, open }) {
 function WaiversView({ leagueId, onSelect }) {
   const [w, setW] = useState(null);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/waivers`).then(setW).catch(() => setW(null)); }, [leagueId]);
-  if (!w) return <div className="panel">Loading free agents…</div>;
-  if (w.error) return <div className="panel warn-text" data-testid="waivers-error">{w.error}</div>;
+  if (!w) return <div className="panel waivers">Loading free agents…</div>;
+  if (w.error) return <div className="panel waivers warn-text" data-testid="waivers-error">{w.error}</div>;
   const faab = w.type === "FAAB";
+  const top = Math.max(...w.claims.map((c) => c.upgrade), 0.01);   // upgrade bars scale to the best one
   return (
-    <div className="panel" data-testid="waivers">
-      <h3 style={{ marginTop: 0 }}>Waiver claims <span className="small muted">{faab ? <>blind FAAB bids · process {w.process} · ${w.faab_left} left of ${w.budget}</> : <>{w.type} waiver priority · process {w.process}</>}</span></h3>
-      {w.drop && <div className="small" style={{ marginBottom: 8 }}>Drop candidate: <strong className="clickable" onClick={() => onSelect(w.drop.player_id)}>{w.drop.name}</strong> <span className="muted">(value {w.drop.value}, your weakest)</span></div>}
+    <div className="panel waivers" data-testid="waivers">
+      <div className="wv-head">
+        <h3>Waiver claims</h3>
+        <span className="wv-chip">{faab ? "Blind FAAB" : `${w.type} priority`}</span>
+        <span className="wv-chip">Process {w.process}</span>
+        {faab && (
+          <span className="wv-faab" data-tip="FAAB left this season">
+            <span className="wv-meter"><span style={{ width: `${(w.faab_left / w.budget) * 100}%` }} /></span>
+            <strong>${w.faab_left}</strong><span className="muted"> / ${w.budget}</span>
+          </span>
+        )}
+      </div>
+      {w.drop && (
+        <div className="wv-drop clickable" onClick={() => onSelect(w.drop.player_id)}>
+          <Headshot sleeperId={w.drop.sleeper_id} name={w.drop.name} size={32} />
+          <div><div className="small muted">Drop candidate · your weakest</div><strong>{w.drop.name}</strong></div>
+          <span className="wv-drop-val"><span className="small muted">value</span> {w.drop.value.toFixed(2)}</span>
+        </div>
+      )}
       {w.claims.length ? (
-        <table className="small">
-          <thead><tr><th>Player</th><th>Team</th><th>Pos</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
-            <th className="num" data-tip="Value over your drop candidate.">Upgrade</th><th className="num">Games this wk</th><th className="num" data-tip="A guide: share of your FAAB that grows with the upgrade. Other bids are hidden.">Bid</th></tr></thead>
+        <table className="wv-table">
+          <thead><tr><th>Player</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
+            <th data-tip="Value over your drop candidate.">Upgrade</th><th className="num">Games this wk</th>
+            <th className="num" data-tip="A guide: share of your FAAB that grows with the upgrade. Other bids are hidden.">Bid</th></tr></thead>
           <tbody>{w.claims.map((c) => (
-            <tr key={c.player_id}><td className="clickable" onClick={() => onSelect(c.player_id)}><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /></td>
-              <td>{c.team}</td><td><PosList list={c.pos} /></td><td className="num">{c.value}</td><td className="num ok">+{c.upgrade}</td>
-              <td className="num">{c.games_this_week}</td><td className="num">{c.bid != null ? <strong>${c.bid}</strong> : <span className="muted">-</span>}</td></tr>))}</tbody>
+            <tr key={c.player_id} className="clickable" onClick={() => onSelect(c.player_id)}>
+              <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={36} />
+                <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted">{c.team} · <PosList list={c.pos} /></div></div></div></td>
+              <td className="num">{c.value.toFixed(2)}</td>
+              <td><div className="wv-up"><span className="wv-bar"><span style={{ width: `${(c.upgrade / top) * 100}%` }} /></span><span className="ok">+{c.upgrade.toFixed(2)}</span></div></td>
+              <td className="num">{c.games_this_week}</td>
+              <td className="num">{c.bid != null ? <span className="wv-bid">${c.bid}</span> : <span className="muted">-</span>}</td></tr>))}</tbody>
         </table>
       ) : <div className="muted">No free agent is an upgrade over your weakest player.</div>}
     </div>
