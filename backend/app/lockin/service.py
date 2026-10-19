@@ -467,7 +467,8 @@ def season_news(view: dict, fetch: Fetch) -> dict:
 
     def notes(sid: str) -> list[dict]:
         p, t = players[sid], owner[sid]
-        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "owner": t["name"]}
+        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "owner": t["name"],
+                 "user": t.get("user") or t["name"]}
                 for n in espn_news(fetch, p["name"], p["team"])]
     sids = [s for s in owner if s in players and s not in RETIRED]
     with ThreadPoolExecutor(16) as ex:
