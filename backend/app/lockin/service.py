@@ -456,9 +456,6 @@ def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
             and a.get("type") != "Media"][:4]   # Media = video clips / highlights, no note
 
 
-LEAGUE_NEWS = 80   # newest league-wide notes shown
-
-
 def season_news(view: dict, fetch: Fetch) -> dict:
     """The News tab: fantasy notes (RotoWire, via ESPN) on every player of yours, then on every player the other teams
     roster, newest first. ESPN's notes feed only works one player at a time (no league-wide feed), so this is one
@@ -477,7 +474,7 @@ def season_news(view: dict, fetch: Fetch) -> dict:
         every = [n for ns in ex.map(notes, sids) for n in ns]
     every.sort(key=lambda n: n.get("published") or "", reverse=True)
     mine = [n for n in every if owner[n["sid"]]["is_user"]]
-    return {"mine": mine, "league": [n for n in every if not owner[n["sid"]]["is_user"]][:LEAGUE_NEWS]}
+    return {"mine": mine, "league": [n for n in every if not owner[n["sid"]]["is_user"]]}   # all of them: the tab filters
 
 
 def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:

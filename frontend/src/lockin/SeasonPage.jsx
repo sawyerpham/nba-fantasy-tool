@@ -556,24 +556,45 @@ function NewsNote({ n, data, open, owner }) {
   );
 }
 
+const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
+
 function NewsView({ data, leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
   const [error, setError] = useState("");
+  const [q, setQ] = useState(""), [nba, setNba] = useState(""), [mgr, setMgr] = useState("");
   useEffect(() => {
     api.get(`/leagues/${leagueId}/season/news`).then((n) => { setNews(n); setError(""); }).catch((e) => setError(e.message));
   }, [leagueId, refreshKey]);
   if (error) return <div className="panel error">{error}</div>;
   if (!news) return <div className="panel muted">Loading news…</div>;
+  const team = (n) => data.players[n.sid]?.team || "";
+  const words = q.toLowerCase().trim();
+  // search: player, NBA team, manager or the note itself; the manager pick only narrows the league list
+  const keep = (n) => (!nba || team(n) === nba)
+    && (!words || [n.name, team(n), n.owner, n.headline, n.story].join(" ").toLowerCase().includes(words));
+  const mine = news.mine.filter(keep);
+  const league = news.league.filter((n) => keep(n) && (!mgr || n.owner === mgr));
+  const nbaTeams = [...new Set([...news.mine, ...news.league].map(team).filter(Boolean))].sort();
+  const managers = [...new Set(news.league.map((n) => n.owner))].sort();
   return (
     <div className="news-col">
-      <details className="panel news" open data-testid="news-mine">
-        <summary><h3>My team <span className="small muted">({news.mine.length})</span></h3></summary>
-        {news.mine.length ? news.mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
-          : <div className="muted">No recent notes on your players.</div>}
-      </details>
+      <div className="panel news-filters" data-testid="news-filters">
+        <input type="search" placeholder="Search player, team, manager or note…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="news-search" />
+        <select value={nba} onChange={(e) => setNba(e.target.value)} data-testid="news-nba"><option value="">All NBA teams</option>{nbaTeams.map((t) => <option key={t}>{t}</option>)}</select>
+        <select value={mgr} onChange={(e) => setMgr(e.target.value)} data-testid="news-manager"><option value="">All managers</option>{managers.map((m) => <option key={m}>{m}</option>)}</select>
+        {(q || nba || mgr) && <button className="small ghost" onClick={() => { setQ(""); setNba(""); setMgr(""); }}>clear</button>}
+      </div>
+      {!mgr && (
+        <details className="panel news" open data-testid="news-mine">
+          <summary><h3>My team <span className="small muted">({mine.length})</span></h3></summary>
+          {mine.length ? mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
+            : <div className="muted">No recent notes on your players{q || nba ? " match" : ""}.</div>}
+        </details>
+      )}
       <div className="panel news" data-testid="news-league">
-        <h3>League-wide <span className="small muted">(other teams' players)</span></h3>
-        {news.league.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} owner />)}
+        <h3>League-wide <span className="small muted">({mgr || "other teams' players"}{league.length > LEAGUE_NEWS ? `, newest ${LEAGUE_NEWS} of ${league.length}` : ""})</span></h3>
+        {league.length ? league.slice(0, LEAGUE_NEWS).map((n, i) => <NewsNote key={i} n={n} data={data} open={open} owner />)
+          : <div className="muted">No notes match.</div>}
       </div>
     </div>
   );
