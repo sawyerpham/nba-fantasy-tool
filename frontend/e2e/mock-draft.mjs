@@ -34,7 +34,7 @@ try {
   await page.getByTestId("health").waitFor();
 
   // ---------------------------------------------------------------- 1. data pull through the UI
-  await page.getByTestId("tab-data").click();
+  await page.getByTestId("tab-settings").click();
   if (process.env.DA_SKIP_PULL !== "1") {
     await page.getByTestId("pull-button").click();
     await page.waitForFunction(() => {

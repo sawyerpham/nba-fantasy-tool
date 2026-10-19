@@ -242,6 +242,24 @@ class AppState:
             self.leagues.save(doc)
             return doc
 
+    def sync_league_name(self, league_id: str) -> str | None:
+        """Take the linked Sleeper league's current name if it was renamed there; the new name, or None (unchanged,
+        unlinked or Sleeper unreachable: a sync never fails over the name)."""
+        session = self.get_session(league_id)
+        sid = session.league.sleeper_league_id
+        if not sid or not hasattr(self.platform, "fetch_league"):
+            return None
+        try:
+            name = (getattr(self.platform.fetch_league(sid), "name", None) or "").strip()
+        except Exception:
+            return None
+        if not name or name == session.league.name:
+            return None
+        with self._lock:
+            session.league.name = name
+            self.save_session(league_id)
+        return name
+
     def replace_league_settings(self, league_id: str, league: LeagueSettings) -> DraftSession:
         with self._lock:
             session = self.get_session(league_id)

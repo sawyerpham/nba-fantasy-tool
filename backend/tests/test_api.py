@@ -198,7 +198,7 @@ def test_keeper_history_put_validates_max_per_manager(pulled):
 
 
 def test_sleeper_preview_and_apply(pulled):
-    client, *_ = pulled
+    client, state, *_ = pulled
     league(client, "lg-sleeper", "Sleeper Test")
     r = client.post("/api/leagues/lg-sleeper/sleeper/preview", json={"sleeper_league_id": PROVISIONAL_LEAGUE})
     assert r.status_code == 200, r.text
@@ -211,6 +211,11 @@ def test_sleeper_preview_and_apply(pulled):
     assert r.json()["sleeper_league_id"] == PROVISIONAL_LEAGUE and r.json()["keeper"]["max_per_manager"] == 1
     assert client.post("/api/leagues/lg-sleeper/sleeper/preview", json={"sleeper_league_id": NFL_LEAGUE}).status_code == 400
     assert client.post("/api/leagues/lg-sleeper/sleeper/preview", json={"sleeper_league_id": "1"}).status_code == 404
+
+    state.get_session("lg-sleeper").league.name = "Old name"   # renamed on Sleeper since: Season Sync takes it
+    assert client.post("/api/leagues/lg-sleeper/season/sync").json()["renamed"] == "Provisional NBA league fixture"
+    assert client.get("/api/leagues/lg-sleeper").json()["league"]["name"] == "Provisional NBA league fixture"
+    assert client.post("/api/leagues/lg-sleeper/season/sync").json()["renamed"] is None   # unchanged: nothing to do
 
 
 # ------------------------------------------------------------------ draft
