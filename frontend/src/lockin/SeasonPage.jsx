@@ -569,13 +569,13 @@ function NewsView({ data, leagueId, open, refreshKey }) {
   if (!news) return <div className="panel muted">Loading news…</div>;
   const team = (n) => data.players[n.sid]?.team || "";
   const words = q.toLowerCase().trim();
-  // search: player, NBA team, manager or the note itself; the manager pick only narrows the league list
+  // search: player, NBA team, manager's username or the note itself; the manager pick only narrows the league list
   const keep = (n) => (!nba || team(n) === nba)
-    && (!words || [n.name, team(n), n.owner, n.headline, n.story].join(" ").toLowerCase().includes(words));
+    && (!words || [n.name, team(n), n.user, n.headline, n.story].join(" ").toLowerCase().includes(words));
   const mine = news.mine.filter(keep);
-  const league = news.league.filter((n) => keep(n) && (!mgr || n.owner === mgr));
+  const league = news.league.filter((n) => keep(n) && (!mgr || n.user === mgr));
   const nbaTeams = [...new Set([...news.mine, ...news.league].map(team).filter(Boolean))].sort();
-  const managers = [...new Set(news.league.map((n) => n.owner))].sort();
+  const managers = [...new Set(news.league.map((n) => n.user))].sort((a, b) => a.localeCompare(b));
   return (
     <div className="news-col">
       <div className="panel news-filters" data-testid="news-filters">
