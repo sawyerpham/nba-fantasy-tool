@@ -492,19 +492,17 @@ function SwapArrows({ pairs, names }) {
 // The past is shaded and the dot can't go there (no lineup to set for it).
 const STEP_MS = 15 * 60000;
 
-// "in 2 days, 3 hours" / "in 5 hours, 10 minutes" / "in 35 minutes"
-const countdown = (ms) => {
-  const mins = Math.max(0, Math.round(ms / 60000)), d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
-  const unit = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  return "in " + (d ? `${unit(d, "day")}, ${unit(h, "hour")}` : h ? `${unit(h, "hour")}, ${unit(m, "minute")}` : unit(m, "minute"));
-};
-
 function Timeline({ tl, nowMs, atMs, following, setAt }) {
   const start = Date.parse(tl.start), end = Date.parse(tl.end);
   const frac = (ms) => Math.min(1, Math.max(0, (ms - start) / (end - start)));
   const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;   // where the 16px dot's centre sits for that time
   const days = Array.from({ length: 7 }, (_, i) => start + i * 86400000 + 12 * 3600000);   // noon of each day
-  const next = tl.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);   // the next purple line
+  // the next purple mark still ahead: when to open Sleeper next ("in 1 day, 4 hours")
+  const next = tl.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
+  const mins = next ? Math.ceil((next - nowMs) / 60000) : 0;
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+  const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+  const until = d ? `${plural(d, "day")}, ${plural(h, "hour")}` : h ? `${plural(h, "hour")}, ${plural(m, "minute")}` : plural(m, "minute");
   return (
     <div className="timeline" data-testid="timeline">
       <div className="tl-back">{!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}</div>
@@ -518,16 +516,14 @@ function Timeline({ tl, nowMs, atMs, following, setAt }) {
           <span className="tl-time" style={{ left: at(atMs) }} data-testid="timeline-time">{fmt(atMs, { hour: "numeric", minute: "2-digit" })}</span>
         </div>
       </div>
-      <div className={`tl-next ${next ? "clickable" : ""}`} onClick={() => next && setAt(next)} data-testid="next-check-in"
-        data-tip={next ? "Open Sleeper then and make that check-in's swaps. Click to see that lineup." : undefined}>
-        <div className="small muted">Next check-in</div>
-        {next ? (
-          <>
-            <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric" })} · {fmt(next, { hour: "numeric", minute: "2-digit" })} {tzAbbr(next)}</strong>
-            <div className="small tl-next-in">{countdown(next - nowMs)}</div>
-          </>
-        ) : <strong className="muted">none this week</strong>}
-      </div>
+      <button className="tl-next" onClick={() => next && setAt(next)} disabled={!next} data-testid="next-check"
+        data-tip="The next time the lineup changes: open Sleeper then and make every swap at once. Click to show that lineup.">
+        <span className="tl-next-label">Next check-in</span>
+        {next ? <>
+          <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
+          <span className="small muted">in {until}</span>
+        </> : <span className="small muted">none left this week</span>}
+      </button>
     </div>
   );
 }
