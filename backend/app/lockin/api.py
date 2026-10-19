@@ -46,10 +46,11 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
 
 @router.post("/sync")
 def sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
-    """Forget every cached Sleeper / ESPN response: the next load pulls the lineup, scores and news fresh."""
+    """Forget every cached Sleeper / ESPN response: the next load pulls the lineup, scores and news fresh. Also takes
+    the Sleeper league's name if it was renamed there."""
     _session(state, league_id)
     _cache.clear()
-    return {"ok": True}
+    return {"ok": True, "renamed": state.sync_league_name(league_id)}
 
 
 class LockIn(BaseModel):

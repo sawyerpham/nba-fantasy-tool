@@ -340,6 +340,9 @@ def sleeper_sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
     else:
         changes.append("draft already started: managers and rules were left as they are")
 
+    old_name = session.league.name
+    if renamed := state.sync_league_name(league_id):   # before or after the draft
+        changes.append(f"league name: {old_name} → {renamed}")
     keepers = current_keepers(session.sleeper_details, session.managers, session.players, session.league.keeper.escalation)
     new_log = [e for e in load_changelog(state.store, sid) if e["id"] not in log_before]
     return {"changes": changes or ["managers and rules already match Sleeper"], "keepers_set": len(keepers),

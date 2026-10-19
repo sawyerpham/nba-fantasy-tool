@@ -8,7 +8,6 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["data", "Data"],
   ["league", "League"],
   ["settings", "Settings"],
   ["draft", "Draft"],
@@ -16,7 +15,10 @@ const TABS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState(() => localStorage.getItem("da.tab") || "data");
+  const [tab, setTab] = useState(() => {
+    const t = localStorage.getItem("da.tab");
+    return !t || t === "data" ? "settings" : t;   // the Data tab now lives at the top of Settings
+  });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
   const [health, setHealth] = useState(null);
@@ -70,9 +72,8 @@ export default function App() {
         </span>
       </header>
       <main>
-        {tab === "data" && <DataPage onPoolChanged={refreshHealth} />}
         {tab === "league" && <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />}
-        {tab === "settings" && <SettingsPage leagueId={leagueId} />}
+        {tab === "settings" && <><DataPage onPoolChanged={refreshHealth} /><SettingsPage leagueId={leagueId} /></>}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
         {tab === "season" && <SeasonPage leagueId={leagueId} />}
       </main>

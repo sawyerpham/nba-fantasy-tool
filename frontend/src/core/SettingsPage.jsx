@@ -234,7 +234,7 @@ export default function SettingsPage({ leagueId }) {
           <label className="inline small" title="other Sleeper leagues with the same people (dynasty, old seasons, any format): used only to learn favourite teams, young/veteran lean and who drafted whom">history leagues
             <input type="text" key={(s.sleeper_history_league_ids || []).join(",")} defaultValue={(s.sleeper_history_league_ids || []).join(", ")} placeholder="ids, comma-separated" onBlur={(e) => set({ sleeper_history_league_ids: e.target.value.split(/[\s,]+/).filter(Boolean) })} data-testid="sleeper-history-ids" style={{ minWidth: 260 }} />
           </label>
-          <span className="small muted">Save, then pull data (Data tab) to fetch managers, keepers and past drafts.</span>
+          <span className="small muted">Save, then pull data (top of this page) to fetch managers, keepers and past drafts.</span>
         </div>
         {preview && (
           <div>
