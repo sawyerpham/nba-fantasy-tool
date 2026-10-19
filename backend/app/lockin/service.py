@@ -295,17 +295,18 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
 
 
 LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
+CHECK_LEAD_MIN = 15      # timeline check-ins sit this long before the tip they're for (on the quarter hour)
 GAME_MINUTES = 135       # ponytail: a game runs ~2 h 15 m; overtime runs longer, use ESPN's final status if that bites
 
 
 def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict | None) -> dict:
     """The best lineup at every moment from now to the end of the week, for the timeline slider. The lineup changes
-    only at check-ins, ALARM_LEAD_MIN before a tip where someone moves in, so you open Sleeper as few times as
+    only at check-ins, CHECK_LEAD_MIN before a tip where someone moves in, so you open Sleeper as few times as
     possible: at that check every swap available then happens at once (later players too, e.g. the 9:30 game
-    moves in at the 8:55 check for the 9:00 games). A game counts as in progress for GAME_MINUTES after its tip,
+    moves in at the 8:45 check for the 9:00 games). A game counts as in progress for GAME_MINUTES after its tip,
     so a player still playing is never swapped out. Each check plans the games still to come (plan_today for the
     next game's day) from the previous lineup, so the moves chain; locked players never move."""
-    from .weekplan import ALARM_LEAD_MIN, plan_today
+    from .weekplan import plan_today
 
     tz = ZoneInfo(view.get("tz") or "America/Chicago")
     first = date.fromisoformat(view["dates"][0])
@@ -329,7 +330,7 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     slots = {p.sid: p.slot for p in players}
     seats = today_seats if today_seats is not None else plan_today(players, counts, next_day() or view["day"]).seats
     segments = [{"date": view["day"], "seats": seats}]
-    lead, length = timedelta(minutes=ALARM_LEAD_MIN), timedelta(minutes=GAME_MINUTES)
+    lead, length = timedelta(minutes=CHECK_LEAD_MIN), timedelta(minutes=GAME_MINUTES)
     for t in tips:
         check = t - lead
         for p in players:   # at the check: earlier games have started; still in progress = can't be moved
