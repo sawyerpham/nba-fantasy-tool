@@ -103,25 +103,23 @@ def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_worl
     assert r["ir_open"] == 1 and r["ir_candidates"] == ["c"]
 
 
-def test_news_merges_my_players_newest_first_and_skips_clips():
+def test_news_merges_my_players_newest_first_and_flags_injuries():
     from app.lockin.service import season_news
 
-    feeds = {"1": [{"type": "Rotowire", "headline": "Pha (ankle) is questionable", "published": "2026-10-20T10:00:00Z"},
-                   {"type": "Media", "headline": "Al Pha dunks", "published": "2026-10-21T10:00:00Z"}],
-             "2": [{"type": "Rotowire", "headline": "Ta scored 30", "published": "2026-10-21T09:00:00Z"}],
-             "3": [{"type": "Rotowire", "headline": "Ga (knee) is out", "published": "2026-10-21T11:00:00Z"}]}
+    note = lambda t, d, ms: {"published": ms, "metadata": {"title": t, "description": d}}   # noqa: E731 - Sleeper's shape
+    feeds = {"a": [note("Al Pha - Questionable", "Pha (ankle) is questionable Monday.", 1_792_000_000_000),
+                   note("", "", 1_792_900_000_000)],                                          # untitled: skipped
+             "b": [note("Bo Ta - Resting Monday", "Ta (rest) won't play Monday.", 1_792_100_000_000)],
+             "c": [note("Cy Ga - Suffers torn Achilles", "Ga suffered a season-ending Achilles tear, Shams Charania reports.", 1_792_200_000_000)]}
+    fetch = lambda url, ttl: feeds[url.split("/")[-2]]   # noqa: E731
 
-    def fetch(url, ttl):
-        if "teams/" in url:
-            return {"athletes": [{"id": "1", "displayName": "Al Pha"}, {"id": "2", "displayName": "Bo Ta"}, {"id": "3", "displayName": "Cy Ga"}]}
-        return {"feed": feeds[url.split("playerId=")[1].split("&")[0]]}
-
-    view = {"teams": [{"is_user": True, "name": "me", "players": ["a", "b"]}, {"is_user": False, "name": "rival", "players": ["c"]}],
-            "players": {"a": {"name": "Al Pha", "team": "MIA", "player_id": 1}, "b": {"name": "Bo Ta", "team": "MIA", "player_id": 2},
-                        "c": {"name": "Cy Ga", "team": "MIA", "player_id": 3}}}
+    view = {"teams": [{"is_user": True, "name": "me", "user": "meuser", "players": ["a", "b"]},
+                      {"is_user": False, "name": "rival", "user": "rivaluser", "players": ["c"]}],
+            "players": {"a": {"name": "Al Pha", "player_id": 1}, "b": {"name": "Bo Ta", "player_id": 2}, "c": {"name": "Cy Ga", "player_id": 3}}}
     n = season_news(view, fetch)
-    assert [x["headline"] for x in n["mine"]] == ["Ta scored 30", "Pha (ankle) is questionable"]   # newest first, no clip
-    assert [(x["headline"], x["owner"]) for x in n["league"]] == [("Ga (knee) is out", "rival")]   # other teams' players
+    assert [(x["headline"], x["injury"]) for x in n["mine"]] == [("Bo Ta - Resting Monday", False), ("Al Pha - Questionable", True)]
+    assert [(x["headline"], x["injury"], x["user"]) for x in n["league"]] == [("Cy Ga - Suffers torn Achilles", True, "rivaluser")]
+    assert n["mine"][0]["published"].startswith("2026-")
 
 
 def test_acquisitions_draft_price_then_moves_in_order():

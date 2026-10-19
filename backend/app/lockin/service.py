@@ -10,8 +10,9 @@ Times are Central (the league's clock); a fantasy week runs Monday-Sunday (Sleep
 
 from __future__ import annotations
 
+import re
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
@@ -428,37 +429,38 @@ def _player_out(q, locks: dict) -> dict:
 
 
 # ---- one player's season page --------------------------------------------------------------------------
-ESPN_CODE = {v: k for k, v in ESPN_TEAM.items()}
-ESPN_ROSTER = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{}/roster"
-ESPN_NEWS = "https://site.api.espn.com/apis/fantasy/v2/games/fba/news/players?playerId={}&limit=6"
+SLEEPER_NEWS = "https://api.sleeper.com/players/nba/{}/news"   # undocumented: the feed the Sleeper app shows
 NEWS_TTL = 15 * 60
 GAME_LOG = 10
 
 
-def espn_news(fetch: Fetch, name: str, team: str | None) -> list[dict]:
-    """Latest fantasy news blurbs from ESPN (the same RotoWire-style notes Sleeper shows), matched by name on his team."""
-    from nba_fantasy_shared.reconcile.names import normalize_name
+# RotoWire tags the player's condition after his name, "Edey (ankle)"; rest and personal days aren't injuries.
+# ponytail: keyword heuristic, a note on a healthy player that recaps an old injury also counts
+INJURY_TAG = re.compile(r"\((?!rest\)|personal\))[a-z][a-z /-]*\)")
+INJURY_WORD = re.compile(r"injur|illness|sore|sprain|strain|tear\b|torn|surgery|fractur|concussion|achilles|out indefinitely", re.I)
 
-    if not team:
-        return []
-    roster = fetch(ESPN_ROSTER.format(ESPN_CODE.get(team, team).lower()), DAY_TTL) or {}
-    want = normalize_name(name)
-    espn_id = next((a["id"] for a in roster.get("athletes", []) if normalize_name(a.get("displayName", "")) == want), None)
-    if not espn_id:
-        return []
-    feed = (fetch(ESPN_NEWS.format(espn_id), NEWS_TTL) or {}).get("feed") or []
-    import re
 
-    last = normalize_name(name).split()[-1]
-    clean = lambda t: re.sub(r"<[^>]+>", " ", t or "").strip()   # noqa: E731 - some items carry raw HTML
-    return [{"published": a.get("published"), "headline": clean(a.get("headline")), "story": clean(a.get("story") or a.get("description"))}
-            for a in feed if a.get("headline") and last in normalize_name(a["headline"])   # notes about him, not league articles
-            and a.get("type") != "Media"][:4]   # Media = video clips / highlights, no note
+def player_news(fetch: Fetch, sid: str) -> list[dict]:
+    """Latest fantasy notes (RotoWire, FantasyPros) on one player, from the feed the Sleeper app shows; [] if it fails."""
+    try:
+        feed = fetch(SLEEPER_NEWS.format(sid), NEWS_TTL) or []
+    except Exception:   # undocumented endpoint: one bad player must not sink the whole tab
+        return []
+    out = []
+    for a in feed:
+        m = a.get("metadata") or {}
+        if not m.get("title"):
+            continue
+        text = f"{m['title']} {m.get('description') or ''}"
+        out.append({"published": datetime.fromtimestamp(a["published"] / 1000, timezone.utc).isoformat() if a.get("published") else None,
+                    "headline": m["title"].strip(), "story": (m.get("description") or "").strip(),
+                    "injury": bool(INJURY_TAG.search(text) or INJURY_WORD.search(text))})
+    return out[:4]
 
 
 def season_news(view: dict, fetch: Fetch) -> dict:
-    """The News tab: fantasy notes (RotoWire, via ESPN) on every player of yours, then on every player the other teams
-    roster, newest first. ESPN's notes feed only works one player at a time (no league-wide feed), so this is one
+    """The News tab: fantasy notes (RotoWire, via Sleeper) on every player of yours, then on every player the other teams
+    roster, newest first. Sleeper's notes feed only works one player at a time (no league-wide feed), so this is one
     request per player, in parallel and cached NEWS_TTL: only the first load after a Sync pays for it."""
     from concurrent.futures import ThreadPoolExecutor
 
@@ -469,7 +471,7 @@ def season_news(view: dict, fetch: Fetch) -> dict:
         p, t = players[sid], owner[sid]
         return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "owner": t["name"],
                  "user": t.get("user") or t["name"]}
-                for n in espn_news(fetch, p["name"], p["team"])]
+                for n in player_news(fetch, sid)]
     sids = [s for s in owner if s in players and s not in RETIRED]
     with ThreadPoolExecutor(16) as ex:
         every = [n for ns in ex.map(notes, sids) for n in ns]
@@ -543,7 +545,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             "injury_note": me.get("injury_note", ""),
             "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
             "acquired": acquisitions(session, fetch, view, sid),
-            "news": espn_news(fetch, rec.full_name, rec.team_abbr)}
+            "news": player_news(fetch, sid)}
 
 
 # ---- waivers ---------------------------------------------------------------------------------------------

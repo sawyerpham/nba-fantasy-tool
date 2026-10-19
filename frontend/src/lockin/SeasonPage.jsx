@@ -561,7 +561,7 @@ const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 function NewsView({ data, leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
   const [error, setError] = useState("");
-  const [q, setQ] = useState(""), [nba, setNba] = useState(""), [mgr, setMgr] = useState("");
+  const [q, setQ] = useState(""), [nba, setNba] = useState(""), [mgr, setMgr] = useState(""), [inj, setInj] = useState(false);
   useEffect(() => {
     api.get(`/leagues/${leagueId}/season/news`).then((n) => { setNews(n); setError(""); }).catch((e) => setError(e.message));
   }, [leagueId, refreshKey]);
@@ -570,7 +570,7 @@ function NewsView({ data, leagueId, open, refreshKey }) {
   const team = (n) => data.players[n.sid]?.team || "";
   const words = q.toLowerCase().trim();
   // search: player, NBA team, manager's username or the note itself; the manager pick only narrows the league list
-  const keep = (n) => (!nba || team(n) === nba)
+  const keep = (n) => (!nba || team(n) === nba) && (!inj || n.injury)
     && (!words || [n.name, team(n), n.user, n.headline, n.story].join(" ").toLowerCase().includes(words));
   const mine = news.mine.filter(keep);
   const league = news.league.filter((n) => keep(n) && (!mgr || n.user === mgr));
@@ -582,13 +582,14 @@ function NewsView({ data, leagueId, open, refreshKey }) {
         <input type="search" placeholder="Search player, team, manager or note…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="news-search" />
         <select value={nba} onChange={(e) => setNba(e.target.value)} data-testid="news-nba"><option value="">All NBA teams</option>{nbaTeams.map((t) => <option key={t}>{t}</option>)}</select>
         <select value={mgr} onChange={(e) => setMgr(e.target.value)} data-testid="news-manager"><option value="">All managers</option>{managers.map((m) => <option key={m}>{m}</option>)}</select>
-        {(q || nba || mgr) && <button className="small ghost" onClick={() => { setQ(""); setNba(""); setMgr(""); }}>clear</button>}
+        <label className="inline"><input type="checkbox" checked={inj} onChange={(e) => setInj(e.target.checked)} data-testid="news-injuries" /> Injuries only</label>
+        {(q || nba || mgr || inj) && <button className="small ghost" onClick={() => { setQ(""); setNba(""); setMgr(""); setInj(false); }}>clear</button>}
       </div>
       {!mgr && (
         <details className="panel news" open data-testid="news-mine">
           <summary><h3>My team <span className="small muted">({mine.length})</span></h3></summary>
           {mine.length ? mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
-            : <div className="muted">No recent notes on your players{q || nba ? " match" : ""}.</div>}
+            : <div className="muted">No recent notes on your players{q || nba || inj ? " match" : ""}.</div>}
         </details>
       )}
       <div className="panel news" data-testid="news-league">
