@@ -540,8 +540,9 @@ const newsTime = (iso) => {
 // One note: who (opens his profile), his injury tag, the fantasy team that has him (league-wide), when, the note.
 function NewsNote({ n, data, open, owner }) {
   const p = data.players[n.sid];
+  const title = n.headline.startsWith(`${n.name} - `) ? n.headline.slice(n.name.length + 3) : n.headline;   // name is already above
   return (
-    <div className="news-item">
+    <div className={`news-item ${n.injury ? "injury" : ""}`}>
       <div className="news-head">
         <span className="clickable news-player" onClick={() => open(n.sid)}>
           <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
@@ -550,7 +551,7 @@ function NewsNote({ n, data, open, owner }) {
         {owner && <span className="small muted">· {n.owner}</span>}
         <span className="small muted news-time">{newsTime(n.published)}</span>
       </div>
-      <div className="news-title">{n.headline}</div>
+      <div className="news-title">{title}</div>
       {n.story && <div className="small news-story">{n.story}</div>}
     </div>
   );
