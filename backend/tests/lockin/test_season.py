@@ -110,15 +110,18 @@ def test_news_merges_my_players_newest_first_and_flags_injuries():
     feeds = {"a": [note("Al Pha - Questionable", "Pha (ankle) is questionable Monday.", 1_792_000_000_000),
                    note("", "", 1_792_900_000_000)],                                          # untitled: skipped
              "b": [note("Bo Ta - Resting Monday", "Ta (rest) won't play Monday.", 1_792_100_000_000)],
-             "c": [note("Cy Ga - Suffers torn Achilles", "Ga suffered a season-ending Achilles tear, Shams Charania reports.", 1_792_200_000_000)]}
+             "c": [note("Cy Ga - Suffers torn Achilles", "Ga suffered a season-ending Achilles tear, Shams Charania reports.", 1_792_200_000_000)],
+             "f": [note("Ben Simmons - Suffers torn Achilles", "Simmons tore his right Achilles.", 1_792_300_000_000)]}
     fetch = lambda url, ttl: feeds[url.split("/")[-2]]   # noqa: E731
 
     view = {"teams": [{"is_user": True, "name": "me", "user": "meuser", "players": ["a", "b"]},
                       {"is_user": False, "name": "rival", "user": "rivaluser", "players": ["c"]}],
-            "players": {"a": {"name": "Al Pha", "player_id": 1}, "b": {"name": "Bo Ta", "player_id": 2}, "c": {"name": "Cy Ga", "player_id": 3}}}
-    n = season_news(view, fetch)
+            "players": {"a": {"name": "Al Pha", "player_id": 1}, "b": {"name": "Bo Ta", "player_id": 2}, "c": {"name": "Cy Ga", "player_id": 3},
+                        "f": {"name": "Ben Simmons", "player_id": 4, "team": "SAC"}}}
+    n = season_news(view, fetch, free=["f", "c", "zz"])   # c is rostered, zz unknown: neither is a free agent
     assert [(x["headline"], x["injury"]) for x in n["mine"]] == [("Bo Ta - Resting Monday", False), ("Al Pha - Questionable", True)]
     assert [(x["headline"], x["injury"], x["user"]) for x in n["league"]] == [("Cy Ga - Suffers torn Achilles", True, "rivaluser")]
+    assert [(x["name"], x["team"], x["owner"]) for x in n["free"]] == [("Ben Simmons", "SAC", None)]
     assert n["mine"][0]["published"].startswith("2026-")
 
 
