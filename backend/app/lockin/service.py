@@ -584,6 +584,7 @@ def waivers(session, view: dict) -> dict:
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
                     "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id),
                     "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
-    return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "name": drop.full_name, "value": round(drop.value, 2)} if drop else None,
+    return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "sleeper_id": drop.sleeper_id, "name": drop.full_name,
+                                             "value": round(drop.value, 2)} if drop else None,
             "claims": out, "budget": budget if faab else None, "type": waiver["type"],
             "process": "daily" if waiver["daily"] else "weekly"}
