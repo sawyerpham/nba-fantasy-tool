@@ -295,13 +295,17 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
 
 
 LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
+GAME_MINUTES = 135       # ponytail: a game runs ~2 h 15 m; overtime runs longer, use ESPN's final status if that bites
+
+
 def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict | None) -> dict:
     """The best lineup at every moment from now to the end of the week, for the timeline slider. The lineup changes
-    at every tip-off on the roster: once a player's game has started, the next segment plans the games still to come
-    (plan_today for the next game's day), so his slot can go to someone who plays later; he keeps it if nobody later
-    needs it (he can still be locked). Each segment starts from the previous one's lineup, so the moves chain.
-    Locked players are pinned by plan_today, so their slot never changes."""
-    from .weekplan import plan_today
+    only at check-ins, ALARM_LEAD_MIN before a tip where someone moves in, so you open Sleeper as few times as
+    possible: at that check every swap available then happens at once (later players too, e.g. the 9:30 game
+    moves in at the 8:55 check for the 9:00 games). A game counts as in progress for GAME_MINUTES after its tip,
+    so a player still playing is never swapped out. Each check plans the games still to come (plan_today for the
+    next game's day) from the previous lineup, so the moves chain; locked players never move."""
+    from .weekplan import ALARM_LEAD_MIN, plan_today
 
     tz = ZoneInfo(view.get("tz") or "America/Chicago")
     first = date.fromisoformat(view["dates"][0])
@@ -324,24 +328,25 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     saved = {id(g): (g.started, g.live) for p in players for g in p.games}
     slots = {p.sid: p.slot for p in players}
     seats = today_seats if today_seats is not None else plan_today(players, counts, next_day() or view["day"]).seats
-    segments = [{"date": view["day"], "to": (tips[0] if tips else end).astimezone(tz).isoformat(), "seats": seats}]
-    for i, t in enumerate(tips):
-        for p in players:   # time moves past this tip: those games have started (not pinned: the plan may move them)
+    segments = [{"date": view["day"], "seats": seats}]
+    lead, length = timedelta(minutes=ALARM_LEAD_MIN), timedelta(minutes=GAME_MINUTES)
+    for t in tips:
+        check = t - lead
+        for p in players:   # at the check: earlier games have started; still in progress = can't be moved
             for g in p.games:
-                if g.tip and at(g.tip) <= t:
-                    g.started, g.live = True, False
+                if g.tip and at(g.tip) <= check:
+                    g.started, g.live = True, check < at(g.tip) + length
             if p.slot != "IR" and p.locked is None:   # start from the previous segment's lineup
                 p.slot = next((s for s, ids in seats.items() if p.sid in ids), "BN")
         d = next_day()
         if d is None:
             break
         nxt = plan_today(players, counts, d).seats
-        to = (tips[i + 1] if i + 1 < len(tips) else end).astimezone(tz).isoformat()
-        if starters(nxt) == starters(seats):   # same players in (moving between starting slots changes nothing)
-            segments[-1]["to"] = to
-        else:
+        tipping = {p.sid for p in active for g in p.games if g.tip and at(g.tip) == t}
+        if (starters(nxt) - starters(seats)) & tipping:   # someone moves in for this tip: check in now, every swap at once
+            segments[-1]["to"] = check.astimezone(tz).isoformat()
             seats = nxt
-            segments.append({"date": d, "to": to, "seats": seats})
+            segments.append({"date": d, "seats": seats})
     for p in players:
         p.slot = slots[p.sid]
         for g in p.games:

@@ -152,7 +152,7 @@ def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
     assert waivers(None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
 
 
-def test_timeline_changes_at_each_tip_so_a_later_player_can_take_the_slot():
+def test_timeline_hands_the_slot_to_a_later_player_at_his_check_in():
     from app.lockin.service import week_timeline
     from app.lockin.weekplan import Game, PlanPlayer, plan_week
 
@@ -162,6 +162,23 @@ def test_timeline_changes_at_each_tip_so_a_later_player_can_take_the_slot():
     view = {"tz": "America/Chicago", "dates": ["2026-10-20", "2026-10-21"], "day": "2026-10-20"}
     segs = week_timeline([shai, reav], {"PG": 1}, view, None)["segments"]
     assert [(x["seats"]["PG"], x["to"][:16]) for x in segs] == [
-        (["s"], "2026-10-20T20:30"),    # Shai starts until his 8:30 PM CT tip ...
+        (["s"], "2026-10-21T20:55"),    # Shai (Tue 8:30 PM) holds the slot until the check 5 min before Reaves's Wed tip ...
         (["r"], "2026-10-26T00:00")]    # ... then the slot goes to the player who still has a game (Shai can be locked)
     assert shai.slot == "PG" and not shai.games[0].started   # the simulation leaves the real state alone
+
+
+def test_timeline_does_a_nights_swaps_at_one_check_in_and_never_moves_a_player_mid_game():
+    from app.lockin.service import week_timeline
+    from app.lockin.weekplan import Game, PlanPlayer, plan_week
+
+    def guy(sid, slot, tip):   # Wed 10/21 (CDT = UTC-5)
+        return PlanPlayer(sid=sid, name=sid, eligibility=["C"], slot=slot, games=[Game("2026-10-21", 20, tip=tip)])
+    six, six30, seven = guy("6:00", "C", "2026-10-21T23:00:00Z"), guy("6:30", "C", "2026-10-21T23:30:00Z"), guy("7:00", "C", "2026-10-22T00:00:00Z")
+    nine, nine30 = guy("9:00", "BN", "2026-10-22T02:00:00Z"), guy("9:30", "BN", "2026-10-22T02:30:00Z")
+    ps = [six, six30, seven, nine, nine30]
+    plan_week(ps, {"C": 3})
+    view = {"tz": "America/Chicago", "dates": ["2026-10-21"], "day": "2026-10-21"}
+    segs = week_timeline(ps, {"C": 3}, view, None)["segments"]
+    assert [(sorted(x["seats"]["C"]), x["to"][:16]) for x in segs] == [
+        (["6:00", "6:30", "7:00"], "2026-10-21T20:55"),   # the early games start; one check at 8:55 PM ...
+        (["7:00", "9:00", "9:30"], "2026-10-26T00:00")]   # ... swaps in the 9:00 AND 9:30 games; 7:00 is still playing
