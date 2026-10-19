@@ -144,7 +144,7 @@ export default function SeasonPage({ leagueId }) {
         ))}
         <RosterAlerts roster={plan.roster} />
         {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
-        {view === "news" && <NewsView data={data} leagueId={leagueId} open={open} refreshKey={tick} />}
+        {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
@@ -538,16 +538,16 @@ const newsTime = (iso) => {
 };
 
 // One note: who (opens his profile), his injury tag, the fantasy team that has him (league-wide), when, the note.
-function NewsNote({ n, data, open, owner }) {
-  const p = data.players[n.sid];
+function NewsNote({ n, open, owner }) {
   const title = n.headline.startsWith(`${n.name} - `) ? n.headline.slice(n.name.length + 3) : n.headline;   // name is already above
   return (
     <div className={`news-item ${n.injury ? "injury" : ""}`}>
       <div className="news-head">
-        <span className="clickable news-player" onClick={() => open(n.sid)}>
+        <span className="clickable news-player" onClick={() => open(n.player_id)}>
           <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
         </span>
-        <InjuryTag tag={p?.injury_tag} note={p?.injury_note} />
+        <InjuryTag tag={n.injury_tag} note={n.injury_note} />
+        {n.team && <span className="small muted">{n.team}</span>}
         {owner && <span className="small muted">· {n.owner}</span>}
         <span className="small muted news-time">{newsTime(n.published)}</span>
       </div>
@@ -559,7 +559,7 @@ function NewsNote({ n, data, open, owner }) {
 
 const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 
-function NewsView({ data, leagueId, open, refreshKey }) {
+function NewsView({ leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState(""), [nba, setNba] = useState(""), [mgr, setMgr] = useState(""), [inj, setInj] = useState(false);
@@ -568,14 +568,13 @@ function NewsView({ data, leagueId, open, refreshKey }) {
   }, [leagueId, refreshKey]);
   if (error) return <div className="panel error">{error}</div>;
   if (!news) return <div className="panel muted">Loading news…</div>;
-  const team = (n) => data.players[n.sid]?.team || "";
   const words = q.toLowerCase().trim();
   // search: player, NBA team, manager's username or the note itself; the manager pick only narrows the league list
-  const keep = (n) => (!nba || team(n) === nba) && (!inj || n.injury)
-    && (!words || [n.name, team(n), n.user, n.headline, n.story].join(" ").toLowerCase().includes(words));
-  const mine = news.mine.filter(keep);
+  const keep = (n) => (!nba || n.team === nba) && (!inj || n.injury)
+    && (!words || [n.name, n.team, n.user, n.headline, n.story].join(" ").toLowerCase().includes(words));
+  const mine = news.mine.filter(keep), free = news.free.filter(keep);
   const league = news.league.filter((n) => keep(n) && (!mgr || n.user === mgr));
-  const nbaTeams = [...new Set([...news.mine, ...news.league].map(team).filter(Boolean))].sort();
+  const nbaTeams = [...new Set([...news.mine, ...news.league, ...news.free].map((n) => n.team).filter(Boolean))].sort();
   const managers = [...new Set(news.league.map((n) => n.user))].sort((a, b) => a.localeCompare(b));
   return (
     <div className="news-col">
@@ -589,13 +588,19 @@ function NewsView({ data, leagueId, open, refreshKey }) {
       {!mgr && (
         <details className="panel news" open data-testid="news-mine">
           <summary><h3>My team <span className="small muted">({mine.length})</span></h3></summary>
-          {mine.length ? mine.map((n, i) => <NewsNote key={i} n={n} data={data} open={open} />)
+          {mine.length ? mine.map((n, i) => <NewsNote key={i} n={n} open={open} />)
             : <div className="muted">No recent notes on your players{q || nba || inj ? " match" : ""}.</div>}
+        </details>
+      )}
+      {!mgr && free.length > 0 && (
+        <details className="panel news" open data-testid="news-free">
+          <summary><h3>Free agents <span className="small muted">(most added / dropped on Sleeper today, {free.length})</span></h3></summary>
+          {free.map((n, i) => <NewsNote key={i} n={n} open={open} />)}
         </details>
       )}
       <div className="panel news" data-testid="news-league">
         <h3>League-wide <span className="small muted">({mgr || "other teams' players"}{league.length > LEAGUE_NEWS ? `, newest ${LEAGUE_NEWS} of ${league.length}` : ""})</span></h3>
-        {league.length ? league.slice(0, LEAGUE_NEWS).map((n, i) => <NewsNote key={i} n={n} data={data} open={open} owner />)
+        {league.length ? league.slice(0, LEAGUE_NEWS).map((n, i) => <NewsNote key={i} n={n} open={open} owner />)
           : <div className="muted">No notes match.</div>}
       </div>
     </div>

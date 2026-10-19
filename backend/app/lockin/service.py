@@ -458,26 +458,43 @@ def player_news(fetch: Fetch, sid: str) -> list[dict]:
     return out[:4]
 
 
-def season_news(view: dict, fetch: Fetch) -> dict:
+def season_news(view: dict, fetch: Fetch, free: list[str] = ()) -> dict:
     """The News tab: fantasy notes (RotoWire, via Sleeper) on every player of yours, then on every player the other teams
     roster, newest first. Sleeper's notes feed only works one player at a time (no league-wide feed), so this is one
-    request per player, in parallel and cached NEWS_TTL: only the first load after a Sync pays for it."""
+    request per player, in parallel and cached NEWS_TTL: only the first load after a Sync pays for it. `free`: free
+    agents to cover too (Sleeper's trending adds / drops; the view must hold them, week_view(extra=...))."""
     from concurrent.futures import ThreadPoolExecutor
 
     players = view["players"]
     owner = {sid: t for t in view["teams"] for sid in t["players"]}
+    free = [s for s in dict.fromkeys(free) if s not in owner and (players.get(s) or {}).get("player_id")]
 
     def notes(sid: str) -> list[dict]:
-        p, t = players[sid], owner[sid]
-        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "owner": t["name"],
-                 "user": t.get("user") or t["name"]}
+        p, t = players[sid], owner.get(sid)
+        return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "team": p.get("team"),
+                 "injury_tag": p.get("injury_tag"), "injury_note": p.get("injury_note"), "owner": t["name"] if t else None,
+                 "user": (t.get("user") or t["name"]) if t else None}
                 for n in player_news(fetch, sid)]
-    sids = [s for s in owner if s in players and s not in RETIRED]
+    sids = [s for s in [*owner, *free] if s in players and s not in RETIRED]
     with ThreadPoolExecutor(16) as ex:
         every = [n for ns in ex.map(notes, sids) for n in ns]
     every.sort(key=lambda n: n.get("published") or "", reverse=True)
-    mine = [n for n in every if owner[n["sid"]]["is_user"]]
-    return {"mine": mine, "league": [n for n in every if not owner[n["sid"]]["is_user"]]}   # all of them: the tab filters
+    side = lambda n: "free" if n["sid"] not in owner else "mine" if owner[n["sid"]]["is_user"] else "league"   # noqa: E731
+    return {k: [n for n in every if side(n) == k] for k in ("mine", "league", "free")}   # all of them: the tab filters
+
+
+SLEEPER_TRENDING = SLEEPER + "/v1/players/nba/trending/{}?lookback_hours=24&limit=25"
+
+
+def trending(fetch: Fetch) -> list[str]:
+    """Sleeper ids most dropped then most added across Sleeper in the last day: the free agents whose news matters."""
+    out = []
+    for kind in ("drop", "add"):
+        try:
+            out += [str(t["player_id"]) for t in fetch(SLEEPER_TRENDING.format(kind), WEEK_TTL) or []]
+        except Exception:   # news without free agents beats no news
+            pass
+    return out
 
 
 def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:
