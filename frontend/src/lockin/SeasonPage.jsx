@@ -331,11 +331,10 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const best = {};
   for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
   const gridRef = React.useRef(null);
-  const slotIn = (st, r) => Object.entries(st || {}).find(([, ids]) => ids.includes(r.sid))?.[0] || (r.slot === "IR" ? "IR" : "BN");
-  // The arrows show the changes: on "now" from your Sleeper lineup, further along from the lineup just before this
-  // change point.
+  // The arrows show the changes from your Sleeper lineup as it is right now, at any point of the timeline (not from
+  // the previous check-in's planned lineup), so they're the moves you'd make in Sleeper from where you are.
   const bestRows = seats ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
-  const before = Object.fromEntries(plan.players.map((r) => [r.sid, at == null || segIdx <= 0 ? r.slot : slotIn(tl.segments[segIdx - 1].seats, r)]));
+  const before = Object.fromEntries(plan.players.map((r) => [r.sid, r.slot]));
   const pairs = seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
