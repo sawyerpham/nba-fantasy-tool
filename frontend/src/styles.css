@@ -707,6 +707,7 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .gch-day { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; } .gch-time { font-weight: 500; }
 .gch-fp { font-size: 13.5px; font-weight: 600; color: var(--muted); }
 .game-chip.played .gch-fp { color: var(--text); font-weight: 800; }
+.gch-fp { white-space: nowrap; } .gch-proj { font-size: 0.62em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }   /* "PROJ 13.2" before the game */
 .game-chip.today { border-color: var(--primary); }
 .game-chip.live { border-color: var(--danger); } .game-chip.live .gch-time { color: var(--danger); font-weight: 800; }
 .game-chip.locked { border: 2px solid var(--ok); background: var(--good); }

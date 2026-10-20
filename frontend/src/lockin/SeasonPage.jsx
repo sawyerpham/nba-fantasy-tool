@@ -193,7 +193,7 @@ function GameChips({ games, today, lockDate, day, lane, team }) {
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""} ${href ? "watch" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
-            <span className="gch-fp">{played ? fp(g.fp) : fp(g.proj)}</span>
+            <span className="gch-fp">{played ? fp(g.fp) : <><span className="gch-proj">proj</span> {fp(g.proj)}</>}</span>
           </Tag>
         );
       });
