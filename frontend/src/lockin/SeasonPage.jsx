@@ -434,7 +434,7 @@ function bestLineup(team, atMs, positions, gap, asIs) {
   const pos = Object.fromEntries(players.map((r) => [r.sid, r.pos || []]));
   const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions);
   const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
-  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos) };
+  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos, !asIs) };
 }
 
 // The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS): one
@@ -445,7 +445,7 @@ const ARROW_GUTTER = 80;
 function SwapArrows({ pairs, side, names }) {
   const svgRef = React.useRef(null);
   const [lines, setLines] = useState([]);
-  const key = pairs.map((p) => `${p.n}:${p.out}>${p.in}`).join(",");
+  const key = pairs.map((p) => `${p.n}:${p.a}>${p.b}`).join(",");
   React.useLayoutEffect(() => {
     // the grid through our own svg: on mount the grid's ref isn't attached yet when this runs (children first)
     const grid = svgRef.current?.parentElement;
@@ -459,7 +459,8 @@ function SwapArrows({ pairs, side, names }) {
         return r.top + r.height / 2 - top;
       };
       // shortest arrows nearest the cards, longest outside: nested lines cross as little as possible
-      setLines(pairs.map((p) => ({ ...p, y1: mid(p.out), y2: mid(p.in) })).filter((l) => l.y1 != null && l.y2 != null)
+      // each step joins the cards its two players' slots show at that step (earlier steps taken as done: swapSteps a / b)
+      setLines(pairs.map((p) => ({ ...p, y1: mid(p.b), y2: mid(p.a) })).filter((l) => l.y1 != null && l.y2 != null)
         .sort((a, b) => Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2)));
     };
     measure();
@@ -480,7 +481,7 @@ function SwapArrows({ pairs, side, names }) {
           + `M ${x} ${mid + dir * gap} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
         const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
         return (
-          <g key={`${l.out}>${l.in}`} style={{ color }}>
+          <g key={l.n} style={{ color }}>
             <title>{`Swap ${names(l.in)} (${l.from}) and ${names(l.out)} (${l.to})`}</title>
             <path d={d} className="swap-path" />
             <polygon points={head(l.y1)} fill="currentColor" />

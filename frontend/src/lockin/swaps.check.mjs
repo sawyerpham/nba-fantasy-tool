@@ -24,6 +24,12 @@ const slots = ["PG", "PG", "SG", "SG", "SF", "BN", "BN"];
 const was = { murray: "PG", hali: "PG", bane: "SG", derozan: "SG", nesmith: "SF", kyrie: "BN" };
 const plan = { murray: "PG", hali: "SG", bane: "SG", derozan: "SF", nesmith: "BN", kyrie: "PG" };   // the plan's slots
 assert.deepEqual(replay(was, reseat(was, plan, p2, slots), p2), ["kyrie<>derozan", "derozan<>nesmith"]);
+// The cards each step's arrow joins, taking earlier steps as done: after Kyrie <-> DeRozan, DeRozan sits in Kyrie's
+// (bench) card, so DeRozan <-> Nesmith joins Kyrie's card and Nesmith's. With the best lineup on screen the cards are
+// the final holders: Kyrie's SG slot is Kyrie's card, the bench slot Nesmith ends in is Nesmith's.
+const cards = (shownAfter) => swapSteps(was, reseat(was, plan, p2, slots), p2, shownAfter).map((s) => `${s.a}-${s.b}`);
+assert.deepEqual(cards(false), ["kyrie-derozan", "kyrie-nesmith"]);
+assert.deepEqual(cards(true), ["nesmith-kyrie", "nesmith-derozan"]);
 // A plain bench-for-starter swap stays one step; nothing to do = no steps.
 assert.deepEqual(replay({ grant: "PF", sabonis: "BN" }, { grant: "BN", sabonis: "PF" }, pos), ["sabonis<>grant"]);
 assert.deepEqual(swapSteps({ grant: "PF" }, { grant: "PF" }, pos), []);
