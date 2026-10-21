@@ -362,6 +362,12 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     return {"start": start.isoformat(), "end": end.isoformat(), "segments": segments}
 
 
+def locked_points(players) -> float:
+    """The team's score so far: locked games only. Sleeper's own total also counts each starter's latest game,
+    which isn't banked until it's locked (a later game replaces it)."""
+    return round(sum(p.locked for p in players if p.locked is not None), 2)
+
+
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
     opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
@@ -387,7 +393,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "user": oteam.get("user"), "avatar": oteam.get("avatar"),
                "expected": oplan.expected,
-               "points": other.get("points") or 0, "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
+               "points": locked_points(oplayers), "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
 
@@ -426,7 +432,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
     return {"roster_id": team["roster_id"], "name": team["name"], "user": team.get("user"), "avatar": team.get("avatar"),
             "expected": plan.expected, "slots": counts,
-            "points": side.get("points") or 0, "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
+            "points": locked_points(players), "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
             "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": reminders + t.watch} if t else
