@@ -114,11 +114,13 @@ def test_a_counted_latest_game_is_guessed_locked_when_locking_beats_waiting(fixt
             "matchups": [[{"roster_id": 1, "players_points": {"hot": 18.6, "cold": 4.0}}]],
             "players": {"hot": pl("hot", [g("2026-10-20", 18.6, st="post"), g("2026-10-23")]),
                         "cold": pl("cold", [g("2026-10-20", 4.0, st="post"), g("2026-10-23")])},
-            "teams": [{"roster_id": 1, "name": "me", "is_user": True, "players": ["hot", "cold"], "starters": ["hot", "cold"], "reserve": []}]}
-    out = {p["sid"]: p for p in team_plan(s, view)["players"]}
+            "teams": [{"roster_id": 1, "name": "rival", "is_user": False, "players": ["hot", "cold"], "starters": ["hot", "cold"], "reserve": []}]}
+    out = {p["sid"]: p for p in team_plan(s, view, roster_id=1)["players"]}
     assert out["hot"]["lock_status"] == "guess" and out["hot"]["locked"] == 18.6   # 18.6 beats ~10 from his next game
     assert out["cold"]["lock_status"] == "maybe" and out["cold"]["locked"] is None  # 4 doesn't: he'd wait
-    assert team_plan(s, view)["points"] == 18.6
+    assert team_plan(s, view, roster_id=1)["points"] == 18.6
+    view["teams"][0]["is_user"] = True   # your own team: no guessing, you know what you locked
+    assert team_plan(s, view)["points"] == 0
 
 
 def test_news_merges_my_players_newest_first_and_flags_injuries():
