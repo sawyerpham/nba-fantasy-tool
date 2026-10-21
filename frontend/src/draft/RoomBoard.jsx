@@ -57,7 +57,7 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                         onDragStart={(e) => { setDragging(p); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
                         onDragEnd={() => { setDragging(null); setOver(null); }}
                         onClick={() => onSelectPlayer?.(p.player_id)}
-                        data-tip={`${p.player_name} ${p.team_abbr || ""} · ${p.fpg ?? "?"} FP/G · $${p.price}${p.is_keeper ? " (keeper)" : ""} · click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
+                        data-tip={`Click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
                         <Headshot sleeperId={p.sleeper_id} name={p.player_name} size={30} />
                         <span className="room-slot-who">
                           <span className="room-slot-name">{p.player_name}</span>

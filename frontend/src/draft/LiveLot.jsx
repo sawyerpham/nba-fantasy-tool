@@ -87,7 +87,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           <div className="small muted">
             {row && <><PosList list={row.eligibility} /> · age {row.age} · {Math.round(row.availability * 100)}% <Term k="avail">avail</Term></>}
             {row?.tier != null && <span className={`tier-tag ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={TERMS.tier[1]}>T{row.tier} · {row.tier_left - 1 === 0 ? "last in his tier" : `${row.tier_left - 1} more like him`}</span>}
-            {extra.role && <span className={`role-tag ${extra.role.star ? "star" : ""}`} style={{ marginLeft: 8 }} data-tip={`${extra.role.label}: #${extra.role.rank} on his team by projected FP/G, ${Math.round(extra.role.share * 100)}% of the top 8's production.`}>{extra.role.star ? "★ " : ""}{extra.role.label}</span>}
+            {extra.role && <span className={`role-tag ${extra.role.star ? "star" : ""}`} style={{ marginLeft: 8 }} data-tip={`#${extra.role.rank} on his team by projected FP/G, ${Math.round(extra.role.share * 100)}% of the top 8's production.`}>{extra.role.star ? "★ " : ""}{extra.role.label}</span>}
           </div>
           {inj && <div className="small warn-text" data-testid="live-injury">{inj}</div>}
         </div>
@@ -103,7 +103,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
           <div className="live-lot-price" data-testid="live-worth">{spend ? `$${Math.round(spend.fair_value)}` : "—"}</div>
           <div className="live-big-sub">Max {can ? `$${spend.recommended}` : "—"}</div>
         </div>
-        <div key={flash} className={`live-lot-bid ${flash ? "flash" : ""}`} data-testid="live-bid-card" data-tip="Sleeper's current high bid and who holds it; the clock ticks down to the sale.">
+        <div key={flash} className={`live-lot-bid ${flash ? "flash" : ""}`} data-testid="live-bid-card" data-tip="Live from Sleeper.">
           <div className="bid-label"><span className="rec-dot" />High bid</div>
           <div className="live-lot-price" data-testid="live-bid">${bid}</div>
           <div className="live-bid-foot"><span className="clip">{lot.leader || "no bids"}</span>{left != null && <span className={`live-clock ${left <= 3 ? "low" : ""}`}>{left}s</span>}</div>

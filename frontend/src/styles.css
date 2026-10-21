@@ -799,8 +799,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mu-card.done .mu-who { opacity: 0.5; }   /* locked in: his week is settled (name and positions dimmed, colours kept) */
 .nick { font-style: italic; }
-.swap-n { font-size: 14px; font-weight: 800; fill: currentColor; text-anchor: middle; dominant-baseline: central;
-  paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }   /* step number on its arrow, punched out of the line */
+.swap-n { font-size: 14px; font-weight: 800; fill: currentColor; text-anchor: middle; dominant-baseline: central; }   /* step number in its arrow's gap */
 .swap-path { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; pointer-events: visibleStroke; }
 
 /* streamed.pk watch links on the season page game chips */

@@ -7,5 +7,7 @@ const INJ_TAG = {
 export default function InjuryTag({ tag, note }) {
   if (!tag) return null;
   const [abbr, cls, meaning] = INJ_TAG[tag] || [tag, "", tag];
-  return <span className={`inj ${cls}`} data-tip={`${meaning[0].toUpperCase()}${meaning.slice(1)}${note ? ` · ${note}` : ""}`}>{abbr}</span>;
+  // the hover spells out the tag only when the tag is an abbreviation (OUT already says it), then Sleeper's note
+  const say = abbr.toLowerCase() === meaning ? "" : `${meaning[0].toUpperCase()}${meaning.slice(1)}`;
+  return <span className={`inj ${cls}`} data-tip={[say, note].filter(Boolean).join(" · ") || undefined}>{abbr}</span>;
 }

@@ -7,7 +7,7 @@ import { PosList, PosTag } from "../core/Pos.jsx";
 import PlayerSidebar from "../core/PlayerSidebar.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
-import { fmt, setZone, timeOf, tzAbbr } from "./tz.js";
+import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
 import { reseat, swapSteps } from "./swaps.js";
 
@@ -193,7 +193,15 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
         const m = findMatch(matches, g, team);
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
-        const tip = `${g.beat != null && !lockDate ? `${Math.round(g.beat * 100)}% to score higher than ${fp(g.fp)} this week · ` : ""}${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? (lockGuess ? " · LOCKED (a guess: Sleeper's API doesn't show locks, but locking it beats waiting, and his next game will confirm it)" : " · LOCKED") : dead ? " · can't be locked" : ""}`;
+        // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
+        const tip = [
+          `${g.home ? "vs" : "@"} ${g.opp}`,
+          live && g.detail, live && g.pace != null && `on pace for ${fp(g.pace)}`,
+          !live && played && g.min != null && `${g.min} min`,
+          g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
+          lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
+          href && "click to watch",
+        ].filter(Boolean).join(" · ");
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
             onClick={href ? (e) => e.stopPropagation() : undefined}
@@ -261,8 +269,8 @@ function laneAt(xs, ms, start, end, width) {
   return width;
 }
 
-const EXP_TIP = "Exp FP: the fantasy points this player is expected to put in your lineup this week. Only one of his games counts: " +
-  "his locked game, else the better of locking his last game now and waiting for the rest (more games = more chances at a big one).";
+const EXP_TIP = "Expected final score: locked points plus what each slot is expected to add (each player's locked game, " +
+  "else the better of locking his last game and waiting for his later ones).";
 
 function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
@@ -277,12 +285,12 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
         <div className="mu-who">
           <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
-            {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
+            {p.nick && showNicks() && <span className="nick" data-tip="Nickname set on Sleeper"> · “{p.nick}”</span>}</div>
         </div>
         </div>
         <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} lane={lane} />
         {mine && starter && locked && (
-          <span className="mu-call"><span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span></span>
+          <span className="mu-call"><span className="ok small clickable" data-tip="Click if he isn't locked" onClick={() => setLock(r.sid, "")}> ✓</span></span>
         )}
       </div>
     </div>
@@ -466,16 +474,19 @@ function SwapArrows({ pairs, side, names }) {
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
-        const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
+        // the vertical run breaks around the step number (mid ± gap), so the line never crosses it
+        const mid = (l.y1 + l.y2) / 2, gap = 10;
+        const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${mid - dir * gap} `
+          + `M ${x} ${mid + dir * gap} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
         const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
         return (
           <g key={`${l.out}>${l.in}`} style={{ color }}>
-            <title>{`Step ${l.n}: swap ${names(l.in)} (${l.from}) and ${names(l.out)} (${l.to})`}</title>
+            <title>{`Swap ${names(l.in)} (${l.from}) and ${names(l.out)} (${l.to})`}</title>
             <path d={d} className="swap-path" />
             <polygon points={head(l.y1)} fill="currentColor" />
             <polygon points={head(l.y2)} fill="currentColor" />
             {/* the step number on the line's middle; the right lane is mirrored, so flip the text back */}
-            <text className="swap-n" x={side === "right" ? -x : x} y={(l.y1 + l.y2) / 2} transform={side === "right" ? "scale(-1,1)" : undefined}>{l.n}</text>
+            <text className="swap-n" x={side === "right" ? -x : x} y={mid} transform={side === "right" ? "scale(-1,1)" : undefined}>{l.n}</text>
           </g>
         );
       })}

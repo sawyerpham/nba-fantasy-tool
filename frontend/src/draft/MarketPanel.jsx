@@ -29,9 +29,9 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
               <tr key={p.pos} className={p.my_open ? "you-need" : ""}>
                 <td><PosTag text={p.pos} />{p.my_open > 0 && <span className="need-dot" data-tip={`You have ${p.my_open} open ${p.pos} spot${p.my_open > 1 ? "s" : ""}.`} />}</td>
                 <td className="num">{p.need}</td>
-                <td className="num" data-tip={`${p.left} starter-quality players counted at ${p.pos}${p.also ? `; ${p.also} more can also play ${p.pos} but were counted at a position that needs them more` : ""}.`}>{p.left}</td>
+                <td className="num" data-tip={`Starter-quality players counted at ${p.pos}${p.also ? `; ${p.also} more can also play it but were counted where they're needed more` : ""}.`}>{p.left}</td>
                 <td><span className={`verdict ${cls}`}>{word}</span></td>
-                <td className="clip" data-tip={c ? `${c.names.join(", ")}${c.left > c.names.length ? " …" : ""} left in T${c.tier}.${c.drop != null ? ` The next tier's best (T${c.next_tier}) is ${c.drop} value points lower.` : ""}` : ""}>
+                <td className="clip" data-tip={c ? `${c.names.join(", ")}${c.left > c.names.length ? " …" : ""}${c.drop != null ? `. T${c.next_tier}'s best is ${c.drop} value points lower.` : ""}` : ""}>
                   {c ? <>T{c.tier} ×{c.left}{c.drop != null && <span className="muted"> · −{c.drop}</span>}</> : "—"}
                 </td>
                 <td className="num" data-tip={p.chasers.length ? `Can afford ${p.best} (worth $${p.best_fair}): ${p.chasers.map((x) => `${x.name} (cap $${x.cap})`).join(", ")}` : `No rival with an open ${p.pos} spot can pay $${p.best_fair ?? "?"} for ${p.best || "the best left"}.`}>
@@ -44,16 +44,16 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
       </table>
 
       <div className="sold-tracker" data-testid="sold-tracker">
-        <span data-tip="Players bought at auction so far (keepers don't count)."><span className="bid-label">Sold</span> <strong>{m.sold}</strong></span>
-        <span data-tip={`Roster spots still open across the room, bench included (${m.starters_left} of them starting spots).`}><strong>{m.spots_left}</strong> <span className="muted">spots left</span></span>
-        <span data-tip={`Available players whose Worth right now is $${m.good_worth} or more: who the room's money is still for. When this runs low, the rest go for $1-3.`}>
+        <span data-tip="Bought at auction; keepers don't count."><span className="bid-label">Sold</span> <strong>{m.sold}</strong></span>
+        <span data-tip={`Across every team, bench included; ${m.starters_left} are starting spots.`}><strong>{m.spots_left}</strong> <span className="muted">spots left</span></span>
+        <span data-tip="Who the room's money is still for. When this runs low, the rest go for $1-3.">
           <strong className={m.good_left <= 10 ? "warn-text" : ""}>{m.good_left}</strong> <span className="muted">left worth ${m.good_worth}+</span>
         </span>
       </div>
       <div className="trend-head">
         <span className="bid-label"><Term k="room_trend" /></span>
         {m.recent_diff != null && (
-          <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Last 10 sales on average: how much more (+) or less (−) than his Worth the buyers paid.">
+          <span className={`small ${m.recent_diff > 2 ? "warn-text" : m.recent_diff < -2 ? "ok" : "muted"}`} data-tip="Average over the last 10 sales.">
             {m.recent_diff > 0 ? "+" : m.recent_diff < 0 ? "−" : ""}${Math.abs(m.recent_diff)} vs worth lately
           </span>
         )}
@@ -64,7 +64,7 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
         <div key={`${s.player_id}-${s.price}`} className="sale-row clickable" onClick={() => onSelect?.(s.player_id)}>
           <span className="clip">{s.player}</span>
           {(() => { const t = priceTone(s.price, s.fair); return <strong><span className={t.cls} data-tip={t.tip}>${s.price}</span></strong>; })()}
-          <span className={`sale-diff ${s.diff > 2 ? "over" : s.diff < -2 ? "under" : ""}`} data-tip={`Worth $${s.fair} at that point; ${s.manager} paid $${s.price}.`}>
+          <span className={`sale-diff ${s.diff > 2 ? "over" : s.diff < -2 ? "under" : ""}`} data-tip={`Worth $${s.fair} when he sold`}>
             {s.diff > 0 ? "+" : ""}{s.diff}
           </span>
           <span className="muted clip sale-mgr">{s.manager}</span>
