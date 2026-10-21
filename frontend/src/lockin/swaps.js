@@ -42,8 +42,11 @@ export function reseat(before, after, pos, positions) {
 // BN <-> Wiggins PF, then Wiggins BN <-> Coward SG; doing it as "Sabonis for Coward" isn't possible: Coward can't play
 // PF). Bench players go first; a swap that settles both players beats one that settles one. IR never moves here.
 // step: { in, out: the two players trading places, slot: the starting slot it fills, n: its order, from / to: in's
-// slot before and after the swap }
-export function swapSteps(before, after, pos) {
+// slot before and after the swap, a / b: the cards (sids) in's and out's slots show on screen at that step }
+// Cards stand for slots, and earlier steps are taken as done: after "Kyrie <-> DeRozan", Kyrie is in DeRozan's card
+// and DeRozan in Kyrie's, so "DeRozan <-> Nesmith" runs from Kyrie's card to Nesmith's. shownAfter: the cards show
+// `after` (your best lineup), so each slot's card is the player who ends up in it, not the one who holds it now.
+export function swapSteps(before, after, pos, shownAfter = false) {
   const cur = { ...before }, steps = [];
   const open = (sid) => cur[sid] !== after[sid] && cur[sid] !== "IR" && after[sid] !== "IR";
   for (let guard = 0; guard < 60; guard++) {
@@ -61,6 +64,16 @@ export function swapSteps(before, after, pos) {
       break;
     }
     if (!done) break;   // ponytail: a move into an empty starting slot (no one to trade with) isn't drawn
+  }
+  // slot each player holds, named by the player who held it at the start (= its card in the `before` lineup)
+  const holds = Object.fromEntries(Object.keys(before).map((s) => [s, s]));
+  for (const s of steps) {
+    s.a = holds[s.in]; s.b = holds[s.out];
+    [holds[s.in], holds[s.out]] = [holds[s.out], holds[s.in]];
+  }
+  if (shownAfter) {   // each slot's card is its final holder
+    const card = Object.fromEntries(Object.entries(holds).map(([sid, slot]) => [slot, sid]));
+    for (const s of steps) { s.a = card[s.a]; s.b = card[s.b]; }
   }
   return steps;
 }
