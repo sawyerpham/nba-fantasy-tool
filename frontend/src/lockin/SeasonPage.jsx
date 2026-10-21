@@ -432,7 +432,7 @@ function swapPairs(before, after, positions) {
 }
 
 // The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS):
-// from the player going to the bench to the one taking his place, coloured by that slot's position. Measured from
+// joining the player going to the bench and the one taking his place (a head at both ends: they trade places), coloured by that slot's position. Measured from
 // the cards on screen; redrawn when the grid changes size.
 const ARROW_GUTTER = 80;
 function SwapArrows({ pairs, side, names }) {
@@ -467,13 +467,14 @@ function SwapArrows({ pairs, side, names }) {
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
-        const d = `M ${end} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
+        const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
+        const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
         return (
           <g key={`${l.out}>${l.in}`} style={{ color }}>
             <title>{`${names(l.in)} takes the place of ${names(l.out)} at ${l.slot}`}</title>
             <path d={d} className="swap-path" />
-            <circle cx={end} cy={l.y1} r="3" fill="currentColor" />
-            <polygon points={`${end - 6},${l.y2 - 5} ${end + 1},${l.y2} ${end - 6},${l.y2 + 5}`} fill="currentColor" />
+            <polygon points={head(l.y1)} fill="currentColor" />
+            <polygon points={head(l.y2)} fill="currentColor" />
           </g>
         );
       })}
