@@ -297,10 +297,6 @@ function bySlot(rows, positions, irSlots) {
   return { lines, bench, ir };
 }
 
-const MODE = { ahead: ["good", "60%+ to win"], behind: ["bad", "40% or less to win"], even: ["", "Close: 40-60% to win"] };
-const WIN_TIP = "Chance to win the week: your counted/locked points + what your other slots are expected to add (with their " +
-  "spread) vs the same for your opponent. Every LOCK / PASS and KEEP / SWAP call picks the choice with the higher chance.";
-
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
 function WeekView({ data, plan, open, setLock, leagueId }) {
@@ -309,11 +305,13 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const [other, setOther] = useState(null);
   const isMine = idx === mineIdx;
   const shown = isMine ? plan : other;
-  // Both teams show their best lineup at the timeline's time (default: now), each with its swap arrows.
-  const [at, setAt] = useState(null);   // ms; null = follow the clock
+  // Both teams show their best lineup at the timeline's time (default: now), each with its swap arrows. In the Sleeper
+  // gap (data.sleeper_gap) the arrows hide and, at now, each side shows its Sleeper lineup as is.
+  const [at, setAt] = useState(null);   // ms; null = follow the clock (so does the slider pushed into the past)
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
-  const me = bestLineup(shown, atMs, data.roster_positions), them = bestLineup(shown?.opponent, atMs, data.roster_positions);
+  const gap = data.sleeper_gap ? (atMs > nowMs ? "arrows" : "all") : null;
+  const me = bestLineup(shown, atMs, data.roster_positions, gap), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -356,7 +354,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const R = o ? bySlot(them.rows, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
   const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
-  const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
@@ -367,28 +364,23 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
   return (
     <div className="panel matchup" data-testid="my-week">
-      {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
+      {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} />}
+      {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: lineups set for the next day don't show until it rolls over, so the arrows are off till then.</div>}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
+        {/* each side: name outside, score toward the centre, its expected final (small, grey) just outside the score */}
         <div className="mu-team">
           <TeamName t={shown} cls="mc-name" size={34} />{isMine && <span className="badge info">YOU</span>}
-          <span className="mc-points">{fp(shown.points)}</span>
-          <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{shown.expected}</strong></span> · {shown.games_left} left</span>
+          <span className="small muted">{shown.games_left} left</span>
+          <span className="mu-score"><span className="mu-exp-total" data-tip={EXP_TIP}>{shown.expected}</span><span className="mc-points">{fp(shown.points)}</span></span>
         </div>
         <div className="mu-mid">
           <span className="small muted">{idx + 1}/{n}</span>
-          <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
-          {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
-          {(seg?.date || data.day) && (
-            <span className="lineup-day" data-tip="The left side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Move the timeline above to see the lineup for a later time.">
-              Best lineup: <strong>{(seg?.date || data.day) === data.today ? "today" : dayName(seg?.date || data.day)}</strong>
-            </span>
-          )}
         </div>
         <div className="mu-team right">
-          {o && <span className="small muted"><span data-tip={EXP_TIP}>exp <strong style={{ color: "var(--text)" }}>{o.expected}</strong></span> · {o.games_left} left · {o.locked} locked</span>}
-          <span className="mc-points">{o ? fp(o.points) : ""}</span>
+          {o && <span className="mu-score"><span className="mc-points">{fp(o.points)}</span><span className="mu-exp-total" data-tip={EXP_TIP}>{o.expected}</span></span>}
+          {o && <span className="small muted">{o.games_left} left · {o.locked} locked</span>}
           {o ? <TeamName t={o} cls="mc-name" size={34} /> : <span className="mc-name">no opponent</span>}
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
@@ -410,16 +402,17 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
 // A team's best lineup at `atMs` from its timeline (one lineup per check-in; locked players never move): rows with
 // everyone in the slot he should be in then, and the swaps from its Sleeper lineup as it is right now (so the arrows
 // are the moves you'd make in Sleeper from where you are, at any point of the timeline).
-function bestLineup(team, atMs, positions) {
+// gap: "all" = Sleeper lineup as is, no arrows; "arrows" = best lineup, no arrows (they'd start from a stale lineup).
+function bestLineup(team, atMs, positions, gap) {
   const tl = team?.timeline, players = team?.players || [];
   const seg = tl?.segments[Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to)))];
   const seats = seg ? seg.seats : team?.today?.seats;
-  if (!seats) return { seg, rows: players, pairs: [] };
+  if (!seats || gap === "all") return { seg, rows: players, pairs: [] };
   const best = {};
   for (const [slot, sids] of Object.entries(seats)) for (const sid of sids) best[sid] = slot;
   const rows = players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") }));
   const slots = (rs) => Object.fromEntries(rs.map((r) => [r.sid, r.slot]));
-  return { seg, rows, pairs: swapPairs(slots(players), slots(rows), positions) };
+  return { seg, rows, pairs: gap ? [] : swapPairs(slots(players), slots(rows), positions) };
 }
 
 // Who replaces whom from lineup `before` to lineup `after` (sid -> slot): each player newly starting is paired with a
@@ -490,7 +483,7 @@ function SwapArrows({ pairs, side, names }) {
 // The past is shaded and the dot can't go there (no lineup to set for it).
 const STEP_MS = 15 * 60000;
 
-function Timeline({ tl, nowMs, atMs, following, setAt }) {
+function Timeline({ tl, nowMs, atMs, setAt }) {
   const start = Date.parse(tl.start), end = Date.parse(tl.end);
   const frac = (ms) => Math.min(1, Math.max(0, (ms - start) / (end - start)));
   const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;   // where the 16px dot's centre sits for that time
@@ -503,7 +496,6 @@ function Timeline({ tl, nowMs, atMs, following, setAt }) {
   const until = d ? `${plural(d, "day")}, ${plural(h, "hour")}` : h ? `${plural(h, "hour")}, ${plural(m, "minute")}` : plural(m, "minute");
   return (
     <div className="timeline" data-testid="timeline">
-      <div className="tl-back">{!following && <button className="tiny" onClick={() => setAt(null)} data-testid="timeline-now">back to now</button>}</div>
       <div className="tl-main">
         <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
         <div className="tl-bar">

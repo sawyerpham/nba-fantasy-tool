@@ -114,6 +114,9 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
     return out
 
 
+SLEEPER_FLIP_HOUR = 4   # ponytail: guessed hour (ET) Sleeper's lineup day rolls over; set it from the measured flip
+
+
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
     from .weekplan import Game, beat_chance, live_estimate, swing_of
 
@@ -228,9 +231,14 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     # The lineup day: today until all of today's games are over, then the next game day. The rules re-run on every
     # request against the clock, so the page is always "what to do now".
     iso = today.isoformat()
+    # The Sleeper gap: Sleeper's API serves one day's lineup at a time and keeps serving that day's after its games
+    # are over (until it flips to the next day), so the next day's lineup a manager may already have set is unseen.
+    sday = (datetime.now(ZoneInfo("America/New_York")) - timedelta(hours=SLEEPER_FLIP_HOUR)).date().isoformat()
+    gap = not preview and bool(tips.get(sday)) and all(t["state"] == "post" for t in tips[sday].values())
     day = iso if preview else next((d for d in dates if d > iso or (d == iso and (not tips[d] or any(t["state"] != "post" for t in tips[d].values())))), None)
     return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
             "now": None if preview else datetime.now(tz).isoformat(), "tz": tz.key, "roster_positions": positions,
+            "sleeper_gap": gap,
             "reserve_slots": reserve_slots,
             "team_games": team_games, "injury_tags": injury_tags, "faab_budget": faab_budget, "waiver": waiver,
             "teams": teams,

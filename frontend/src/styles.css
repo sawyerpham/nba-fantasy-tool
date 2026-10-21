@@ -633,10 +633,9 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .wv-player { display: flex; align-items: center; gap: 10px; }
 .wv-up { display: flex; align-items: center; gap: 10px; } .wv-bar { width: 90px; } .wv-bar > span { display: block; height: 100%; background: var(--ok); }
 .wv-bid { display: inline-block; min-width: 40px; text-align: center; padding: 3px 10px; border-radius: 999px; font-weight: 700; background: var(--primary-soft); color: var(--info-t); }
-/* week timeline: "back to now" on the left, then the week as a line with a dot; the dot's time rides under it;
-   past shaded; ticks where the lineup changes */
+/* week timeline: the week as a line with a dot; the dot's time rides under it; past shaded (the dot can't go
+   there, so pushing it all the way left is "now"); ticks where the lineup changes */
 .timeline { display: flex; align-items: flex-start; gap: 10px; margin: 0 4px 22px; }
-.tl-back { flex: none; width: 92px; padding-top: 24px; text-align: right; }
 .tl-next { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; text-align: left;
   border: 1px solid var(--primary-border); border-left-width: 3px; border-radius: 10px; background: var(--primary-soft); }
 .tl-next:disabled { opacity: 0.6; cursor: default; }
@@ -771,13 +770,16 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .day-pick button.is-today { font-weight: 800; }
-.win-chance { font-size: 15px; white-space: nowrap; }
 .win-pair { white-space: nowrap; font-size: 12px; }
 .game-chip.pick { border: 2px solid var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
 .game-chip.dim { opacity: 0.45; }
 .verdict.off { opacity: 0.6; font-weight: 600; }
 .day-pick { align-items: center; }
-.lineup-day { font-size: 13px; white-space: nowrap; margin-left: 6px; }
+/* matchup header: each side's score at its centre end, its expected final small and grey just outside it */
+.mu-score { display: inline-flex; align-items: baseline; gap: 8px; }
+.mu-team:not(.right) .mu-score { margin-left: auto; } .mu-team.right .mu-score { margin-right: auto; }
+.mu-exp-total { font-size: 14px; font-weight: 600; color: var(--muted); }
+.mu-gap { text-align: center; margin: -12px 0 8px; }
 
 /* lineup-change arrows: a lane left of your cards */
 .mu-grid { position: relative; }   /* holds the time lines */
