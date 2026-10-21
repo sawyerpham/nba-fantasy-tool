@@ -315,7 +315,8 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
                  for g in p["games"]]
         swing = swing_of(val.per_game_fpts) if val else swing_of([])
         status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
-        if status == "maybe":   # Sleeper can't tell yet: guess locked when it's the right call (beats waiting for his later games)
+        if status == "maybe" and not team.get("is_user"):   # rivals: Sleeper can't tell yet, so guess locked when it's
+            # the right call (beats waiting for his later games); your own locks you know (the ✓ / your answers)
             fp_then = next(g["fp"] for g in p["games"] if g["date"] == when)
             status = "guess" if fp_then >= wait_value([g for g in games if not g.started], swing, p["injury"]) else "maybe"
         locks[sid] = (status, when)
