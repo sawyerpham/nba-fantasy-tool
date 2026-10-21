@@ -62,6 +62,7 @@ def http_fetch(platform: Any) -> Fetch:
         data = None if resp.status_code == 404 else (resp.raise_for_status() or resp.json())
         _cache[url] = (time.monotonic(), data)
         return data
+    fetch.platform = platform   # week_view adds rostered players the pool left out from Sleeper's (cached) player list
     return fetch
 
 
@@ -187,6 +188,11 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
 
     by_sleeper = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
     rostered = {sid for t in teams for sid in t["players"]} | set(extra)
+    from ..core.services.sleeper_league import _add_sleeper_only
+    for sid in rostered - by_sleeper.keys():   # rostered but not in the pool (retired / FA at pull time): name, positions, status
+        rec = _add_sleeper_only(getattr(fetch, "platform", None), session, sid)
+        if rec:
+            by_sleeper[sid] = rec
     players = {}
     for sid in rostered:
         rec = by_sleeper.get(sid)
