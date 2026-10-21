@@ -305,13 +305,14 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const [other, setOther] = useState(null);
   const isMine = idx === mineIdx;
   const shown = isMine ? plan : other;
-  // Both teams show their best lineup at the timeline's time (default: now), each with its swap arrows. In the Sleeper
+  // Your side shows your best lineup at the timeline's time (default: now); rivals show their real Sleeper lineup.
+  // Each side's arrows are the moves from its Sleeper lineup to its best one. In the Sleeper
   // gap (data.sleeper_gap) the arrows hide and, at now, each side shows its Sleeper lineup as is.
   const [at, setAt] = useState(null);   // ms; null = follow the clock (so does the slider pushed into the past)
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
   const gap = data.sleeper_gap ? (atMs > nowMs ? "arrows" : "all") : null;
-  const me = bestLineup(shown, atMs, data.roster_positions, gap), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap);
+  const me = bestLineup(shown, atMs, data.roster_positions, gap, !isMine), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap, true);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -403,7 +404,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
 // everyone in the slot he should be in then, and the swaps from its Sleeper lineup as it is right now (so the arrows
 // are the moves you'd make in Sleeper from where you are, at any point of the timeline).
 // gap: "all" = Sleeper lineup as is, no arrows; "arrows" = best lineup, no arrows (they'd start from a stale lineup).
-function bestLineup(team, atMs, positions, gap) {
+// asIs (rivals): rows stay their real Sleeper lineup; the arrows still show the moves to the best one.
+function bestLineup(team, atMs, positions, gap, asIs) {
   const tl = team?.timeline, players = team?.players || [];
   const seg = tl?.segments[Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to)))];
   const seats = seg ? seg.seats : team?.today?.seats;
@@ -412,7 +414,7 @@ function bestLineup(team, atMs, positions, gap) {
   for (const [slot, sids] of Object.entries(seats)) for (const sid of sids) best[sid] = slot;
   const rows = players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") }));
   const slots = (rs) => Object.fromEntries(rs.map((r) => [r.sid, r.slot]));
-  return { seg, rows, pairs: gap ? [] : swapPairs(slots(players), slots(rows), positions) };
+  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapPairs(slots(players), slots(rows), positions) };
 }
 
 // Who replaces whom from lineup `before` to lineup `after` (sid -> slot): each player newly starting is paired with a
