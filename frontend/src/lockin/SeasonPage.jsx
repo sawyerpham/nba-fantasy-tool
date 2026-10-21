@@ -175,26 +175,30 @@ function RosterAlerts({ roster }) {
   );
 }
 
-// One card per game he has this week (so 3-4 at most): day, tip time, then his FP (-- before the game) with the
+// One card per game he has this week (so 3-4 at most): day, tip time, then his FP (— before the game) with the
 // projection small beside it; live, the projection turns green / red as his pace (backend live_estimate) beats it or not.
+// A game that can't be locked (or count any more) is crossed out: every game but the locked one once he's locked;
+// a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it).
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-function GameChips({ games, today, lockDate, day, lane, team }) {
+function GameChips({ games, today, lockDate, lockable, day, lane, team }) {
   const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
-  const chips = games.map((g) => {
+  const chips = games.map((g, i) => {
         const played = g.fp != null, live = g.state === "in";
+        const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
+        const dead = lockDate ? g.date !== lockDate : g.state === "post" && (later || !lockable);
         const m = findMatch(matches, g, team);
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
-        const tip = `${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? " · LOCKED" : ""}`;
+        const tip = `${g.beat != null && !lockDate ? `${Math.round(g.beat * 100)}% to score higher than ${fp(g.fp)} this week · ` : ""}${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? " · LOCKED" : dead ? " · can't be locked" : ""}`;
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
             onClick={href ? (e) => e.stopPropagation() : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""} ${href ? "watch" : ""}`}
+            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
-            <span className="gch-fp">{played ? fp(g.fp) : "--"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
+            <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </Tag>
         );
       });
@@ -272,12 +276,9 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
-        {mine && (
-          <span className="mu-call">
-            <div className="mu-exp" data-tip={EXP_TIP}><span className="bid-label">Exp</span><strong>{fp(r.value)}</strong></div>
-            {starter && r.lock_status === "locked" && <span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span>}
-          </span>
+        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={r.lock_status === "locked" ? r.lock_date : null} lockable={r.x != null} lane={lane} />
+        {mine && starter && r.lock_status === "locked" && (
+          <span className="mu-call"><span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span></span>
         )}
       </div>
     </div>

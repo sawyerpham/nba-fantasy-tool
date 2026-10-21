@@ -115,7 +115,7 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
 
 
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
-    from .weekplan import Game, live_estimate
+    from .weekplan import Game, beat_chance, live_estimate, swing_of
 
     lg = session.league
     if not lg.sleeper_league_id:
@@ -210,6 +210,13 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                 g["pace"] = round(live_estimate(Game(date=d, proj=g["proj"], fp=g["fp"], started=True, live=True, min=g["min"],
                                                      proj_min=g["proj_min"], period=g["period"], clock=g["clock"])), 2)
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
+        # each final game: the chance one of his unfinished games this week beats it (the chip's hover)
+        left = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre", live=g["state"] == "in",
+                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"]) for g in games if g["state"] != "post"]
+        swing = swing_of(val.per_game_fpts if val else [])
+        for g in games:
+            if g["state"] == "post" and g["fp"] is not None:
+                g["beat"] = round(beat_chance(g["fp"], left, swing, inj), 3)
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
                         "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games,
