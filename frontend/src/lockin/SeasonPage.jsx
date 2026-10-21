@@ -9,6 +9,7 @@ import PlayerSearch from "../core/PlayerSearch.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf, tzAbbr } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
+import { reseat, swapSteps } from "./swaps.js";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
@@ -420,33 +421,23 @@ function bestLineup(team, atMs, positions, gap, asIs) {
   if (!seats || gap === "all") return { seg, rows: players, pairs: [] };
   const best = {};
   for (const [slot, sids] of Object.entries(seats)) for (const sid of sids) best[sid] = slot;
-  const rows = players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") }));
-  const slots = (rs) => Object.fromEntries(rs.map((r) => [r.sid, r.slot]));
-  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapPairs(slots(players), slots(rows), positions) };
+  // the plan says who starts; reseat keeps everyone who already starts in his Sleeper slot, so the moves are fewest
+  const now = Object.fromEntries(players.map((r) => [r.sid, r.slot]));
+  const pos = Object.fromEntries(players.map((r) => [r.sid, r.pos || []]));
+  const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions);
+  const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
+  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos) };
 }
 
-// Who replaces whom from lineup `before` to lineup `after` (sid -> slot): each player newly starting is paired with a
-// player leaving the lineup, the one from the same slot when there is one. Moves between starting slots aren't swaps.
-const isStarter = (slot) => slot && slot !== "BN" && slot !== "IR";
-function swapPairs(before, after, positions) {
-  const ins = Object.keys(after).filter((sid) => isStarter(after[sid]) && !isStarter(before[sid]))
-    .sort((a, b) => positions.indexOf(after[a]) - positions.indexOf(after[b]));
-  const outs = Object.keys(before).filter((sid) => isStarter(before[sid]) && !isStarter(after[sid]));
-  return ins.flatMap((sid) => {
-    if (!outs.length) return [];
-    const k = outs.findIndex((o) => before[o] === after[sid]);
-    return [{ in: sid, out: outs.splice(k < 0 ? 0 : k, 1)[0], slot: after[sid] }];
-  });
-}
-
-// The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS):
-// joining the player going to the bench and the one taking his place (a head at both ends: they trade places), coloured by that slot's position. Measured from
-// the cards on screen; redrawn when the grid changes size.
+// The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS): one
+// per Sleeper swap (swapSteps), joining the two players who trade places (a head at both ends), numbered in the order
+// to make them and coloured by the starting slot it fills. Measured from the cards on screen; redrawn when the grid
+// changes size.
 const ARROW_GUTTER = 80;
 function SwapArrows({ pairs, side, names }) {
   const svgRef = React.useRef(null);
   const [lines, setLines] = useState([]);
-  const key = pairs.map((p) => `${p.out}>${p.in}`).join(",");
+  const key = pairs.map((p) => `${p.n}:${p.out}>${p.in}`).join(",");
   React.useLayoutEffect(() => {
     // the grid through our own svg: on mount the grid's ref isn't attached yet when this runs (children first)
     const grid = svgRef.current?.parentElement;
@@ -479,10 +470,12 @@ function SwapArrows({ pairs, side, names }) {
         const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
         return (
           <g key={`${l.out}>${l.in}`} style={{ color }}>
-            <title>{`${names(l.in)} takes the place of ${names(l.out)} at ${l.slot}`}</title>
+            <title>{`Step ${l.n}: swap ${names(l.in)} (${l.from}) and ${names(l.out)} (${l.to})`}</title>
             <path d={d} className="swap-path" />
             <polygon points={head(l.y1)} fill="currentColor" />
             <polygon points={head(l.y2)} fill="currentColor" />
+            {/* the step number on the line's middle; the right lane is mirrored, so flip the text back */}
+            <text className="swap-n" x={side === "right" ? -x : x} y={(l.y1 + l.y2) / 2} transform={side === "right" ? "scale(-1,1)" : undefined}>{l.n}</text>
           </g>
         );
       })}
