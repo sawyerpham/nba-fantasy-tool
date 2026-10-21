@@ -293,7 +293,7 @@ def _slot_counts(positions: list[str]) -> dict[str, int]:
 
 
 def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
-    from .weekplan import Game, PlanPlayer, swing_of
+    from .weekplan import Game, PlanPlayer, swing_of, wait_value
 
     positions = view["roster_positions"]
     slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
@@ -309,15 +309,19 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
             continue
         val = session.valuations.get(p["player_id"]) if p["player_id"] else None
         slot = "IR" if sid in team["reserve"] else slot_of.get(sid, "BN")
-        status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
-        locks[sid] = (status, when)
-        locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status == "locked" else None
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
                       live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
                       proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0))
                  for g in p["games"]]
+        swing = swing_of(val.per_game_fpts) if val else swing_of([])
+        status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
+        if status == "maybe":   # Sleeper can't tell yet: guess locked when it's the right call (beats waiting for his later games)
+            fp_then = next(g["fp"] for g in p["games"] if g["date"] == when)
+            status = "guess" if fp_then >= wait_value([g for g in games if not g.started], swing, p["injury"]) else "maybe"
+        locks[sid] = (status, when)
+        locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status in ("locked", "guess") else None
         out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
-                              swing=swing_of(val.per_game_fpts) if val else swing_of([]), injury=p["injury"]))
+                              swing=swing, injury=p["injury"]))
     return out, locks, side
 
 
@@ -414,7 +418,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "user": oteam.get("user"), "avatar": oteam.get("avatar"),
                "expected": oplan.expected,
-               "points": locked_points(oplayers), "locked": sum(1 for v in olocks.values() if v[0] == "locked"),
+               "points": locked_points(oplayers), "locked": sum(1 for v in olocks.values() if v[0] in ("locked", "guess")),
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
 
