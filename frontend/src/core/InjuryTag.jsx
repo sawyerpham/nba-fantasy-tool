@@ -1,6 +1,6 @@
 // Sleeper's injury tag -> [abbreviation, color class, meaning]: red = won't / likely won't play, yellow = unsure, green = likely plays.
 const INJ_TAG = {
-  Sus: ["SUS", "out", "suspended"], Suspended: ["SUS", "out", "suspended"], Out: ["O", "out", "out"], IR: ["O", "out", "out"],
+  Sus: ["SUS", "out", "suspended"], Suspended: ["SUS", "out", "suspended"], Out: ["OUT", "out", "out"], IR: ["OUT", "out", "out"],
   Doubtful: ["D", "out", "doubtful"], DTD: ["DTD", "", "day-to-day"], GTD: ["GTD", "", "game-time decision"],
   Questionable: ["Q", "", "questionable"], Probable: ["P", "ok", "probable"],
 };

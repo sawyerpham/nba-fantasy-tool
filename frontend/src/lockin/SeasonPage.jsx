@@ -354,6 +354,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const L = bySlot(me.rows, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(them.rows, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
+  const irRows = Math.max(L.ir.length, R.ir.length);
+  const allRows = L.lines.length + Math.max(L.bench.length, R.bench.length) + irRows;
   const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
@@ -386,7 +388,9 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
-      <div className="mu-grid with-arrows" ref={gridRef}>
+      {/* starters + bench fill the window; IR rows sit below the fold (scroll down), at the same row height */}
+      <div className="mu-scroll">
+      <div className="mu-grid with-arrows" ref={gridRef} style={irRows ? { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` } : undefined}>
         <SwapArrows pairs={me.pairs} side="left" names={(sid) => data.players[sid]?.name || sid} />
         <SwapArrows pairs={them.pairs} side="right" names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
@@ -394,7 +398,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         ))}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
-        {Array.from({ length: Math.max(L.ir.length, R.ir.length) }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
+        {Array.from({ length: irRows }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
+      </div>
       </div>
     </div>
   );
