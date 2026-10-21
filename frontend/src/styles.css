@@ -730,7 +730,7 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 /* compact matchup header: one line, arrows at the ends */
 .matchup { padding-top: 8px; padding-bottom: 10px; }
 .matchup .mu-head { display: flex; align-items: center; gap: 12px; padding: 0; margin-bottom: 8px; }
-.matchup .mu-team { flex: 1; display: flex; align-items: baseline; gap: 10px; min-width: 0; text-align: left; }
+.matchup .mu-team { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; }
 .matchup .mu-team.right { justify-content: flex-end; }
 .matchup .mc-name { font-size: 16px; } .matchup .mc-points { font-size: 26px; line-height: 1; }
 .matchup .mu-mid { flex-direction: row; gap: 8px; }
@@ -777,7 +777,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .verdict.off { opacity: 0.6; font-weight: 600; }
 .day-pick { align-items: center; }
 /* matchup header: each side's score at its centre end, its expected final small and grey just outside it */
-.mu-score { display: inline-flex; align-items: baseline; gap: 8px; }
+.mu-score { display: inline-flex; align-items: center; gap: 8px; }
 .mu-team:not(.right) .mu-score { margin-left: auto; } .mu-team.right .mu-score { margin-right: auto; }
 .mu-exp-total { font-size: 14px; font-weight: 600; color: var(--muted); }
 .mu-gap { text-align: center; margin: -12px 0 8px; }
