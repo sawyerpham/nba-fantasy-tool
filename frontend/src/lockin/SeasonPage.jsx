@@ -273,7 +273,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
         <div className="mu-who">
           <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
-          <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} ·<PosList list={r.pos} />
+          <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
             {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
