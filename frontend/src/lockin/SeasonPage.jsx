@@ -175,7 +175,8 @@ function RosterAlerts({ roster }) {
   );
 }
 
-// One card per game he has this week (so 3-4 at most): day, tip time, then FP once played or the projection.
+// One card per game he has this week (so 3-4 at most): day, tip time, then his FP (-- before the game) with the
+// projection small beside it; live, the projection turns green / red as his pace (backend live_estimate) beats it or not.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
 function GameChips({ games, today, lockDate, day, lane, team }) {
   const { list: matches } = useNBAMatches();
@@ -185,7 +186,7 @@ function GameChips({ games, today, lockDate, day, lane, team }) {
         const m = findMatch(matches, g, team);
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
-        const tip = `${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${played ? `${g.fp} FP in ${g.min} min` : live ? `live: ${g.detail}` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))} · projected ${fp(g.proj)} FP`}${lockDate === g.date ? " · LOCKED" : ""}${href ? " · ▶ opens streamed.pk" : ""}`;
+        const tip = `${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? " · LOCKED" : ""}`;
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
             onClick={href ? (e) => e.stopPropagation() : undefined}
@@ -193,7 +194,7 @@ function GameChips({ games, today, lockDate, day, lane, team }) {
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : "dim") : ""} ${href ? "watch" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
-            <span className="gch-fp">{played ? fp(g.fp) : <><span className="gch-proj">proj</span> {fp(g.proj)}</>}</span>
+            <span className="gch-fp">{played ? fp(g.fp) : "--"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </Tag>
         );
       });
@@ -281,7 +282,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : null} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
+        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={r.lock_status === "locked" ? r.lock_date : null} lane={lane} />
         {mine && (
           <span className="mu-call">
             {word && <span className={`verdict ${cls}`} data-tip={tip} data-testid={`call-${r.sid}`}>{word}</span>}
@@ -320,26 +321,28 @@ const WIN_TIP = "Chance to win the week: your counted/locked points + what your 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
 function WeekView({ data, plan, open, setLock, leagueId }) {
-  // Your side shows the best lineup at the timeline's time (default: now): everyone in the slot he should be in then,
-  // not his Sleeper slot. The timeline has one lineup per game day; locked players never move.
-  const [at, setAt] = useState(null);   // ms; null = follow the clock
-  const tl = plan.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
-  const atMs = Math.max(at ?? nowMs, nowMs);
-  const segIdx = tl ? Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to))) : -1;
-  const seg = tl?.segments[segIdx];
-  const seats = seg ? seg.seats : plan.today?.seats;
-  const best = {};
-  for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
-  const gridRef = React.useRef(null);
-  // The arrows show the changes from your Sleeper lineup as it is right now, at any point of the timeline (not from
-  // the previous check-in's planned lineup), so they're the moves you'd make in Sleeper from where you are.
-  const bestRows = seats ? plan.players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : plan.players;
-  const before = Object.fromEntries(plan.players.map((r) => [r.sid, r.slot]));
-  const pairs = seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
   const isMine = idx === mineIdx;
+  const shown = isMine ? plan : other;
+  // The left team shows the best lineup at the timeline's time (default: now): everyone in the slot he should be in
+  // then, not his Sleeper slot. The timeline has one lineup per game day; locked players never move.
+  const [at, setAt] = useState(null);   // ms; null = follow the clock
+  const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
+  const atMs = Math.max(at ?? nowMs, nowMs);
+  const segIdx = tl ? Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to))) : -1;
+  const seg = tl?.segments[segIdx];
+  const seats = seg ? seg.seats : shown?.today?.seats;
+  const best = {};
+  for (const [slot, sids] of Object.entries(seats || {})) for (const sid of sids) best[sid] = slot;
+  const gridRef = React.useRef(null);
+  // The arrows show the changes from the Sleeper lineup as it is right now, at any point of the timeline (not from
+  // the previous check-in's planned lineup), so they're the moves you'd make in Sleeper from where you are.
+  const players = shown?.players || [];
+  const bestRows = seats ? players.map((r) => ({ ...r, slot: best[r.sid] || (r.slot === "IR" ? "IR" : "BN") })) : players;
+  const before = Object.fromEntries(players.map((r) => [r.sid, r.slot]));
+  const pairs = seats ? swapPairs(before, Object.fromEntries(bestRows.map((r) => [r.sid, r.slot])), data.roster_positions) : [];
   useEffect(() => {
     if (isMine) { setOther(null); return; }
     const rid = data.matchups[idx]?.[0]?.roster_id;
@@ -366,7 +369,6 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     ro.observe(grid);
     return () => ro.disconnect();
   });
-  const shown = isMine ? plan : other;
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
   const nav = (
@@ -377,11 +379,10 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
   if (!shown) return <div className="panel matchup"><div className="mu-head">{nav}<div className="muted">Loading matchup {idx + 1} of {n}…</div></div></div>;
   const o = shown.opponent;
-  const L = bySlot(isMine ? bestRows : shown.players, data.roster_positions, data.reserve_slots);
+  const L = bySlot(bestRows, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(o.players, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
   const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
-  const lineMs = isMine ? atMs : nowMs;   // the slider only shows on your matchup
   const mode = MODE[shown.mode] || MODE.even;
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
@@ -393,7 +394,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   );
   return (
     <div className="panel matchup" data-testid="my-week">
-      {isMine && tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
+      {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} following={at == null} setAt={setAt} />}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         <div className="mu-team">
@@ -406,8 +407,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
           <span className={`verdict ${mode[0]}`} data-tip={mode[1]}>{shown.mode}</span>
           {shown.win_chance != null && <strong className="win-chance" data-tip={WIN_TIP}>{Math.round(shown.win_chance * 100)}% to win</strong>}
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
-          {isMine && (seg?.date || data.day) && (
-            <span className="lineup-day" data-tip="Your side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Move the timeline above to see the lineup for a later time.">
+          {(seg?.date || data.day) && (
+            <span className="lineup-day" data-tip="The left side is the best lineup for this day: set Sleeper to match. Start whoever plays, earliest tip first; slots nobody playing that day needs go by each player's next game. Move the timeline above to see the lineup for a later time.">
               Best lineup: <strong>{(seg?.date || data.day) === data.today ? "today" : dayName(seg?.date || data.day)}</strong>
             </span>
           )}
@@ -419,10 +420,10 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
         </div>
         <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
       </div>
-      <div className={`mu-grid ${isMine ? "with-arrows" : ""}`} ref={gridRef}>
-        {isMine && <SwapArrows pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />}
+      <div className="mu-grid with-arrows" ref={gridRef}>
+        <SwapArrows pairs={pairs} names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
-          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, lineMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
+          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}

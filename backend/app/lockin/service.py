@@ -115,6 +115,8 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
 
 
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
+    from .weekplan import Game, live_estimate
+
     lg = session.league
     if not lg.sleeper_league_id:
         raise ValueError("league is not linked to Sleeper (Settings)")
@@ -203,6 +205,10 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "min": round(float(st.get("sp") or 0) / 60, 1) if played else None,
                           "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
                           "period": tip.get("period", 0), "clock": tip.get("clock", 0.0)})
+            g = games[-1]
+            if g["state"] == "in" and played:   # where his game will likely finish (the chip colours his projection by it)
+                g["pace"] = round(live_estimate(Game(date=d, proj=g["proj"], fp=g["fp"], started=True, live=True, min=g["min"],
+                                                     proj_min=g["proj_min"], period=g["period"], clock=g["clock"])), 2)
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
@@ -405,7 +411,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                 reminders.append({"kind": "lock", "sid": q.sid, "name": q.name, "slot": q.seat, "by": nxt.tip,
                                   "alarm": _minus_minutes(nxt.tip, LOCK_REMINDER_MIN), "decision": "LOCK",
                                   "text": f"Lock {q.name} ({q.x:.1f}) in the {q.seat} slot before his next tip: {q.why}."})
-    timeline = week_timeline(players, counts, view, t.seats if t else None) if roster_id is None and view["dates"] else None
+    timeline = week_timeline(players, counts, view, t.seats if t else None) if view["dates"] else None
     out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)
     active = [q for q in players if q.slot != "IR"]
     healthy_ir = [q.name for q in players if q.slot == "IR" and q.injury not in out_now]
