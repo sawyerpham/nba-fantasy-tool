@@ -185,7 +185,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
   const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
-        const played = g.fp != null, live = g.state === "in";
+        // live: ESPN says in progress, or his stats are coming in before ESPN's state catches up; final only once ESPN says so
+        const played = g.fp != null, live = g.state === "in" || (played && g.state !== "post");
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : g.state === "post" && (later || !lockable);
         const m = findMatch(matches, g, team);
@@ -198,7 +199,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : lockDate === g.date || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
             data-tip={tip}>
-            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{played ? "final" : live ? "LIVE" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{live ? "LIVE" : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </Tag>
         );
