@@ -215,7 +215,7 @@ const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 // within a day the tips spread by the hour (4-12 px an hour, as much as fits); room left over spaces the days in
 // proportion to time. Too narrow even at 4 px an hour: the chips shrink (scale) down to 65%; narrower than that, xs is
 // null and the chips sit in a plain row (no time line).
-const CHIP_W = 86, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
+const CHIP_W = 112, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
 function laneXs(games, width) {   // games: [tip ms, game date] for every chip in the matchup
   const day = new Map(games);
   const tips = [...day.keys()].sort((a, b) => a - b);
@@ -519,11 +519,9 @@ function Timeline({ tl, nowMs, atMs, setAt }) {
       </div>
       <button className="tl-next" onClick={() => next && setAt(next)} disabled={!next} data-testid="next-check"
         data-tip="The next time the lineup changes: open Sleeper then and make every swap at once. Click to show that lineup.">
-        <span className="tl-next-label">Next check-in</span>
-        {next ? <>
-          <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
-          <span className="small muted">in {until}</span>
-        </> : <span className="small muted">none left this week</span>}
+        {/* two short lines, as tall as the timeline beside it */}
+        <span><span className="tl-next-label">Next check-in</span> <span className="small muted">{next ? `in ${until}` : "none left this week"}</span></span>
+        {next && <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>}
       </button>
     </div>
   );
