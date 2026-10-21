@@ -81,11 +81,11 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
               {data.team?.role && (() => {
                 const r = data.team.role;
                 return <span className={`role-tag ${r.star ? "star" : ""}`} data-testid="team-role"
-                  data-tip={`${r.label} on ${data.team.abbr}: ${r.fpg} projected FP/G, #${r.rank} on the team, ${Math.round(r.share * 100)}% of the top 8's production${r.vs ? `; ${r.star ? "next best" : "the #1 is"} ${r.vs.name} at ${r.vs.fpg}` : ""}. Based on Sleeper's projection, which includes usage and minutes.`}>
+                  data-tip={`#${r.rank} on ${data.team.abbr} at ${r.fpg} projected FP/G, ${Math.round(r.share * 100)}% of the top 8's production${r.vs ? `; ${r.star ? "next best" : "the #1 is"} ${r.vs.name} at ${r.vs.fpg}` : ""}. From Sleeper's projection (usage and minutes).`}>
                   {r.star ? "★ " : ""}{r.label}</span>;
               })()}
               {row?.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{row.pos_rank}</span>}
-              {row?.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={`Tier ${row.tier}: ${row.tier_left} of ${row.tier_size} still available. ${TERMS.tier[1]}`}>T{row.tier}</span>}
+              {row?.tier != null && <span className={`tier-cell ${row.tier_size >= 3 && row.tier_left <= 2 ? "last" : ""}`} style={tierHue(row.tier)} data-tip={`${row.tier_left} of ${row.tier_size} still available. ${TERMS.tier[1]}`}>T{row.tier}</span>}
             </span>
           )}
         </span>
@@ -201,7 +201,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
                 {list.map((m) => (
                   <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
                     onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
-                    title={`${m.name} · ${m.pos.join("/")} · ${m.fpg} FP/G${m.min ? ` · ${m.min} min` : ""}${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}`}>
+                    title={[m.pos.join("/"), m.min && `${m.min} min`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ")}>
                     <PosTag className="teammate-rank" text={m.depth || "—"} />
                     <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
                     <span className="teammate-name">{m.name}</span>
@@ -273,7 +273,7 @@ function DepthGrid({ grid, onSelectPlayer }) {
           {[0, 1, 2].map((i) => {
             const m = grid[pos]?.[i];
             return <td key={i} className={m ? `dg-cell ${m.is_self ? "self" : "clickable"}` : "muted"} onClick={() => m && !m.is_self && onSelectPlayer?.(m.player_id)}
-              data-tip={m ? `${m.name} · ${m.fpg} FP/G${m.drafted_by ? ` · ${m.drafted_by}` : ""}` : ""}>
+              data-tip={m ? `${m.fpg} FP/G${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}` : ""}>
               {m ? <><Headshot sleeperId={m.sleeper_id} name={m.name} size={22} /> <span className="dg-name">{m.name.split(" ")[0][0]}. {m.name.split(" ").slice(1).join(" ")}</span></> : "—"}
             </td>;
           })}

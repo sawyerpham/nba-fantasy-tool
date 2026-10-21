@@ -65,7 +65,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               data-testid={`rank-row-${r.player_id}`}
             >
               <td className="rank-cell">
-                {r.tier != null && <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} data-tip={`Tier ${r.tier}: ${r.tier_left} of ${r.tier_size} still available. ${TERMS.tier[1]}`}>T{r.tier}</span>}
+                {r.tier != null && <span className={`tier-cell ${r.tier_size >= 3 && r.tier_left <= 2 ? "last" : ""}`} style={tierHue(r.tier)} data-tip={`${r.tier_left} of ${r.tier_size} still available. ${TERMS.tier[1]}`}>T{r.tier}</span>}
                 {" "}<span className="rank-num muted">{r.rank}</span>
               </td>
               <td>
@@ -89,7 +89,7 @@ export default function RankingsTable({ rows, selectedId, onSelect, onBlock, liv
               </td>
               <td className="muted col-narrow-hide">{r.team_abbr || "FA"}</td>
               <td><PosList list={r.eligibility} />{(posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank) && <div className={`pos-rank ${posClass(posFilter ? r.pos_ranks[posFilter] : r.pos_rank)}`} data-tip={posFilter ? `Rank among every ${posFilter}-eligible player by Sleeper average draft position.` : TERMS.pos_rank[1]}>{posFilter ? r.pos_ranks[posFilter] : r.pos_rank}</div>}</td>
-              <td className="num" data-tip={r.proj_fpts != null ? `projected ${r.proj_fpts.toFixed(1)} · last season ${r.last_fpts.toFixed(1)}` : "no projection: last season only"}>
+              <td className="num" data-tip={r.proj_fpts != null ? `Sleeper projection · last season ${r.last_fpts.toFixed(1)}` : "No projection: last season's number"}>
                 <strong>{r.avg_fpts.toFixed(1)}</strong>
                 {(({ dir, n, diff }) => <span className={`trend ${dir}`} data-tip={n ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)} FP/G vs last season${r.fpg_reason && r.fpg_reason.reason !== "steady" ? ` · ${r.fpg_reason.reason}` : ""}` : ""}>{(dir === "up" ? "▲" : "▼").repeat(n)}</span>)(trend(r))}
               </td>

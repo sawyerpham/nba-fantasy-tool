@@ -75,10 +75,10 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
               <button
                 key={m.manager_id} type="button" className={`mgr-btn ${m.is_user ? "you" : ""}`}
                 disabled={busy || empty || tooMuch} onClick={() => record(m.manager_id)}
-                title={empty ? "enter a price first" : tooMuch ? `cap $${m.budget.max_bid}` : `${m.name} wins at $${n}`}
+                title={empty ? "enter a price first" : tooMuch ? `cap $${m.budget.max_bid}` : `wins at $${n}`}
                 data-testid={`pick-mgr-${m.manager_id}`}
               >
-                {m.name}<span className="mgr-max" data-testid={`pick-max-${m.manager_id}`} data-tip={`${m.name}'s cap: ${TERMS.cap[1]}`}>${m.budget.max_bid}</span>
+                {m.name}<span className="mgr-max" data-testid={`pick-max-${m.manager_id}`} data-tip={TERMS.cap[1]}>${m.budget.max_bid}</span>
               </button>
             );
           })}
