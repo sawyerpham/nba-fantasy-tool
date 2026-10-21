@@ -267,7 +267,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
   const starter = r.slot !== "BN" && r.slot !== "IR";
   const locked = r.lock_status === "locked" || r.lock_status === "guess";   // guess: Sleeper can't tell yet, the math says locked
   return (
-    <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
+    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${locked ? "done" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={42} />
