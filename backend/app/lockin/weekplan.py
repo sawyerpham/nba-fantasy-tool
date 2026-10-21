@@ -309,11 +309,34 @@ def live_estimate(g: Game) -> float | None:
     played = g.min or 0.0
     proj_rate = (g.proj or 0.0) / g.proj_min if g.proj_min else 0.0
     rate = (g.fp + proj_rate * PRIOR_MINUTES) / (played + PRIOR_MINUTES)
-    elapsed = min(GAME_SECONDS, (max(1, g.period) - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - g.clock)) if g.period else 0
-    left = max(0.0, (g.proj_min or played) * (1 - elapsed / GAME_SECONDS))
-    if g.period > 4:   # overtime: whatever he plays now is a bonus
-        left = 0.0
+    left = max(0.0, (g.proj_min or played) * _share_left(g))
     return g.fp + rate * left
+
+
+def _share_left(g: Game) -> float:
+    """Share of a live game still to play (0 in overtime: whatever he plays then is a bonus)."""
+    if g.period > 4:
+        return 0.0
+    elapsed = min(GAME_SECONDS, (max(1, g.period) - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - g.clock)) if g.period else 0
+    return 1 - elapsed / GAME_SECONDS
+
+
+def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> float:
+    """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(proj, proj × swing), played at his
+    PLAY_CHANCE (next game, later games); a live game centres on his pace, its spread shrinking with the time left.
+    ponytail: games taken as independent, so it runs a little high when hot / cold streaks carry over."""
+    nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
+    miss = 1.0
+    for i, g in enumerate(games):
+        if g.live:
+            mu = live_estimate(g) if g.fp is not None else max(0.0, g.proj or 0.0)
+            sd, p = mu * swing * _share_left(g), 1.0
+        else:
+            mu = max(0.0, g.proj or 0.0)
+            sd, p = mu * swing, nxt if i == 0 else later
+        hit = (1.0 if mu > score else 0.0) if sd <= 0 else 1 - _cdf((score - mu) / sd)
+        miss *= 1 - p * hit
+    return 1 - miss
 
 
 def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:

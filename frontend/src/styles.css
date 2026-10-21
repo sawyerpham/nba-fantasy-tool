@@ -697,12 +697,8 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .mu-id:hover { background: var(--primary-soft); } .mu-id:hover .mu-name { color: var(--primary); }
 .mu-who { flex: 1; min-width: 0; }
 .mu-name { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mu-exp { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; margin-left: auto; min-width: 44px; }
-.mu-exp strong { font-size: 17px; }
 .mu-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.mu-call { display: inline-flex; align-items: center; gap: 6px; min-width: 104px; justify-content: flex-end; margin-left: auto; }
-.mu-call + .mu-exp { margin-left: 0; }   /* your side: lock column, then Exp at the right edge like the opponent's */
-.chips-row { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+.mu-call { display: inline-flex; align-items: center; gap: 6px; min-width: 104px; justify-content: flex-end; margin-left: auto; }.chips-row { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .game-chip { display: inline-flex; flex-direction: column; align-items: center; min-width: 62px; padding: 2px 7px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); line-height: 1.2; }
 .gch-day { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; } .gch-time { font-weight: 500; }
 .gch-fp { font-size: 13.5px; font-weight: 600; color: var(--muted); }
@@ -711,6 +707,10 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .gch-exp { font-size: 0.55em; font-weight: 600; color: var(--muted); margin-left: 4px; }   /* expected FP beside the score */
 .gch-exp.up { color: var(--ok); } .gch-exp.down { color: var(--danger); }   /* live: on pace to beat it or not */
 .game-chip.today { border-color: var(--primary); }
+/* a game that can't be locked: a grey X corner to corner */
+.game-chip.dead { --x: color-mix(in srgb, var(--muted) 55%, transparent);
+  background-image: linear-gradient(to top right, transparent calc(50% - 1px), var(--x) calc(50% - 1px), var(--x) calc(50% + 1px), transparent calc(50% + 1px)),
+                    linear-gradient(to bottom right, transparent calc(50% - 1px), var(--x) calc(50% - 1px), var(--x) calc(50% + 1px), transparent calc(50% + 1px)); }
 .game-chip.live { border-color: var(--danger); } .game-chip.live .gch-time { color: var(--danger); font-weight: 800; }
 .game-chip.locked { border: 2px solid var(--ok); background: var(--good); }
 .team-col { display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
@@ -763,8 +763,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-id { width: 290px; }
 .mu-name { font-size: 17px; }
 .mu-who .small { font-size: 14px; }
-.mu-exp { min-width: 40px; } .mu-exp strong { font-size: 13px; } .mu-exp .bid-label { font-size: 9px; }
-.mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room until there's a call to show */ .mu-call .verdict { font-size: 13px; padding: 3px 9px; }
+.mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room (only a locked ✓ shows here) */
 .chips-row { gap: 8px; }
 .game-chip { min-width: 84px; padding: 3px 10px; border-radius: 9px; }
 .gch-day { font-size: 10.5px; } .gch-fp { font-size: 18px; }
