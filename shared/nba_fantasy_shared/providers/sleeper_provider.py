@@ -120,6 +120,7 @@ def fantasy_attributes_from_entry(entry: dict[str, Any]) -> FantasyAttributes:
         team_changed_at=_ms_epoch_to_datetime(entry.get("team_changed_at")),
         depth_chart_position=entry.get("depth_chart_position") or None,
         depth_chart_order=as_int(entry.get("depth_chart_order")),
+        number=as_int(entry.get("number")),
     )
 
 

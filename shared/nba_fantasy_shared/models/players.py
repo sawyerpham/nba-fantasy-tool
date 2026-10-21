@@ -91,6 +91,7 @@ class FantasyAttributes(BaseModel):
     team_changed_at: datetime | None = None
     depth_chart_position: str | None = None
     depth_chart_order: int | None = None
+    number: int | None = None            # jersey number
 
 
 class PlayerRecord(BaseModel):
