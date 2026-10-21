@@ -412,6 +412,10 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                                   "alarm": _minus_minutes(nxt.tip, LOCK_REMINDER_MIN), "decision": "LOCK",
                                   "text": f"Lock {q.name} ({q.x:.1f}) in the {q.seat} slot before his next tip: {q.why}."})
     timeline = week_timeline(players, counts, view, t.seats if t else None) if view["dates"] else None
+    if opp:   # their best lineup over the week too: the matchup draws their swap arrows, mirrored on the right
+        ot = plan_today(oplayers, counts, today) if today in view["dates"] else None
+        opp["today"] = {"date": today, "seats": ot.seats} if ot else None
+        opp["timeline"] = week_timeline(oplayers, counts, view, ot.seats if ot else None) if view["dates"] else None
     out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)
     active = [q for q in players if q.slot != "IR"]
     healthy_ir = [q.name for q in players if q.slot == "IR" and q.injury not in out_now]
