@@ -765,8 +765,8 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-who .small { font-size: 14px; }
 .mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room (only a locked ✓ shows here) */
 .chips-row { gap: 8px; }
-.game-chip { min-width: 84px; padding: 4px 6px; border-radius: 9px; }
-.gch-day { font-size: 15px; } .gch-fp { font-size: 28px; }
+.game-chip { min-width: 84px; padding: 3px 10px; border-radius: 9px; }
+.gch-day { font-size: 10.5px; } .gch-fp { font-size: 18px; }
 .mu-slot .pos-tag, .mu-slot span { font-size: 15px; font-weight: 800; }
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -789,7 +789,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .swap-arrows.right { left: auto; right: 0; transform: scaleX(-1); }   /* the rival's arrows: the left lane mirrored */
 /* your game chips as a timeline (x from laneXs) and the time line through them; the line sits under the chips */
 .chips-lane { position: relative; flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; }
-.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 112px; min-width: 0; box-sizing: border-box; transform-origin: left center; }
+.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 86px; min-width: 0; box-sizing: border-box; transform-origin: left center; }
 .chips-lane > .chips-row { flex-wrap: nowrap; }   /* too narrow for the timeline: one plain row, as before */
 .time-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary); opacity: 0.85; pointer-events: none; }
 /* fantasy teams: Sleeper avatar + team name (+ username); player nicknames on the cards */
