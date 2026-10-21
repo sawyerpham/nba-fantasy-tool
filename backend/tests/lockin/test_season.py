@@ -103,6 +103,24 @@ def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_worl
     assert r["ir_open"] == 1 and r["ir_candidates"] == ["c"]
 
 
+def test_a_counted_latest_game_is_guessed_locked_when_locking_beats_waiting(fixture_world):
+    from app.lockin.service import team_plan
+
+    s = make_session(fixture_world)
+    g = lambda d, fp=None, proj=10.0, st="pre": {"date": d, "proj": proj, "fp": fp, "state": st, "tip": None, "min": None}   # noqa: E731
+    pl = lambda sid, games: {"player_id": None, "name": sid, "team": "DEN", "pos": ["PG"], "injury": "healthy",   # noqa: E731
+                             "injury_note": "", "retired": False, "games": games}
+    view = {"today": "2026-10-21", "dates": [], "roster_positions": ["PG", "PG"], "reserve_slots": 0,
+            "matchups": [[{"roster_id": 1, "players_points": {"hot": 18.6, "cold": 4.0}}]],
+            "players": {"hot": pl("hot", [g("2026-10-20", 18.6, st="post"), g("2026-10-23")]),
+                        "cold": pl("cold", [g("2026-10-20", 4.0, st="post"), g("2026-10-23")])},
+            "teams": [{"roster_id": 1, "name": "me", "is_user": True, "players": ["hot", "cold"], "starters": ["hot", "cold"], "reserve": []}]}
+    out = {p["sid"]: p for p in team_plan(s, view)["players"]}
+    assert out["hot"]["lock_status"] == "guess" and out["hot"]["locked"] == 18.6   # 18.6 beats ~10 from his next game
+    assert out["cold"]["lock_status"] == "maybe" and out["cold"]["locked"] is None  # 4 doesn't: he'd wait
+    assert team_plan(s, view)["points"] == 18.6
+
+
 def test_news_merges_my_players_newest_first_and_flags_injuries():
     from app.lockin.service import season_news
 

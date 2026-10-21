@@ -180,7 +180,7 @@ function RosterAlerts({ roster }) {
 // A game that can't be locked (or count any more) is crossed out: every game but the locked one once he's locked;
 // a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it).
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-function GameChips({ games, today, lockDate, lockable, day, lane, team }) {
+function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, team }) {
   const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
@@ -190,7 +190,7 @@ function GameChips({ games, today, lockDate, lockable, day, lane, team }) {
         const m = findMatch(matches, g, team);
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
-        const tip = `${g.beat != null && !lockDate ? `${Math.round(g.beat * 100)}% to score higher than ${fp(g.fp)} this week · ` : ""}${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? " · LOCKED" : dead ? " · can't be locked" : ""}`;
+        const tip = `${g.beat != null && !lockDate ? `${Math.round(g.beat * 100)}% to score higher than ${fp(g.fp)} this week · ` : ""}${dayName(g.date)} ${md(g.date)} ${g.home ? "vs" : "@"} ${g.opp} · ${live ? `live: ${g.detail} · ${fp(g.fp ?? 0)} FP${g.pace != null ? `, on pace for ${fp(g.pace)}` : ""}` : played ? `${g.fp} FP in ${g.min} min` : `tips ${timeOf(g.tip)} ${tzAbbr(Date.parse(g.tip))}`} · exp ${fp(g.proj)} FP${lockDate === g.date ? (lockGuess ? " · LOCKED (a guess: Sleeper's API doesn't show locks, but locking it beats waiting, and his next game will confirm it)" : " · LOCKED") : dead ? " · can't be locked" : ""}`;
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
             onClick={href ? (e) => e.stopPropagation() : undefined}
@@ -265,6 +265,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const starter = r.slot !== "BN" && r.slot !== "IR";
+  const locked = r.lock_status === "locked" || r.lock_status === "guess";   // guess: Sleeper can't tell yet, the math says locked
   return (
     <div className={`mu-card ${side} ${starter ? "" : "bench"}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
@@ -276,8 +277,8 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip={`Nickname on Sleeper: ${p.nick}`}> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={r.lock_status === "locked" ? r.lock_date : null} lockable={r.x != null} lane={lane} />
-        {mine && starter && r.lock_status === "locked" && (
+        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} lane={lane} />
+        {mine && starter && locked && (
           <span className="mu-call"><span className="ok small clickable" data-tip="Locked. Click if that's wrong." onClick={() => setLock(r.sid, "")}> ✓</span></span>
         )}
       </div>
