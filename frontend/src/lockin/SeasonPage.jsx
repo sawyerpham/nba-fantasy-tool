@@ -9,7 +9,7 @@ import PlayerSearch from "../core/PlayerSearch.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
-import { reseat, swapSteps } from "./swaps.js";
+import { moveArrows, reseat } from "./swaps.js";
 
 // The in-season tab: your Lock-In week (matchup, week plan with LOCK / PASS calls, every player's games Mon-Sun),
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
@@ -418,7 +418,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
 }
 
 // A team's best lineup at `atMs` from its timeline (one lineup per check-in; locked players never move): rows with
-// everyone in the slot he should be in then, and the swaps from its Sleeper lineup as it is right now (so the arrows
+// everyone in the slot he should be in then, and the moves from its Sleeper lineup as it is right now (so the arrows
 // are the moves you'd make in Sleeper from where you are, at any point of the timeline).
 // gap: "all" = Sleeper lineup as is, no arrows; "arrows" = best lineup, no arrows (they'd start from a stale lineup).
 // asIs (rivals): rows stay their real Sleeper lineup; the arrows still show the moves to the best one.
@@ -434,18 +434,18 @@ function bestLineup(team, atMs, positions, gap, asIs) {
   const pos = Object.fromEntries(players.map((r) => [r.sid, r.pos || []]));
   const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions);
   const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
-  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos) };
+  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : moveArrows(now, after, !asIs) };
 }
 
 // The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS): one
-// per Sleeper swap (swapSteps), joining the two players who trade places (a head at both ends), numbered in the order
-// to make them and coloured by the starting slot it fills. Measured from the cards on screen; redrawn when the grid
-// changes size.
+// per player who moves (moveArrows), from the row of the slot he leaves to the row of the slot he takes, coloured by
+// that slot's position (grey: to the bench). A row both sends and receives in a chain, so arrows leave a row a little
+// above its middle and arrive a little below. Measured from the cards on screen; redrawn when the grid changes size.
 const ARROW_GUTTER = 80;
 function SwapArrows({ pairs, side, names }) {
   const svgRef = React.useRef(null);
   const [lines, setLines] = useState([]);
-  const key = pairs.map((p) => `${p.n}:${p.out}>${p.in}`).join(",");
+  const key = pairs.map((p) => `${p.sid}:${p.from}>${p.to}`).join(",");
   React.useLayoutEffect(() => {
     // the grid through our own svg: on mount the grid's ref isn't attached yet when this runs (children first)
     const grid = svgRef.current?.parentElement;
@@ -459,7 +459,8 @@ function SwapArrows({ pairs, side, names }) {
         return r.top + r.height / 2 - top;
       };
       // shortest arrows nearest the cards, longest outside: nested lines cross as little as possible
-      setLines(pairs.map((p) => ({ ...p, y1: mid(p.out), y2: mid(p.in) })).filter((l) => l.y1 != null && l.y2 != null)
+      setLines(pairs.map((p) => ({ ...p, a: mid(p.from), b: mid(p.to) })).filter((l) => l.a != null && l.b != null)
+        .map((l) => ({ ...l, y1: l.a - 5, y2: l.b + 5 }))
         .sort((a, b) => Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2)));
     };
     measure();
@@ -473,20 +474,13 @@ function SwapArrows({ pairs, side, names }) {
     <svg ref={svgRef} className={`swap-arrows ${side}`} width={ARROW_GUTTER} data-testid={`swap-arrows-${side}`}>
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
-        const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
-        // the vertical run breaks around the step number (mid ± gap), so the line never crosses it
-        const mid = (l.y1 + l.y2) / 2, gap = 10;
-        const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${mid - dir * gap} `
-          + `M ${x} ${mid + dir * gap} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
-        const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
+        const color = l.slot === "BN" ? "var(--muted)" : `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
+        const d = `M ${end} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
         return (
-          <g key={`${l.out}>${l.in}`} style={{ color }}>
-            <title>{`Swap ${names(l.in)} (${l.from}) and ${names(l.out)} (${l.to})`}</title>
+          <g key={l.sid} style={{ color }}>
+            <title>{`${names(l.sid)}: ${l.was} → ${l.slot}`}</title>
             <path d={d} className="swap-path" />
-            <polygon points={head(l.y1)} fill="currentColor" />
-            <polygon points={head(l.y2)} fill="currentColor" />
-            {/* the step number on the line's middle; the right lane is mirrored, so flip the text back */}
-            <text className="swap-n" x={side === "right" ? -x : x} y={mid} transform={side === "right" ? "scale(-1,1)" : undefined}>{l.n}</text>
+            <polygon points={`${end - 6},${l.y2 - 5} ${end + 1},${l.y2} ${end - 6},${l.y2 + 5}`} fill="currentColor" />
           </g>
         );
       })}

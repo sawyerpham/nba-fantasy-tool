@@ -1,4 +1,4 @@
-// Lineup changes as Sleeper swaps (plain JS, no JSX, so `node src/lockin/swaps.check.mjs` can run it).
+// Lineup changes for the move arrows (plain JS, no JSX, so `node src/lockin/swaps.check.mjs` can run it).
 
 // Can a player with positions `pos` sit in `slot`? (Sleeper NBA slots: the positions, G, F, UTIL, BN.)
 export const fits = (pos, slot) => slot === "BN" || slot === "UTIL" ? true : slot === "G" ? pos.some((p) => p === "PG" || p === "SG")
@@ -37,30 +37,23 @@ export function reseat(before, after, pos, positions) {
   return out;
 }
 
-// The moves from lineup `before` to `after` (sid -> slot) as Sleeper swaps, in order: each step trades two players'
-// slots and only ever puts a player in a slot he can play, so following them one by one reaches `after` (e.g. Sabonis
-// BN <-> Wiggins PF, then Wiggins BN <-> Coward SG; doing it as "Sabonis for Coward" isn't possible: Coward can't play
-// PF). Bench players go first; a swap that settles both players beats one that settles one. IR never moves here.
-// step: { in, out: the two players trading places, slot: the starting slot it fills, n: its order, from / to: in's
-// slot before and after the swap }
-export function swapSteps(before, after, pos) {
-  const cur = { ...before }, steps = [];
-  const open = (sid) => cur[sid] !== after[sid] && cur[sid] !== "IR" && after[sid] !== "IR";
-  for (let guard = 0; guard < 60; guard++) {
-    // the player the last swap moved goes next (a chain's steps stay together), then bench players
-    const last = steps.at(-1)?.out;
-    const todo = Object.keys(cur).filter(open).sort((a, b) => (b === last) - (a === last) || (cur[b] === "BN") - (cur[a] === "BN"));
-    let done = false;
-    for (const p of todo) {
-      const qs = Object.keys(cur).filter((q) => q !== p && open(q) && cur[q] === after[p] && fits(pos[q] || [], cur[p]));
-      const q = qs.find((x) => after[x] === cur[p]) || qs[0];
-      if (!q) continue;
-      steps.push({ in: p, out: q, slot: after[p] === "BN" ? cur[p] : after[p], n: steps.length + 1, from: cur[p], to: cur[q] });
-      [cur[p], cur[q]] = [cur[q], cur[p]];
-      done = true;
-      break;
-    }
-    if (!done) break;   // ponytail: a move into an empty starting slot (no one to trade with) isn't drawn
+// One arrow per player who changes slot from lineup `before` to `after` (sid -> slot): from the row of the slot he
+// leaves to the row of the slot he takes. A slot's row is the player shown in it: with the `before` lineup on screen
+// that's whoever holds the slot now (and leaves it); with `after` on screen, whoever takes it. Leavers and takers of
+// each slot are paired in order, so a chain draws as a loop (Kyrie -> DeRozan's SG row, DeRozan -> Nesmith's SF row,
+// Nesmith -> Kyrie's bench row). No order to follow: every move lands in a slot he can play (reseat), and Sleeper takes
+// them in whatever order works. IR never moves here.
+// ponytail: a move into an empty slot (no one leaving it) has no row to point at and isn't drawn.
+// move: { sid, from: row sid, to: row sid, was: his slot now, slot: his slot after }
+export function moveArrows(before, after, shownAfter) {
+  const moving = Object.keys(before).filter((s) => before[s] !== after[s] && before[s] !== "IR" && after[s] !== "IR");
+  const leaver = {}, taker = {};   // sid -> his partner in the slot he leaves / takes
+  for (const slot of new Set(moving.flatMap((s) => [before[s], after[s]]))) {
+    const out = moving.filter((s) => before[s] === slot), inn = moving.filter((s) => after[s] === slot);
+    out.forEach((s, i) => { if (inn[i]) { taker[s] = inn[i]; leaver[inn[i]] = s; } });
   }
-  return steps;
+  return moving.flatMap((sid) => {
+    const from = shownAfter ? taker[sid] : sid, to = shownAfter ? sid : leaver[sid];
+    return from && to ? [{ sid, from, to, was: before[sid], slot: after[sid] }] : [];
+  });
 }
