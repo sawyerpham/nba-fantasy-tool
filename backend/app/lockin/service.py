@@ -411,8 +411,8 @@ def locked_points(players) -> float:
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
     opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
-    from .weekplan import (_minus_minutes, decide_by_win_chance, plan_today, plan_week, scenario_total, swap_win_chance,
-                           team_total, win_chance)
+    from .weekplan import (_minus_minutes, decide_by_win_chance, lock_slots, plan_today, plan_week, scenario_total,
+                           swap_win_chance, team_total, win_chance)
 
     team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
     if team is None:
@@ -441,6 +441,9 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
 
+    for q in players:   # every lockable game: which slot to lock him in (the one leaving the rest of the lineup most)
+        if q.seat and q.x is not None and q.locked is None:
+            q.lock_at = lock_slots(q, players, counts)
     today = view.get("day", view["today"])
     t = plan_today(players, counts, today) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
@@ -493,7 +496,8 @@ def _player_out(q, locks: dict) -> dict:
             "lock_status": status, "lock_date": when, "action": q.action, "why": q.why, "injury": q.injury,
             "win_lock": round(q.win_lock, 3) if q.win_lock is not None else None,
             "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None,
-            "slot_w": round(q.slot_w, 2) if q.slot_w is not None else None, "slot_from": [list(d) for d in q.slot_from]}
+            "slot_w": round(q.slot_w, 2) if q.slot_w is not None else None, "slot_from": [list(d) for d in q.slot_from],
+            "lock_at": q.lock_at}
 
 
 # ---- one player's season page --------------------------------------------------------------------------

@@ -278,3 +278,18 @@ def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
     rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
     fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
     assert rested < fresh and rested == pytest.approx(15.0 * 0.97 * 0.85)   # sitting the final game leaves 0
+
+
+def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
+    from app.lockin.weekplan import lock_slots
+
+    # Sabonis can lock at PF or C; two C-only players need both C slots, while a forward could take the PF slot
+    sab = pp("sabonis", ["PF", "C"], "PF", [], x=14.9, value=15.0, seat="PF")
+    c1 = pp("kessler", ["C"], "C", [], value=13.0, seat="C")
+    c2 = pp("okongwu", ["C"], "BN", [], value=11.0)
+    f = pp("watson", ["SF", "PF"], "BN", [], value=9.0)
+    slots = {"PF": 1, "C": 2}
+    best = lock_slots(sab, [sab, c1, c2, f], slots)
+    assert [o["slot"] for o in best] == ["PF", "C"]       # at C he'd push Okongwu out (11) for Watson's PF (9)
+    assert best[0]["team"] - best[1]["team"] == pytest.approx(2.0)
+    assert sab.slot == "PF" and c2.slot == "BN"           # the lineup it tried is undone

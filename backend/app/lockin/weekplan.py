@@ -86,6 +86,7 @@ class PlanPlayer:
     win_wait: float | None = None
     slot_w: float | None = None     # a lockable starter's slot left open: what it can still get (open_slot)
     slot_from: list = field(default_factory=list)   # [(date, player name)]: whose game it would take each day
+    lock_at: list = field(default_factory=list)     # where to lock him: lock_slots, best first
 
 
 @dataclass
@@ -143,6 +144,30 @@ def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
         p = play_chance(remaining[i], injury, i == 0)
         v = p * (mu if i == len(remaining) - 1 else expected_max(mu, mu * swing, v)) + (1 - p) * v
     return v
+
+
+def lock_slots(p: PlanPlayer, players: list[PlanPlayer], slot_counts: dict[str, int]) -> list[dict]:
+    """Where to lock him (a lock freezes him in that slot for the week): for every starting slot he can play, the value
+    the rest of the lineup can still reach with him locked there (everyone else seated around him by value, sliding
+    multi-position players: seat_players), and how many other players could use that slot. Best first.
+    [{slot, team: value of the other slots, others: other unlocked players who can play it, open: free slots left}]"""
+    saved = {id(q): (q.seat, q.slot) for q in players}
+    locked = [q for q in players if q.locked is not None and q.slot in slot_counts]
+    others = sorted((q for q in players if q is not p and q.locked is None and q.slot != "IR" and q.value > 0),
+                    key=lambda q: -q.value)
+    out = []
+    for s in roster.candidate_slots(p.eligibility):
+        if s not in slot_counts or sum(q.slot == s for q in locked) >= slot_counts[s]:
+            continue
+        p.slot = s
+        seats = seat_players(others, slot_counts, locked + [p])
+        out.append({"slot": s, "team": round(sum(q.value for ss in seats.values() for q in ss if q in others), 2),
+                    "others": sum(1 for q in others if s in roster.candidate_slots(q.eligibility)),
+                    "open": slot_counts[s] - 1 - sum(q.slot == s for q in locked)})
+        p.slot = saved[id(p)][1]
+    for q in players:
+        q.seat, q.slot = saved[id(q)]
+    return sorted(out, key=lambda o: (-o["team"], o["slot"] != p.slot))   # a tie: where he already sits (no move)
 
 
 def seat_players(order: list[PlanPlayer], slot_counts: dict[str, int], pinned=()) -> dict[str, list[PlanPlayer]]:

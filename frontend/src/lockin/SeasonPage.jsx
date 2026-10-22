@@ -253,6 +253,15 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
                 <div className="guide-lock-top"><strong>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
                 <div className="small muted">Open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
                 {r.win_lock != null && <div className="small muted">Win % locked <span className="guide-hi">{pct(r.win_lock)}</span> · open <span className="guide-hi">{pct(r.win_wait)}</span></div>}
+                {r.lock_at?.length > 0 && (() => {
+                  // which slot to lock him in: the rest of the lineup's value with him locked in each slot he can play
+                  const [best, ...rest] = r.lock_at;
+                  const diff = rest.filter((o) => best.team - o.team >= 0.05);
+                  const detail = r.lock_at.map((o) => `${o.slot}: ${o.open} slot${o.open === 1 ? "" : "s"} left, ${o.others} others can play it`).join(" · ");
+                  return <div className="small muted" data-tip={detail}>Lock slot <span className="guide-hi">{best.slot}</span>
+                    {r.slot !== best.slot ? ` (now ${r.slot})` : ""}
+                    {diff.length ? ` · ${diff.map((o) => `${o.slot} −${fp(best.team - o.team)}`).join(", ")}` : rest.length ? ` · ${rest.map((o) => o.slot).join(", ")} the same` : " · only option"}</div>;
+                })()}
                 {tip && <div className="small muted">Next tip {when(tip)}</div>}
               </div>
               <div className="guide-lock-side"><span className="guide-lock-x">{fp(r.x)}</span>
