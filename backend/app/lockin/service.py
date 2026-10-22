@@ -427,7 +427,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     mode, chance, theirs, outlook = "even", None, None, None
     if other:
         oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
-        oplayers, olocks, _ = _plan_players(session, view, oteam, {})
+        oplayers, olocks, _ = _plan_players(session, view, oteam, manual or {})   # your answers about their locks too
         oplan = plan_week(oplayers, counts)
         theirs = team_total(oplayers)
         chance = decide_by_win_chance(players, theirs)   # LOCK / PASS by the chance to win, not expected points
