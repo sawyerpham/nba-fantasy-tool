@@ -135,6 +135,10 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     weeks = week_dates(schedule)
     week = week or current_week(weeks, today)
     dates = weeks.get(week, [])
+    # every (date, team) with a game all season: a game is the second night of a back-to-back when his team also
+    # played the day before (Monday's look back into last week too)
+    played_on = {(g["date"], g[side]["team"]) for g in schedule for side in ("home", "away")}
+    b2b = lambda d, team: ((date.fromisoformat(d) - timedelta(days=1)).isoformat(), team) in played_on   # noqa: E731
     plays = {}   # (date, team) -> opponent, from Sleeper's schedule
     for g in schedule:
         if int(g["week"]) == week:
@@ -219,6 +223,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
                           "period": tip.get("period", 0), "clock": tip.get("clock", 0.0),
                           "score": tip.get("score"), "opp_score": tip.get("opp_score"),   # the game's score (live or final)
+                          "b2b": b2b(d, team),
                           # his box score (live games too), for the game card's hover
                           "box": {k: int(st.get(k) or 0) for k in BOX_KEYS} if played else None})
             g = games[-1]
@@ -228,7 +233,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
         # each final game: the chance one of his unfinished games this week beats it (the chip's hover)
         left = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre", live=g["state"] == "in",
-                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"]) for g in games if g["state"] != "post"]
+                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"], b2b=g["b2b"]) for g in games if g["state"] != "post"]
         swing = swing_of(val.per_game_fpts if val else [])
         for g in games:
             if g["state"] == "post" and g["fp"] is not None:
@@ -318,7 +323,7 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
         slot = "IR" if sid in team["reserve"] else slot_of.get(sid, "BN")
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
                       live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
-                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0))
+                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False))
                  for g in p["games"]]
         swing = swing_of(val.per_game_fpts) if val else swing_of([])
         status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
