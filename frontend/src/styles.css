@@ -503,7 +503,7 @@ button:not(:disabled), .clickable, .clickable-name, .room-slot-player, .live-lot
 header.top .brand { cursor: pointer; }
 .tip { position: fixed; z-index: 100; transform: translateX(-50%); max-width: 320px; width: max-content; padding: 8px 11px; border-radius: 10px;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 13px; font-weight: 500;
-  line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: normal; text-align: left; pointer-events: none; }
+  line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: pre-line; text-align: left; pointer-events: none; }   /* pre-line: a tip's \n starts a new line */
 .tip.up { transform: translate(-50%, -100%); }
 .call-buy { color: var(--ok); } .call-star { color: var(--even-t); } .call-pricey, .call-cannot { color: var(--danger); }
 
