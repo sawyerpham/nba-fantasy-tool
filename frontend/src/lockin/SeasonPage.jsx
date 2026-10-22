@@ -151,8 +151,71 @@ export default function SeasonPage({ leagueId }) {
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
       <aside className="season-side">
-        <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
+        {selected
+          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
+          : <LockinGuide data={data} plan={plan} />}
       </aside>
+    </div>
+  );
+}
+
+// The right side when no player is open: your week's Lock-In to-do list, from the plan. The swaps now (Sleeper lineup ->
+// best lineup now), the next check-in and its swaps, the LOCK calls, tonight's swap checks and injury checks.
+function LockinGuide({ data, plan }) {
+  const nowMs = data.now ? Date.parse(data.now) : Date.now();
+  const gamesOf = Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games]));
+  const name = (sid) => data.players[sid]?.name || sid;
+  const when = (t) => fmt(t, { weekday: "short", hour: "numeric", minute: "2-digit" });
+  const slots = (rows) => Object.fromEntries(rows.map((r) => [r.sid, r.slot]));
+  const posOf = Object.fromEntries(plan.players.map((r) => [r.sid, r.pos || []]));
+  const now = bestLineup(plan, nowMs, data.roster_positions, data.sleeper_gap ? "arrows" : null, false, gamesOf);
+  const next = plan.timeline?.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
+  const then = next ? bestLineup(plan, next + 1, data.roster_positions, null, false, gamesOf) : null;
+  const thenSteps = then ? swapSteps(slots(now.rows), slots(then.rows), posOf) : [];
+  const watch = plan.today?.watch || [];
+  const lockBy = Object.fromEntries(watch.filter((w) => w.kind === "lock").map((w) => [w.sid, w.by]));
+  const locks = plan.players.filter((r) => r.action === "LOCK" && r.lock_status !== "locked");
+  const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
+  const steps = (list) => (
+    <ol>{list.map((s) => <li key={s.n}>Swap <strong>{name(s.in)}</strong> <span className="muted">({s.from})</span> ↔ <strong>{name(s.out)}</strong> <span className="muted">({s.to})</span></li>)}</ol>
+  );
+  return (
+    <div className="panel scroll guide" data-testid="lockin-guide">
+      <h3>Lock-In guide</h3>
+      <h4>Do now</h4>
+      {data.sleeper_gap ? <div className="small muted">Sleeper still shows the day that just ended; check back once it rolls over.</div>
+        : now.pairs.length ? steps(now.pairs) : <div className="small muted">Lineup is set: nothing to change in Sleeper.</div>}
+      {next && <>
+        <h4>Next check-in · {when(next)}</h4>
+        {thenSteps.length ? steps(thenSteps) : <div className="small muted">No swaps then.</div>}
+      </>}
+      {locks.length > 0 && <>
+        <h4>Locks</h4>
+        <ul>{locks.map((r) => (
+          <li key={r.sid}><span className="verdict good">LOCK</span> <strong>{r.name}</strong> {fp(r.x)} at {r.seat}
+            <div className="small muted">{lockBy[r.sid] ? `before ${when(lockBy[r.sid])} · ` : ""}{Math.round((r.win_lock ?? 0) * 100)}% to win locked, {Math.round((r.win_wait ?? 0) * 100)}% waiting</div></li>
+        ))}</ul>
+      </>}
+      {swaps.length > 0 && <>
+        <h4>Tonight's swap checks</h4>
+        <ul>{swaps.map((w) => (
+          <li key={w.backup_sid}><span className={`verdict ${w.decision === "SWAP" ? "bad" : w.decision === "KEEP" ? "good" : ""}`}>{w.decision}</span> {when(w.alarm)}: <strong>{w.backup}</strong> for {w.name}
+            <div className="small muted">{w.text}</div></li>
+        ))}</ul>
+      </>}
+      {injuries.length > 0 && <>
+        <h4>Injury checks</h4>
+        <ul>{injuries.map((w) => <li key={`${w.kind}-${w.sid}`} className="small">{w.text}</li>)}</ul>
+      </>}
+      <details className="small">
+        <summary><h4>How Lock-In works</h4></summary>
+        <ul className="muted">
+          <li>Each starting slot scores one game a week: the latest game of whoever is in it.</li>
+          <li>Lock a game right after it ends to keep it; the player then stays in that slot all week.</li>
+          <li>Not locked, his next game replaces it, better or worse. Lock when the score beats what his later games are likely to give.</li>
+          <li>Bench players' games don't count, and a bench player can't come in once his game has started.</li>
+        </ul>
+      </details>
     </div>
   );
 }
