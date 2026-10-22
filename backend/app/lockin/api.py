@@ -38,7 +38,7 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
     session = _session(state, league_id)
     try:
         view = week_view(session, _fetch(state), week, today)
-        manual = read_locks(state.store, league_id, view["week"]) if not roster_id else {}
+        manual = read_locks(state.store, league_id, view["week"])   # your answers, any team's player (rivals too)
         return team_plan(session, view, roster_id, manual)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

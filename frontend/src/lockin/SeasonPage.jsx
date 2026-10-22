@@ -153,7 +153,7 @@ export default function SeasonPage({ leagueId }) {
       <aside className="season-side">
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
-          : <LockinGuide data={data} plan={plan} leagueId={leagueId} />}
+          : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} />}
       </aside>
     </div>
   );
@@ -169,7 +169,7 @@ export default function SeasonPage({ leagueId }) {
 //   Swap windows, Injury watch - tonight's live-vs-later comparisons and questionable / out starters.
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 const lastName = (n) => n.split(" ").slice(1).join(" ") || n;
-function LockinGuide({ data, plan, leagueId }) {
+function LockinGuide({ data, plan, leagueId, setLock }) {
   const [rid, setRid] = useState(plan.roster_id);
   const [other, setOther] = useState(null);
   const mine = rid === plan.roster_id;
@@ -201,8 +201,13 @@ function LockinGuide({ data, plan, leagueId }) {
   const odds = out ? [["Lock all now", out.safe], ["Leave all open", out.risky], ["Plan mix", p.win_chance]] : [];
   const top = Math.max(...odds.map(([, v]) => v ?? 0));
   const signed = (x) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}`;
+  // a guessed lock (?) can be answered here: ✓ locked / ✕ not locked (saved like your own lock answers)
   const chip = (r, value, guess) => (
-    <span key={r.sid} className="guide-chip"><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)} <strong>{value}{guess ? "?" : ""}</strong></span>
+    <span key={r.sid} className="guide-chip"><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)} <strong>{value}{guess ? "?" : ""}</strong>
+      {guess && setLock && <>
+        <button className="chip-btn" onClick={() => setLock(r.sid, r.lock_date)} data-tip="He locked it">✓</button>
+        <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked">✕</button>
+      </>}</span>
   );
   const side = (t, label) => (
     <div className="hub-side">
