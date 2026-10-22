@@ -119,6 +119,9 @@ def test_a_counted_latest_game_is_guessed_locked_when_locking_beats_waiting(fixt
     assert out["hot"]["lock_status"] == "guess" and out["hot"]["locked"] == 18.6   # 18.6 beats ~10 from his next game
     assert out["cold"]["lock_status"] == "maybe" and out["cold"]["locked"] is None  # 4 doesn't: he'd wait
     assert team_plan(s, view, roster_id=1)["points"] == 18.6
+    view["players"]["hot"]["games"][0]["state"] = "in"   # still playing: can't be locked yet, so no guess
+    assert {p["sid"]: p["lock_status"] for p in team_plan(s, view, roster_id=1)["players"]}["hot"] == "maybe"
+    view["players"]["hot"]["games"][0]["state"] = "post"
     view["teams"][0]["is_user"] = True   # your own team: no guessing, you know what you locked
     assert team_plan(s, view)["points"] == 0
 
