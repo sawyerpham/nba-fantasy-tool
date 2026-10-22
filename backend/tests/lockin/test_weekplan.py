@@ -138,6 +138,28 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
         assert w["decision"] == want, (fp_now, w)
 
 
+def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one_with_weaker_later_games():
+    from app.lockin.weekplan import plan_today
+
+    # Wiggins: 4.1 with 6 min left in Q4 but good later games; Grant: 6.0 late in Q3, weak later games.
+    # Benching either gives up only tonight's game, so the one headed lower (Wiggins) sits for Sabonis.
+    today = "2026-10-21"
+    wig = pp("wiggins", ["SF", "PF"], "PF", [Game(today, 8.5, fp=4.1, started=True, live=True, tip="2026-10-21T23:30Z",
+                                                  min=30, proj_min=32, period=4, clock=360)] + future(8.3, 8.0))
+    grant = pp("grant", ["SF", "PF"], "PF", [Game(today, 5.4, fp=6.0, started=True, live=True, tip="2026-10-22T00:00Z",
+                                                  min=22, proj_min=30, period=3, clock=78)] + future(5.6, 6.2))
+    sab = pp("sabonis", ["PF", "C"], "BN", [Game(today, 13.7, tip="2026-10-22T02:30Z", proj_min=34)] + future(14.0))
+    players, pf = [wig, grant, sab], {"PF": 2}
+    plan_week(players, pf)
+    w = next(x for x in plan_today(players, pf, today).watch if x["kind"] == "swap")
+    assert (w["decision"], w["name"], w["backup"]) == ("SWAP", "wiggins", "sabonis")
+
+    for g in wig.games[:1] + grant.games[:1]:   # the timeline's check after their games: free to move, same scores
+        g.live = False
+    plan_week(players, pf)
+    assert sorted(plan_today(players, pf, today).seats["PF"]) == ["grant", "sabonis"]
+
+
 def test_a_day_without_games_seats_by_next_tip():
     from app.lockin.weekplan import plan_today
 
