@@ -9,10 +9,11 @@ export const fits = (pos, slot) => slot === "BN" || slot === "UTIL" ? true : slo
 // (breadth-first: Kyrie in at SG with DeRozan sliding SG -> SF beats Kyrie at PG pushing Haliburton to SG pushing
 // DeRozan to SF). The plan only decides who starts; which slots is ours to pick. Bench / IR untouched.
 // positions: the league's roster slots ("PG", "PG", ..., "BN", "IR").
-export function reseat(before, after, pos, positions) {
+// fixed: players Sleeper won't move (locked in, or his game is under way): they stay in their slot and are never bumped.
+export function reseat(before, after, pos, positions, fixed = new Set()) {
   const seats = positions.filter((s) => s !== "BN" && s !== "IR"), who = Array(seats.length).fill(null);
   const starts = (slot) => slot && slot !== "BN" && slot !== "IR";
-  const starters = Object.keys(after).filter((sid) => starts(after[sid]));
+  const starters = [...new Set([...Object.keys(after).filter((sid) => starts(after[sid])), ...[...fixed].filter((s) => starts(before[s]))])];
   for (const sid of starters.filter((s) => starts(before[s]))) {   // stay put
     const i = seats.findIndex((t, k) => t === before[sid] && who[k] == null);
     if (i >= 0) who[i] = sid;
@@ -27,12 +28,14 @@ export function reseat(before, after, pos, positions) {
         who[k] = sid;
         return true;
       }
+      if (fixed.has(who[k])) continue;   // he can't slide anywhere
       for (const j of seatsFor(who[k])) if (!prev.has(j)) { prev.set(j, k); queue.push(j); }
     }
     return false;
   };
   for (const sid of starters.filter((s) => !who.includes(s))) if (!place(sid)) return after;   // can't: keep the plan's
   const out = { ...after };
+  for (const sid of fixed) if (!starts(before[sid])) out[sid] = before[sid];   // a fixed bench / IR player stays there too
   who.forEach((sid, k) => { if (sid) out[sid] = seats[k]; });
   return out;
 }
