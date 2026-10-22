@@ -328,7 +328,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
   const gap = data.sleeper_gap ? (atMs > nowMs ? "arrows" : "all") : null;
-  const me = bestLineup(shown, atMs, data.roster_positions, gap, !isMine), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap, true);
+  const gamesOf = Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games]));
+  const me = bestLineup(shown, atMs, data.roster_positions, gap, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap, true, gamesOf);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -426,7 +427,8 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
 // are the moves you'd make in Sleeper from where you are, at any point of the timeline).
 // gap: "all" = Sleeper lineup as is, no arrows; "arrows" = best lineup, no arrows (they'd start from a stale lineup).
 // asIs (rivals): rows stay their real Sleeper lineup; the arrows still show the moves to the best one.
-function bestLineup(team, atMs, positions, gap, asIs) {
+const GAME_MS = 135 * 60000;   // a game counts as under way this long after its tip (as the backend's timeline does)
+function bestLineup(team, atMs, positions, gap, asIs, games = {}) {
   const tl = team?.timeline, players = team?.players || [];
   const seg = tl?.segments[Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to)))];
   const seats = seg ? seg.seats : team?.today?.seats;
@@ -436,7 +438,13 @@ function bestLineup(team, atMs, positions, gap, asIs) {
   // the plan says who starts; reseat keeps everyone who already starts in his Sleeper slot, so the moves are fewest
   const now = Object.fromEntries(players.map((r) => [r.sid, r.slot]));
   const pos = Object.fromEntries(players.map((r) => [r.sid, r.pos || []]));
-  const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions);
+  // Sleeper won't move these: locked in (or guessed locked), or his game is under way at the time shown
+  const playing = (sid) => (games[sid] || []).some((g) => {
+    const tip = Date.parse(g.tip);
+    return tip <= atMs && g.state !== "post" && (g.state === "in" || atMs < tip + GAME_MS);
+  });
+  const fixed = new Set(players.filter((r) => r.lock_status === "locked" || r.lock_status === "guess" || playing(r.sid)).map((r) => r.sid));
+  const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions, fixed);
   const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
   return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos, !asIs) };
 }
@@ -479,8 +487,9 @@ function SwapArrows({ pairs, side, names }) {
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
-        // the vertical run breaks around the step number (mid ± gap), so the line never crosses it
-        const mid = (l.y1 + l.y2) / 2, gap = 10;
+        // the vertical run breaks around the step number (mid ± gap), so the line never crosses it; neighbouring lines
+        // put theirs at different heights (middle, upper, lower third) so side-by-side numbers don't run together
+        const mid = l.y1 + (l.y2 - l.y1) * [0.5, 0.3, 0.7][i % 3], gap = 10;
         const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${mid - dir * gap} `
           + `M ${x} ${mid + dir * gap} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
         const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
