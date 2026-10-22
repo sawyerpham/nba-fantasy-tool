@@ -467,6 +467,18 @@ def team_total(players: list[PlanPlayer], skip: PlanPlayer | None = None) -> tup
     return mean, var
 
 
+def scenario_total(players: list[PlanPlayer], lock_all: bool) -> tuple[float, float]:
+    """The team's final (mean, variance) if you lock every game you can now (safe) or wait on every player who still
+    has games to come (risky; a player with nothing left to play still locks what he has)."""
+    mean = var = 0.0
+    for p in players:
+        if p.seat is None:
+            continue
+        m, v = slot_spread(p, lock=p.x is not None and (lock_all or p.w <= 0))
+        mean, var = mean + m, var + v
+    return mean, var
+
+
 def win_chance(mine: tuple[float, float], theirs: tuple[float, float]) -> float:
     sd = math.sqrt(mine[1] + theirs[1])
     if sd == 0:

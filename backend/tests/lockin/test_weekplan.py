@@ -248,3 +248,13 @@ def test_beat_chance_is_one_minus_every_game_missing():
     two = beat_chance(17.5, future(13.7, 14.6), 0.3, "healthy")
     assert 0.25 < two < 0.4 and two > beat_chance(17.5, future(14.6), 0.3, "healthy")
     assert beat_chance(17.5, future(13.7, 14.6), 0.3, "out_long_term") == 0
+
+
+def test_safe_locks_every_game_risky_waits_on_every_later_one():
+    from app.lockin.weekplan import scenario_total
+
+    a = pp("a", ["PG"], "PG", [], x=17.5, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
+    done = pp("done", ["PG"], "PG", [], x=9.0, w=0.0, swing=0.3, seat="PG")   # no games left: locks either way
+    assert scenario_total([a, done], True) == (26.5, 0.0)                  # certain
+    mean, var = scenario_total([a, done], False)
+    assert mean == 24.5 and var > 0                                        # waits on a's later games, with their spread

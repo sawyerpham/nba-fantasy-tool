@@ -159,42 +159,59 @@ export default function SeasonPage({ leagueId }) {
   );
 }
 
-// The right side when no player is open: your week's Lock-In to-do list, from the plan. The swaps now (Sleeper lineup ->
-// best lineup now), the next check-in and its swaps, the LOCK calls, tonight's swap checks and injury checks.
+// The right side when no player is open: this week's Lock-In advice for your team, from the plan.
+//   This week - take the risk or play it safe: the chance to win locking every game you can now vs waiting on later
+//               games vs the plan's mix (backend outlook), and what the opponent still has to play / has banked;
+//   Locks     - every game you could lock now: LOCK or PASS, what waiting is worth and on which games, both chances;
+//   then tonight's swap checks and injury checks.
+const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 function LockinGuide({ data, plan }) {
-  const nowMs = data.now ? Date.parse(data.now) : Date.now();
-  const gamesOf = Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games]));
-  const name = (sid) => data.players[sid]?.name || sid;
   const when = (t) => fmt(t, { weekday: "short", hour: "numeric", minute: "2-digit" });
-  const slots = (rows) => Object.fromEntries(rows.map((r) => [r.sid, r.slot]));
-  const posOf = Object.fromEntries(plan.players.map((r) => [r.sid, r.pos || []]));
-  const now = bestLineup(plan, nowMs, data.roster_positions, data.sleeper_gap ? "arrows" : null, false, gamesOf);
-  const next = plan.timeline?.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
-  const then = next ? bestLineup(plan, next + 1, data.roster_positions, null, false, gamesOf) : null;
-  const thenSteps = then ? swapSteps(slots(now.rows), slots(then.rows), posOf) : [];
+  const left = (sid) => (data.players[sid]?.games || []).filter((g) => g.state === "pre" && g.fp == null);
   const watch = plan.today?.watch || [];
-  const lockBy = Object.fromEntries(watch.filter((w) => w.kind === "lock").map((w) => [w.sid, w.by]));
-  const locks = plan.players.filter((r) => r.action === "LOCK" && r.lock_status !== "locked");
+  const o = plan.opponent, out = plan.outlook;
+  const locks = plan.players.filter((r) => r.seat && r.x != null && r.lock_status !== "locked")
+    .sort((a, b) => (a.action !== "LOCK") - (b.action !== "LOCK") || b.x - a.x);
   const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
-  const steps = (list) => (
-    <ol>{list.map((s) => <li key={s.n}>Swap <strong>{name(s.in)}</strong> <span className="muted">({s.from})</span> ↔ <strong>{name(s.out)}</strong> <span className="muted">({s.to})</span></li>)}</ol>
-  );
+  // the opponent: biggest games still to come (unlocked starters' wait values) and what's already banked
+  const threats = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 3);
+  const banked = (o?.players || []).filter((r) => r.locked != null).sort((a, b) => b.locked - a.locked);
+  const verdict = !out ? null : out.risky > out.safe + 0.03 ? ["bad", "Take the risk"] : out.safe > out.risky + 0.03 ? ["good", "Play it safe"] : ["", "Close call"];
   return (
     <div className="panel scroll guide" data-testid="lockin-guide">
       <h3>Lock-In guide</h3>
-      <h4>Do now</h4>
-      {data.sleeper_gap ? <div className="small muted">Sleeper still shows the day that just ended; check back once it rolls over.</div>
-        : now.pairs.length ? steps(now.pairs) : <div className="small muted">Lineup is set: nothing to change in Sleeper.</div>}
-      {next && <>
-        <h4>Next check-in · {when(next)}</h4>
-        {thenSteps.length ? steps(thenSteps) : <div className="small muted">No swaps then.</div>}
+      {verdict && <>
+        <h4>This week</h4>
+        <div className="guide-verdict"><span className={`verdict ${verdict[0]}`}>{verdict[1]}</span>
+          <span className="small">{verdict[1] === "Take the risk" ? "You need more upside than locking gives: pass on good-not-great games and wait for big ones."
+            : verdict[1] === "Play it safe" ? "Bank good games: locking beats chasing bigger ones."
+            : "Locking and waiting come out about even: follow each call below."}</span></div>
+        <table className="small guide-odds"><tbody>
+          <tr><td>Lock every game you can now</td><td className="num">{pct(out.safe)}</td></tr>
+          <tr><td>Wait on every later game</td><td className="num">{pct(out.risky)}</td></tr>
+          <tr><td><strong>The plan's mix (below)</strong></td><td className="num"><strong>{pct(plan.win_chance)}</strong></td></tr>
+        </tbody></table>
+        <div className="small muted">chance to win the week</div>
+        {o && <div className="small guide-them">
+          {threats.length > 0 && <div><strong>{o.name}</strong> still to play: {threats.map((r) => `${r.name} ~${fp(r.w)}`).join(", ")}</div>}
+          {banked.length > 0 && <div>Banked: {banked.map((r) => `${r.name} ${fp(r.locked)}${r.lock_status === "guess" ? "?" : ""}`).join(", ")}</div>}
+        </div>}
       </>}
       {locks.length > 0 && <>
         <h4>Locks</h4>
-        <ul>{locks.map((r) => (
-          <li key={r.sid}><span className="verdict good">LOCK</span> <strong>{r.name}</strong> {fp(r.x)} at {r.seat}
-            <div className="small muted">{lockBy[r.sid] ? `before ${when(lockBy[r.sid])} · ` : ""}{Math.round((r.win_lock ?? 0) * 100)}% to win locked, {Math.round((r.win_wait ?? 0) * 100)}% waiting</div></li>
-        ))}</ul>
+        <ul className="guide-locks">{locks.map((r) => {
+          const games = left(r.sid);
+          return (
+            <li key={r.sid}>
+              <span className={`verdict ${r.action === "LOCK" ? "good" : "even"}`}>{r.action}</span> <strong>{r.name}</strong> {fp(r.x)} <span className="muted">at {r.seat}</span>
+              <div className="small muted">
+                waiting: ~{fp(r.w)}{games.length ? ` from ${games.map((g) => dayName(g.date)).join(", ")}` : " (no games left)"}
+                {r.action === "LOCK" && games[0]?.tip ? ` · lock before ${when(games[0].tip)}` : ""}
+              </div>
+              {r.win_lock != null && <div className="small muted">to win: {pct(r.win_lock)} locked · {pct(r.win_wait)} waiting</div>}
+            </li>
+          );
+        })}</ul>
       </>}
       {swaps.length > 0 && <>
         <h4>Tonight's swap checks</h4>
@@ -207,15 +224,6 @@ function LockinGuide({ data, plan }) {
         <h4>Injury checks</h4>
         <ul>{injuries.map((w) => <li key={`${w.kind}-${w.sid}`} className="small">{w.text}</li>)}</ul>
       </>}
-      <details className="small">
-        <summary><h4>How Lock-In works</h4></summary>
-        <ul className="muted">
-          <li>Each starting slot scores one game a week: the latest game of whoever is in it.</li>
-          <li>Lock a game right after it ends to keep it; the player then stays in that slot all week.</li>
-          <li>Not locked, his next game replaces it, better or worse. Lock when the score beats what his later games are likely to give.</li>
-          <li>Bench players' games don't count, and a bench player can't come in once his game has started.</li>
-        </ul>
-      </details>
     </div>
   );
 }

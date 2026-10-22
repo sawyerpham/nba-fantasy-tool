@@ -406,7 +406,8 @@ def locked_points(players) -> float:
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
     opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
-    from .weekplan import _minus_minutes, decide_by_win_chance, plan_today, plan_week, swap_win_chance, team_total
+    from .weekplan import (_minus_minutes, decide_by_win_chance, plan_today, plan_week, scenario_total, swap_win_chance,
+                           team_total, win_chance)
 
     team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
     if team is None:
@@ -418,7 +419,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     opp = None
     pair = next((pr for pr in view["matchups"] if any(m["roster_id"] == team["roster_id"] for m in pr)), [])
     other = next((m for m in pair if m["roster_id"] != team["roster_id"]), None)
-    mode, chance, theirs = "even", None, None
+    mode, chance, theirs, outlook = "even", None, None, None
     if other:
         oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
         oplayers, olocks, _ = _plan_players(session, view, oteam, {})
@@ -426,6 +427,9 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         theirs = team_total(oplayers)
         chance = decide_by_win_chance(players, theirs)   # LOCK / PASS by the chance to win, not expected points
         mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
+        # this week's advice: the chance to win locking everything you can now (safe) vs waiting on later games (risky)
+        outlook = {"safe": round(win_chance(scenario_total(players, True), theirs), 3),
+                   "risky": round(win_chance(scenario_total(players, False), theirs), 3)}
         opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "user": oteam.get("user"), "avatar": oteam.get("avatar"),
                "expected": oplan.expected,
                "points": locked_points(oplayers), "locked": sum(1 for v in olocks.values() if v[0] in ("locked", "guess")),
@@ -468,6 +472,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     return {"roster_id": team["roster_id"], "name": team["name"], "user": team.get("user"), "avatar": team.get("avatar"),
             "expected": plan.expected, "slots": counts,
             "points": locked_points(players), "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
+            "outlook": outlook,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
             "today": {"date": today, "seats": t.seats, "moves": t.moves, "watch": reminders + t.watch} if t else
