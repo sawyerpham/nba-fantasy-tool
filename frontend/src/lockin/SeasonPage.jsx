@@ -196,7 +196,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           `${g.home ? "vs" : "@"} ${g.opp}`,
-          live && g.detail, live && g.pace != null && `on pace for ${fp(g.pace)}`,
+          live && quarters(g.detail), live && g.pace != null && `on pace for ${fp(g.pace)}`,
           !live && played && g.min != null && `${g.min} min`,
           g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
@@ -216,6 +216,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
   if (!lane) return <span className="chips-row">{chips}</span>;
   return <span className="chips-lane">{lane.xs ? chips : <span className="chips-row">{chips}</span>}</span>;
 }
+
+// ESPN's live status in quarters: "3:14 - 1st" -> "Q1 3:14", "1:05 - OT" -> "OT 1:05", "End of 3rd" -> "End of Q3"
+const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1")
+  .replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
