@@ -27,7 +27,7 @@ through one slot; good enough to rank lock/pass, revisit if the calls look off i
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from statistics import mean, pstdev
 
 from ..core.engine import roster
@@ -249,8 +249,10 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     rest = [p for p in free if p not in tier1 and p not in tier2]
     # ...except a starter who already played this week, today included (unlocked): benching him gives up locking that game, and on a
     # day neither plays nothing is gained, so he holds his slot (anyone who plays today can still take it, above).
+    # When a later player needs one of their slots, the one who sits is whoever's latest game is worth least
+    # (given_up: a game in progress counts at its projected finish).
     held = sorted((p for p in rest if p.slot in slot_counts and any(g.date < today or g.started for g in p.games)
-                   and p.injury not in OUT), key=lambda p: -p.value)
+                   and p.injury not in OUT), key=lambda p: -given_up(p))
     tier3 = held + _by_tip([p for p in rest if p not in held and nxt(p) and p.injury not in OUT], nxt)
     tier3 += sorted((p for p in rest if p not in tier3 and p.slot in slot_counts), key=lambda p: -p.value)
     plan_seat = {id(p): p.seat for p in players}
@@ -311,6 +313,15 @@ def live_estimate(g: Game) -> float | None:
     rate = (g.fp + proj_rate * PRIOR_MINUTES) / (played + PRIOR_MINUTES)
     left = max(0.0, (g.proj_min or played) * _share_left(g))
     return g.fp + rate * left
+
+
+def given_up(p: PlanPlayer) -> float:
+    """What benching him now gives up: his latest game, a game in progress at its projected finish (live_estimate, by
+    ESPN's clock now). Only that game: his later games stay usable in any slot, so they don't decide who sits."""
+    last = next((g for g in reversed(p.games) if g.fp is not None), None)
+    if last is None:
+        return p.value
+    return live_estimate(replace(last, live=True)) if not last.final and last.period else last.fp
 
 
 def _share_left(g: Game) -> float:
@@ -398,12 +409,14 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
             if call["swap"] - call["bar"] >= MIN_SWAP_GAIN:   # his game must beat just waiting on S's later games
                 candidates.setdefault(b.sid, (b, []))[1].append((s, slot, call))
 
-    # One alarm per later player: at his tip - ALARM_LEAD_MIN, swap him in for the starter furthest below his keep
-    # line (most to gain), or keep everyone. PENDING until at least one of those starters' games has begun.
+    # One alarm per later player: at his tip - ALARM_LEAD_MIN, swap him in (if that's worth it) for the starter whose
+    # game is headed lowest (his projected finish: benching him gives up only tonight's game, his later ones stay
+    # usable), or keep everyone. PENDING until at least one of those starters' games has begun.
     for b, opts in candidates.values():
         tip = _today(b, today).tip
         live = [o for o in opts if o[2]["decision"] != "PENDING"]
-        best = max(live, key=lambda o: o[2]["swap"] - o[2]["keep"], default=None)
+        best = min((o for o in live if o[2]["decision"] == "SWAP"), key=lambda o: o[2]["est"], default=None) \
+            or max(live, key=lambda o: o[2]["swap"] - o[2]["keep"], default=None)
         if best and best[2]["decision"] == "SWAP":
             s, slot, call = best
             text = (f"SWAP: {s.name} is headed for ~{call['est']} (keep is worth {call['keep']}). Bench him and start "
