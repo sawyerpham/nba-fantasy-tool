@@ -37,6 +37,16 @@ DEFAULT_SWING, MIN_SWING, MAX_SWING, MIN_GAMES_FOR_SWING = 0.3, 0.12, 0.6, 15
 # ponytail: flat guesses; tune from what actually happens once the season runs.
 PLAY_CHANCE = {"healthy": (0.97, 0.97), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
                "out_long_term": (0.0, 0.0), "out_season": (0.0, 0.0)}
+# The second night of a back-to-back: rest days land there (RotoWire: passing on a good early game backfires when he
+# sits later, and an unlocked player's final game counts even at zero). His chance to play it is scaled by this.
+# ponytail: one flat factor for everyone; stars rest more than role players, tune per player if it matters.
+B2B_PLAY = 0.85
+
+
+def play_chance(g: "Game", injury: str, first: bool) -> float:
+    """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night."""
+    nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
+    return (nxt if first else later) * (B2B_PLAY if g.b2b else 1.0)
 
 
 @dataclass
@@ -52,6 +62,7 @@ class Game:
     proj_min: float | None = None   # Sleeper's projected minutes
     period: int = 0             # live game clock (ESPN): quarter and seconds left in it
     clock: float = 0.0
+    b2b: bool = False           # his team played the day before (second night of a back-to-back)
 
 
 @dataclass
@@ -124,12 +135,12 @@ def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tup
 
 
 def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
-    """Value of his remaining games played with the optimal lock rule (see module doc)."""
-    nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
+    """Value of his remaining games played with the optimal lock rule (see module doc). Sitting out the final game
+    leaves 0 (v starts at 0: Sleeper counts an unlocked player's final game, even a zero)."""
     v = 0.0
     for i in range(len(remaining) - 1, -1, -1):
         mu = max(0.0, remaining[i].proj or 0.0)
-        p = nxt if i == 0 else later
+        p = play_chance(remaining[i], injury, i == 0)
         v = p * (mu if i == len(remaining) - 1 else expected_max(mu, mu * swing, v)) + (1 - p) * v
     return v
 
@@ -354,9 +365,8 @@ def _share_left(g: Game) -> float:
 
 def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> float:
     """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(proj, proj × swing), played at his
-    PLAY_CHANCE (next game, later games); a live game centres on his pace, its spread shrinking with the time left.
+    play_chance (injury, back-to-backs); a live game centres on his pace, its spread shrinking with the time left.
     ponytail: games taken as independent, so it runs a little high when hot / cold streaks carry over."""
-    nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
     miss = 1.0
     for i, g in enumerate(games):
         if g.live:
@@ -364,7 +374,7 @@ def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> f
             sd, p = mu * swing * _share_left(g), 1.0
         else:
             mu = max(0.0, g.proj or 0.0)
-            sd, p = mu * swing, nxt if i == 0 else later
+            sd, p = mu * swing, play_chance(g, injury, i == 0)
         hit = (1.0 if mu > score else 0.0) if sd <= 0 else 1 - _cdf((score - mu) / sd)
         miss *= 1 - p * hit
     return 1 - miss
@@ -376,7 +386,7 @@ def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
     gs, gb = _today(s, today), _today(b, today)
     later = [g for g in s.games if g.date > today and not g.started]
     bar = wait_value(later, s.swing, s.injury)                 # what S's later games are worth
-    nxt = PLAY_CHANCE.get(b.injury, PLAY_CHANCE["healthy"])[0]
+    nxt = play_chance(gb, b.injury, True)
     mu_b = max(0.0, gb.proj or 0.0)
     swap = nxt * expected_max(mu_b, mu_b * b.swing, bar) + (1 - nxt) * bar
     est = live_estimate(gs)

@@ -271,3 +271,10 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
     w, src = open_slot(jaq, [jaq, spare, c_only, starter])
     assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12
+
+
+def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
+    # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
+    rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
+    fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
+    assert rested < fresh and rested == pytest.approx(15.0 * 0.97 * 0.85)   # sitting the final game leaves 0
