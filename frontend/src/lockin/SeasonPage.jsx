@@ -153,80 +153,113 @@ export default function SeasonPage({ leagueId }) {
       <aside className="season-side">
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
-          : <LockinGuide data={data} plan={plan} />}
+          : <LockinGuide data={data} plan={plan} leagueId={leagueId} />}
       </aside>
     </div>
   );
 }
 
-// The right side when no player is open: this week's Lock-In advice for your team, from the plan.
+// The right side when no player is open: this week's Lock-In advice for any team (yours by default; the drop-down
+// loads another's plan from the plan endpoint).
 //   This week - take the risk or play it safe: the chance to win locking every game you can now vs waiting on later
 //               games vs the plan's mix (backend outlook), and what the opponent still has to play / has banked;
-//   Locks     - every game you could lock now: LOCK or PASS, what his slot is worth left open (his later games or a
+//   Locks     - every game they could lock now: LOCK or PASS, what his slot is worth left open (his later games or a
 //               spare bench player's, whichever is best each day) and both chances;
 //   then tonight's swap checks and injury checks.
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
-function LockinGuide({ data, plan }) {
+const lastName = (n) => n.split(" ").slice(1).join(" ") || n;
+function LockinGuide({ data, plan, leagueId }) {
+  const [rid, setRid] = useState(plan.roster_id);
+  const [other, setOther] = useState(null);
+  const mine = rid === plan.roster_id;
+  useEffect(() => {
+    if (mine) return;
+    setOther(null);
+    api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
+  }, [rid, mine, leagueId, data.week, data.now]);
+  const p = mine ? plan : other;
+  const picker = (
+    <select className="guide-team" value={rid} onChange={(e) => setRid(Number(e.target.value))} data-testid="guide-team">
+      {[...data.teams].sort((a, b) => b.is_user - a.is_user || (a.user || a.name).localeCompare(b.user || b.name)).map((t) => (
+        <option key={t.roster_id} value={t.roster_id}>{t.user || t.name}{t.is_user ? " (you)" : ""}</option>))}
+    </select>
+  );
+  const head = <div className="guide-head"><h3>Lock-In guide</h3>{picker}</div>;
+  if (!p) return <div className="panel scroll guide" data-testid="lockin-guide">{head}<div className="muted small">Loading…</div></div>;
+
   const when = (t) => fmt(t, { weekday: "short", hour: "numeric", minute: "2-digit" });
   const left = (sid) => (data.players[sid]?.games || []).filter((g) => g.state === "pre" && g.fp == null);
-  const watch = plan.today?.watch || [];
-  const o = plan.opponent, out = plan.outlook;
-  const locks = plan.players.filter((r) => r.seat && r.x != null && r.lock_status !== "locked")
+  const watch = p.today?.watch || [];
+  const o = p.opponent, out = p.outlook;
+  const locks = p.players.filter((r) => r.seat && r.x != null && r.lock_status !== "locked" && r.lock_status !== "guess")
     .sort((a, b) => (a.action !== "LOCK") - (b.action !== "LOCK") || b.x - a.x);
   const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
   // the opponent: biggest games still to come (unlocked starters' wait values) and what's already banked
-  const threats = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 3);
+  const threats = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 4);
   const banked = (o?.players || []).filter((r) => r.locked != null).sort((a, b) => b.locked - a.locked);
-  const verdict = !out ? null : out.risky > out.safe + 0.03 ? ["bad", "Take the risk"] : out.safe > out.risky + 0.03 ? ["good", "Play it safe"] : ["", "Close call"];
+  const verdict = !out ? null : out.risky > out.safe + 0.03 ? ["bad", "Take the risk", "Waiting on later games wins more often than locking now: pass on good-not-great games."]
+    : out.safe > out.risky + 0.03 ? ["good", "Play it safe", "Locking now wins more often than waiting: bank good games."]
+    : ["", "Close call", "Locking and waiting come out about even: follow each call below."];
+  const odds = out ? [["Lock everything now", out.safe], ["Wait on everything", out.risky], ["The plan's mix", p.win_chance]] : [];
+  const top = Math.max(...odds.map(([, v]) => v ?? 0));
+  const chip = (r, value, guess) => (
+    <span key={r.sid} className="guide-chip"><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)} <strong>{value}{guess ? "?" : ""}</strong></span>
+  );
   return (
     <div className="panel scroll guide" data-testid="lockin-guide">
-      <h3>Lock-In guide</h3>
-      {verdict && <>
-        <h4>This week</h4>
-        <div className="guide-verdict"><span className={`verdict ${verdict[0]}`}>{verdict[1]}</span>
-          <span className="small">{verdict[1] === "Take the risk" ? "You need more upside than locking gives: pass on good-not-great games and wait for big ones."
-            : verdict[1] === "Play it safe" ? "Bank good games: locking beats chasing bigger ones."
-            : "Locking and waiting come out about even: follow each call below."}</span></div>
-        <table className="small guide-odds"><tbody>
-          <tr><td>Lock every game you can now</td><td className="num">{pct(out.safe)}</td></tr>
-          <tr><td>Wait on every later game</td><td className="num">{pct(out.risky)}</td></tr>
-          <tr><td><strong>The plan's mix (below)</strong></td><td className="num"><strong>{pct(plan.win_chance)}</strong></td></tr>
-        </tbody></table>
-        <div className="small muted">chance to win the week</div>
-        {o && <div className="small guide-them">
-          {threats.length > 0 && <div><strong>{o.name}</strong> still to play: {threats.map((r) => `${r.name} ~${fp(r.w)}`).join(", ")}</div>}
-          {banked.length > 0 && <div>Banked: {banked.map((r) => `${r.name} ${fp(r.locked)}${r.lock_status === "guess" ? "?" : ""}`).join(", ")}</div>}
-        </div>}
-      </>}
+      {head}
+      {verdict && (
+        <section className="guide-card">
+          <div className="guide-verdict"><span className={`verdict ${verdict[0]}`}>{verdict[1]}</span><span className="small">{verdict[2]}</span></div>
+          <div className="guide-odds">{odds.map(([label, v]) => (
+            <div key={label} className={`guide-odd ${v === top ? "best" : ""}`}>
+              <span className="small">{label}</span>
+              <span className="guide-bar"><span style={{ width: pct(v) }} /></span>
+              <strong className="small">{pct(v)}</strong>
+            </div>
+          ))}</div>
+          <div className="small muted">chance to win the week{o ? ` vs ${o.user || o.name}` : ""}</div>
+          {o && threats.length > 0 && <div className="guide-chips"><span className="bid-label">Still to play</span>{threats.map((r) => chip(r, `~${fp(r.w)}`))}</div>}
+          {o && banked.length > 0 && <div className="guide-chips"><span className="bid-label">Banked</span>{banked.map((r) => chip(r, fp(r.locked), r.lock_status === "guess"))}</div>}
+        </section>
+      )}
       {locks.length > 0 && <>
         <h4>Locks</h4>
-        <ul className="guide-locks">{locks.map((r) => {
-          const games = left(r.sid);
+        {locks.map((r) => {
+          const games = left(r.sid), lock = r.action === "LOCK";
           // keeping the slot open: the best game it can still take each day, his or a spare bench player's (backend open_slot)
-          const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${who.split(" ").slice(-1)[0]}`}`);
+          const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${lastName(who)}`}`);
           return (
-            <li key={r.sid}>
-              <span className={`verdict ${r.action === "LOCK" ? "good" : "even"}`}>{r.action}</span> <strong>{r.name}</strong> {fp(r.x)} <span className="muted">at {r.seat}</span>
-              <div className="small muted">
-                slot left open: ~{fp(r.slot_w ?? r.w)}{from.length ? ` from ${from.join(", ")}` : " (no games left)"}
-                {r.action === "LOCK" && games[0]?.tip ? ` · lock before ${when(games[0].tip)}` : ""}
+            <div key={r.sid} className={`guide-lock ${lock ? "lock" : "pass"}`}>
+              <Headshot sleeperId={r.sid} name={r.name} size={38} />
+              <div className="guide-lock-main">
+                <div className="guide-lock-top"><strong>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
+                <div className="small muted">open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
+                {r.win_lock != null && <div className="small muted">to win: <span className={lock ? "guide-hi" : ""}>{pct(r.win_lock)} locked</span> · <span className={lock ? "" : "guide-hi"}>{pct(r.win_wait)} open</span>
+                  {lock && games[0]?.tip ? ` · by ${when(games[0].tip)}` : ""}</div>}
               </div>
-              {r.win_lock != null && <div className="small muted">to win: {pct(r.win_lock)} locked · {pct(r.win_wait)} open</div>}
-            </li>
+              <div className="guide-lock-side"><span className="guide-lock-x">{fp(r.x)}</span><span className={`verdict ${lock ? "good" : "even"}`}>{r.action}</span></div>
+            </div>
           );
-        })}</ul>
+        })}
       </>}
       {swaps.length > 0 && <>
         <h4>Tonight's swap checks</h4>
-        <ul>{swaps.map((w) => (
-          <li key={w.backup_sid}><span className={`verdict ${w.decision === "SWAP" ? "bad" : w.decision === "KEEP" ? "good" : ""}`}>{w.decision}</span> {when(w.alarm)}: <strong>{w.backup}</strong> for {w.name}
-            <div className="small muted">{w.text}</div></li>
-        ))}</ul>
+        {swaps.map((w) => (
+          <div key={w.backup_sid} className="guide-row">
+            <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
+            <div><div><span className={`verdict ${w.decision === "SWAP" ? "bad" : w.decision === "KEEP" ? "good" : ""}`}>{w.decision}</span> <strong>{w.backup}</strong> for {w.name} <span className="muted small">{when(w.alarm)}</span></div>
+              <div className="small muted">{w.text}</div></div>
+          </div>
+        ))}
       </>}
       {injuries.length > 0 && <>
         <h4>Injury checks</h4>
-        <ul>{injuries.map((w) => <li key={`${w.kind}-${w.sid}`} className="small">{w.text}</li>)}</ul>
+        {injuries.map((w) => (
+          <div key={`${w.kind}-${w.sid}`} className="guide-row"><Headshot sleeperId={w.sid} name={w.name} size={30} /><div className="small">{w.text}</div></div>
+        ))}
       </>}
+      {!locks.length && !swaps.length && !injuries.length && <div className="small muted guide-empty">Nothing to lock or check right now.</div>}
     </div>
   );
 }
