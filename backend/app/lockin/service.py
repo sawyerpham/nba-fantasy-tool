@@ -115,6 +115,7 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
     return out
 
 
+BOX_KEYS = ("pts", "reb", "ast", "blk", "fgm", "fga", "ftm", "fta", "to", "pf")   # Sleeper's per-game stat keys
 SLEEPER_FLIP_HOUR = 4   # ponytail: guessed hour (ET) Sleeper's lineup day rolls over; set it from the measured flip
 
 
@@ -213,7 +214,9 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "fp": round(actual_fp(st, lg.scoring), 2) if played else None,
                           "min": round(float(st.get("sp") or 0) / 60, 1) if played else None,
                           "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
-                          "period": tip.get("period", 0), "clock": tip.get("clock", 0.0)})
+                          "period": tip.get("period", 0), "clock": tip.get("clock", 0.0),
+                          # his box score (live games too), for the game card's hover
+                          "box": {k: int(st.get(k) or 0) for k in BOX_KEYS} if played else None})
             g = games[-1]
             if g["state"] == "in" and played:   # where his game will likely finish (the chip colours his projection by it)
                 g["pace"] = round(live_estimate(Game(date=d, proj=g["proj"], fp=g["fp"], started=True, live=True, min=g["min"],
