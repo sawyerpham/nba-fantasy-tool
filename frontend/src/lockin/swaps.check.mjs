@@ -30,7 +30,7 @@ assert.deepEqual(replay(was, reseat(was, plan, p2, slots), p2), ["kyrie<>derozan
 const cards = (shownAfter) => swapSteps(was, reseat(was, plan, p2, slots), p2, shownAfter).map((s) => `${s.a}-${s.b}`);
 assert.deepEqual(cards(false), ["kyrie-derozan", "kyrie-nesmith"]);
 assert.deepEqual(cards(true), ["nesmith-kyrie", "nesmith-derozan"]);
-// A fixed player (locked in, or mid-game) is never moved: with DeRozan locked at SG (and Bane able to play SF), Kyrie
+// A fixed player (locked in, or benched mid-game) is never moved: with DeRozan locked at SG (and Bane able to play SF), Kyrie
 // takes Bane's SG and Bane slides to SF; DeRozan stays put.
 const p3 = { ...p2, bane: ["PG", "SG", "SF"] };
 const fixedBest = reseat(was, plan, p3, slots, new Set(["derozan"]));
