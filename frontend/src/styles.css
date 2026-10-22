@@ -805,8 +805,6 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .guide .verdict { font-size: 11px; padding: 2px 7px; }
 /* the week's verdict: a card with the three ways to play it as bars */
 .guide-card { padding: 12px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border); }
-.guide-verdict { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; line-height: 1.35; }
-.guide-verdict .verdict { font-size: 12.5px; padding: 3px 10px; flex: none; }
 .guide-odds { display: grid; gap: 7px; margin-bottom: 6px; }
 .guide-odd { display: grid; grid-template-columns: 140px 1fr 36px; white-space: nowrap; align-items: center; gap: 10px; color: var(--muted); }
 .guide-odd strong { text-align: right; }
@@ -827,8 +825,16 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .guide-lock-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
 .guide-lock-x { font-size: 19px; font-weight: 800; line-height: 1; }
 .guide-hi { color: var(--text); font-weight: 700; }
+.guide-card + .guide-card { margin-top: 10px; }
+.guide-card > .bid-label { display: block; margin-bottom: 8px; }
+.hub-win { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.hub-win strong { font-size: 26px; font-weight: 900; line-height: 1; }
+.hub-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.hub-team { font-weight: 700; font-size: 13px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-stat { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); padding: 2px 0; }
+.hub-stat strong { color: var(--text); }
+.hub-edge { font-size: 12px; font-weight: 800; } .hub-edge.up { color: var(--ok); } .hub-edge.down { color: var(--even-t); }
 .guide-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--panel-2); line-height: 1.4; }
-.guide-empty { margin-top: 14px; }
 .mu-card.done .mu-who { opacity: 0.5; }   /* locked in: his week is settled (name and positions dimmed, colours kept) */
 .nick { font-style: italic; }
 .swap-n { font-size: 14px; font-weight: 800; fill: currentColor; text-anchor: middle; dominant-baseline: central; }   /* step number in its arrow's gap */
