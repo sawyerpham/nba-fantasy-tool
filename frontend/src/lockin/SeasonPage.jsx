@@ -197,7 +197,6 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
           [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
-          live && quarters(g.detail),
           !live && played && g.min != null && `${g.min} min`,
           g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
@@ -208,7 +207,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day ? "pick" : lockDate === g.date || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
             data-tip={tip}>
-            <span className="gch-day">{dayName(g.date)} <span className="gch-time">{live ? "LIVE" : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </Tag>
         );
@@ -220,6 +219,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
 // ESPN's live status in quarters: "3:14 - 1st" -> "Q1 3:14", "1:05 - OT" -> "OT 1:05", "End of 3rd" -> "End of Q3"
 const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1")
   .replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
+// ...short enough for a live card's top line, in place of the weekday: "Q1 3:14", "End Q3", "Half"
+const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").replace("Start of ", "Start ").replace("Halftime", "Half") || "—";
 
 // His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
 const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
