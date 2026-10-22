@@ -196,11 +196,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           `${g.home ? "vs" : "@"} ${g.opp}`,
-          live && quarters(g.detail), live && g.pace != null && `on pace for ${fp(g.pace)}`,
+          live && quarters(g.detail),
           !live && played && g.min != null && `${g.min} min`,
           g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
-          href && "click to watch",
         ].filter(Boolean).join(" · ");
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
