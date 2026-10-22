@@ -258,3 +258,16 @@ def test_safe_locks_every_game_risky_waits_on_every_later_one():
     assert scenario_total([a, done], True) == (26.5, 0.0)                  # certain
     mean, var = scenario_total([a, done], False)
     assert mean == 24.5 and var > 0                                        # waits on a's later games, with their spread
+
+
+def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
+    from app.lockin.weekplan import open_slot
+
+    # Jaquez can lock 9.7; his own later game is only ~7. A spare forward on the bench plays a 12-proj game Friday:
+    # left open, his slot can take that, so it's worth more than his own games alone.
+    jaq = pp("jaquez", ["SG", "SF"], "SF", [Game("2026-10-23", 7.0)], seat="SF")
+    spare = pp("spare", ["SF", "PF"], "BN", [Game("2026-10-23", 12.0), Game("2026-10-24", 8.0)])
+    c_only = pp("big", ["C"], "BN", [Game("2026-10-23", 20.0)])                      # can't play SF: no help
+    starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
+    w, src = open_slot(jaq, [jaq, spare, c_only, starter])
+    assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12

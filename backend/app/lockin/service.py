@@ -487,7 +487,8 @@ def _player_out(q, locks: dict) -> dict:
             "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2), "locked": q.locked,
             "lock_status": status, "lock_date": when, "action": q.action, "why": q.why, "injury": q.injury,
             "win_lock": round(q.win_lock, 3) if q.win_lock is not None else None,
-            "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None}
+            "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None,
+            "slot_w": round(q.slot_w, 2) if q.slot_w is not None else None, "slot_from": [list(d) for d in q.slot_from]}
 
 
 # ---- one player's season page --------------------------------------------------------------------------

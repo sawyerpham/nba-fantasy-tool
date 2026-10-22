@@ -73,6 +73,8 @@ class PlanPlayer:
     why: str = ""
     win_lock: float | None = None   # chance to win the week if he locks now / if he waits (decide_by_win_chance)
     win_wait: float | None = None
+    slot_w: float | None = None     # a lockable starter's slot left open: what it can still get (open_slot)
+    slot_from: list = field(default_factory=list)   # [(date, player name)]: whose game it would take each day
 
 
 @dataclass
@@ -103,6 +105,22 @@ def expected_max(mu: float, sigma: float, v: float) -> float:
         return max(mu, v)
     d = (mu - v) / sigma
     return v + (mu - v) * _cdf(d) + sigma * _phi(d)
+
+
+def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]]]:
+    """What his slot is worth left open (not locking him): each remaining day it can take the best game from him or a
+    bench player who fits the slot and isn't seated in the plan, with the option to lock the best one (wait_value).
+    That's why locking a decent game can be wrong with a deep bench: it gives up every one of those chances.
+    ponytail: two open slots can both count the same bench player; fine while one lock is decided at a time."""
+    pool = [p] + [q for q in players if q is not p and q.seat is None and q.slot != "IR" and q.locked is None
+                  and q.injury not in OUT and p.seat in roster.candidate_slots(q.eligibility)]
+    best: dict[str, tuple[Game, PlanPlayer]] = {}
+    for q in pool:
+        for g in q.games:
+            if not g.started and (g.date not in best or (g.proj or 0) > (best[g.date][0].proj or 0)):
+                best[g.date] = (g, q)
+    days = [best[d] for d in sorted(best)]
+    return wait_value([g for g, _ in days], p.swing, "healthy"), [(g.date, q.name) for g, q in days]
 
 
 def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
@@ -175,18 +193,20 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
     order = sorted((p for p in players if p.locked is None and p.slot != "IR" and p.value > 0), key=lambda p: -p.value)
     seats = seat_players(order, slot_counts, pinned)
 
+    for p in players:   # a lockable starter: locking him closes his slot, so waiting is worth what the open slot gets
+        p.slot_w, p.slot_from = open_slot(p, players) if p.seat and p.x is not None and p.locked is None else (None, [])
     for p in players:
         if p.locked is not None:
             p.action, p.why = "LOCKED", f"locked {p.locked:.1f}"
         elif p.seat is None:
             p.action = "DONE" if p.value <= 0 else "BENCH"
             p.why = "no games left" if p.value <= 0 else "his games aren't worth a slot this week"
-        elif p.x is not None and p.x >= p.w:
+        elif p.x is not None and p.x >= p.slot_w:
             p.action = "LOCK"
             move = f" (move him {p.slot} → {p.seat} first)" if p.seat != p.slot else ""
-            p.why = f"{p.x:.1f} beats waiting (~{p.w:.1f}): lock in the {p.seat} slot{move}"
+            p.why = f"{p.x:.1f} beats keeping the slot open (~{p.slot_w:.1f}): lock in the {p.seat} slot{move}"
         elif p.x is not None:
-            p.action, p.why = "PASS", f"his remaining games are worth ~{p.w:.1f}, more than {p.x:.1f}"
+            p.action, p.why = "PASS", f"the {p.seat} slot's games still to come are worth ~{p.slot_w:.1f}, more than {p.x:.1f}"
         else:
             p.action, p.why = "WAIT", f"{p.seat} slot: his games are worth ~{p.w:.1f}"
     expected = sum(p.value for s in seats.values() for p in s)
@@ -454,7 +474,8 @@ def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
         return p.locked, 0.0
     if lock and p.x is not None:
         return p.x, 0.0
-    return p.w, (p.w * p.swing * SPREAD) ** 2
+    w = p.slot_w if p.slot_w is not None else p.w   # waiting on a lockable game: the open slot's value (open_slot)
+    return w, (w * p.swing * SPREAD) ** 2
 
 
 def team_total(players: list[PlanPlayer], skip: PlanPlayer | None = None) -> tuple[float, float]:
@@ -493,9 +514,10 @@ def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float])
             continue
         mean, var = team_total(players, skip=p)
         p.win_lock = win_chance((mean + p.x, var), theirs)
-        p.win_wait = win_chance((mean + p.w, var + (p.w * p.swing * SPREAD) ** 2), theirs) if p.w > 0 else 0.0
+        w = p.slot_w if p.slot_w is not None else p.w   # waiting = keeping his slot open (open_slot)
+        p.win_wait = win_chance((mean + w, var + (w * p.swing * SPREAD) ** 2), theirs) if w > 0 else 0.0
         p.action = "LOCK" if p.win_lock >= p.win_wait else "PASS"
-        p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · wait (~{p.w:.1f} from his later games): {p.win_wait:.0%}"
+        p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · keep the slot open (~{w:.1f} from games still to come): {p.win_wait:.0%}"
                  + (f" · lock in the {p.seat} slot" if p.action == "LOCK" else ""))
     return win_chance(team_total(players), theirs)
 
