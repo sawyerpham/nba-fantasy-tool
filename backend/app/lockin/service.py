@@ -107,10 +107,13 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
     for e in data.get("events", []):
         comp = e["competitions"][0]
         teams = {c["homeAway"]: ESPN_TEAM.get(c["team"]["abbreviation"], c["team"]["abbreviation"]) for c in comp["competitors"]}
+        score = {c["homeAway"]: c.get("score") for c in comp["competitors"]}
         st = e["status"]["type"]
         for side, team in teams.items():
+            other = "away" if side == "home" else "home"
             out[team] = {"tip": e["date"], "state": st["state"], "detail": st.get("shortDetail", ""),
-                         "opp": teams["away" if side == "home" else "home"], "home": side == "home",
+                         "opp": teams[other], "home": side == "home",
+                         "score": score[side] if st["state"] != "pre" else None, "opp_score": score[other] if st["state"] != "pre" else None,
                          "period": e["status"].get("period") or 0, "clock": float(e["status"].get("clock") or 0)}
     return out
 
@@ -215,6 +218,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "min": round(float(st.get("sp") or 0) / 60, 1) if played else None,
                           "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
                           "period": tip.get("period", 0), "clock": tip.get("clock", 0.0),
+                          "score": tip.get("score"), "opp_score": tip.get("opp_score"),   # the game's score (live or final)
                           # his box score (live games too), for the game card's hover
                           "box": {k: int(st.get(k) or 0) for k in BOX_KEYS} if played else None})
             g = games[-1]

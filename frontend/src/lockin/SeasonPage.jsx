@@ -195,7 +195,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
         const Tag = href ? "a" : "span";
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
-          `${g.home ? "vs" : "@"} ${g.opp}`,
+          // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
+          [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
           live && quarters(g.detail),
           !live && played && g.min != null && `${g.min} min`,
           g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
