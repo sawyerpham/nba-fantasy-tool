@@ -9,7 +9,8 @@ export const fits = (pos, slot) => slot === "BN" || slot === "UTIL" ? true : slo
 // (breadth-first: Kyrie in at SG with DeRozan sliding SG -> SF beats Kyrie at PG pushing Haliburton to SG pushing
 // DeRozan to SF). The plan only decides who starts; which slots is ours to pick. Bench / IR untouched.
 // positions: the league's roster slots ("PG", "PG", ..., "BN", "IR").
-// fixed: players Sleeper won't move (locked in, or his game is under way): they stay in their slot and are never bumped.
+// fixed: players Sleeper won't move (locked in, or benched with his game under way): they stay in their slot and are
+// never bumped.
 export function reseat(before, after, pos, positions, fixed = new Set()) {
   const seats = positions.filter((s) => s !== "BN" && s !== "IR"), who = Array(seats.length).fill(null);
   const starts = (slot) => slot && slot !== "BN" && slot !== "IR";

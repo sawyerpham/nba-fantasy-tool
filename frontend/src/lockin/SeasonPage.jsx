@@ -179,17 +179,18 @@ function RosterAlerts({ roster }) {
 // One card per game he has this week (so 3-4 at most): day, tip time, then his FP (— before the game) with the
 // projection small beside it; live, the projection turns green / red as his pace (backend live_estimate) beats it or not.
 // A game that can't be locked (or count any more) is crossed out: every game but the locked one once he's locked;
-// a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it).
+// a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it); a live
+// game while he sits on the bench (it won't count, and it's too late to start him).
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, team }) {
+function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team }) {
   const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
         // live: ESPN says in progress, or his stats are coming in before ESPN's state catches up; final only once ESPN says so
         const played = g.fp != null, live = g.state === "in" || (played && g.state !== "post");
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
-        const dead = lockDate ? g.date !== lockDate : g.state === "post" && (later || !lockable);
+        const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const m = findMatch(matches, g, team);
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
@@ -296,7 +297,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip="Nickname set on Sleeper"> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} lane={lane} />
+        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane} />
         {mine && starter && locked && (
           <span className="mu-call"><span className="ok small clickable" data-tip="Click if he isn't locked" onClick={() => setLock(r.sid, "")}> ✓</span></span>
         )}
@@ -442,12 +443,14 @@ function bestLineup(team, atMs, positions, gap, asIs, games = {}) {
   // the plan says who starts; reseat keeps everyone who already starts in his Sleeper slot, so the moves are fewest
   const now = Object.fromEntries(players.map((r) => [r.sid, r.slot]));
   const pos = Object.fromEntries(players.map((r) => [r.sid, r.pos || []]));
-  // Sleeper won't move these: locked in (or guessed locked), or his game is under way at the time shown
+  // Sleeper won't move these: locked in (or guessed locked), or benched with his game under way at the time shown (too
+  // late to start him). A starter mid-game can still be benched for a later player (the plan's KEEP / SWAP calls).
   const playing = (sid) => (games[sid] || []).some((g) => {
     const tip = Date.parse(g.tip);
     return tip <= atMs && g.state !== "post" && (g.state === "in" || atMs < tip + GAME_MS);
   });
-  const fixed = new Set(players.filter((r) => r.lock_status === "locked" || r.lock_status === "guess" || playing(r.sid)).map((r) => r.sid));
+  const fixed = new Set(players.filter((r) => r.lock_status === "locked" || r.lock_status === "guess"
+    || (r.slot === "BN" && playing(r.sid))).map((r) => r.sid));
   const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions, fixed);
   const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
   return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos, !asIs) };
