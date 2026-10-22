@@ -162,7 +162,8 @@ export default function SeasonPage({ leagueId }) {
 // The right side when no player is open: this week's Lock-In advice for your team, from the plan.
 //   This week - take the risk or play it safe: the chance to win locking every game you can now vs waiting on later
 //               games vs the plan's mix (backend outlook), and what the opponent still has to play / has banked;
-//   Locks     - every game you could lock now: LOCK or PASS, what waiting is worth and on which games, both chances;
+//   Locks     - every game you could lock now: LOCK or PASS, what his slot is worth left open (his later games or a
+//               spare bench player's, whichever is best each day) and both chances;
 //   then tonight's swap checks and injury checks.
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 function LockinGuide({ data, plan }) {
@@ -201,14 +202,16 @@ function LockinGuide({ data, plan }) {
         <h4>Locks</h4>
         <ul className="guide-locks">{locks.map((r) => {
           const games = left(r.sid);
+          // keeping the slot open: the best game it can still take each day, his or a spare bench player's (backend open_slot)
+          const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${who.split(" ").slice(-1)[0]}`}`);
           return (
             <li key={r.sid}>
               <span className={`verdict ${r.action === "LOCK" ? "good" : "even"}`}>{r.action}</span> <strong>{r.name}</strong> {fp(r.x)} <span className="muted">at {r.seat}</span>
               <div className="small muted">
-                waiting: ~{fp(r.w)}{games.length ? ` from ${games.map((g) => dayName(g.date)).join(", ")}` : " (no games left)"}
+                slot left open: ~{fp(r.slot_w ?? r.w)}{from.length ? ` from ${from.join(", ")}` : " (no games left)"}
                 {r.action === "LOCK" && games[0]?.tip ? ` · lock before ${when(games[0].tip)}` : ""}
               </div>
-              {r.win_lock != null && <div className="small muted">to win: {pct(r.win_lock)} locked · {pct(r.win_wait)} waiting</div>}
+              {r.win_lock != null && <div className="small muted">to win: {pct(r.win_lock)} locked · {pct(r.win_wait)} open</div>}
             </li>
           );
         })}</ul>
