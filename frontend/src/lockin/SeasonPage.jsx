@@ -325,7 +325,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
           !live && played && g.min != null && `${g.min} min`,
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
-          g.beat != null && !lockDate && `${Math.round(g.beat * 100)}% to score higher this week`,
+          g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
         return (
