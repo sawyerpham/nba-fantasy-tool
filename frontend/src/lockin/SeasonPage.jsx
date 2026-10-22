@@ -220,8 +220,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, day, lane, tea
 const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1")
   .replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
 
-// His box score on one line: "38 pts, 5 reb, 3 ast, 0 blk, 12/21 fg, 7/8 ft, 3 to, 5 pf"
-const boxLine = (b) => `${b.pts} pts, ${b.reb} reb, ${b.ast} ast, ${b.blk} blk, ${b.fgm}/${b.fga} fg, ${b.ftm}/${b.fta} ft, ${b.to} to, ${b.pf} pf`;
+// His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
+const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
