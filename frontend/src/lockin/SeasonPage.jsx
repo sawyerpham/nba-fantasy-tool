@@ -614,15 +614,22 @@ function SwapArrows({ pairs, side, names }) {
     return () => ro.disconnect();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
   const step = Math.min(13, (ARROW_GUTTER - 24) / Math.max(1, lines.length));
+  // the steps whose order matters (sharing a player with another step: a chain), numbered 1, 2, ... in step order
+  const label = {};
+  for (const s of pairs) {
+    if (pairs.some((o) => o.n !== s.n && [o.in, o.out].some((x) => x === s.in || x === s.out))) label[s.n] = Object.keys(label).length + 1;
+  }
   const end = ARROW_GUTTER - 6;   // just left of the cards
   return (
     <svg ref={svgRef} className={`swap-arrows ${side}`} width={ARROW_GUTTER} data-testid={`swap-arrows-${side}`}>
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
-        // the vertical run breaks around the step number (mid ± gap), so the line never crosses it; neighbouring lines
-        // put theirs at different heights (middle, upper, lower third) so side-by-side numbers don't run together
-        const mid = l.y1 + (l.y2 - l.y1) * [0.5, 0.3, 0.7][i % 3], gap = 10;
+        // A number only where order matters: a step sharing a player with another step (a chain); a lone swap can be
+        // made any time, so it's a plain line. The vertical run breaks around the number (mid ± gap), so the line never
+        // crosses it; neighbouring lines put theirs at different heights so side-by-side numbers don't run together.
+        const chained = label[l.n] != null;
+        const mid = l.y1 + (l.y2 - l.y1) * [0.5, 0.3, 0.7][i % 3], gap = chained ? 10 : 0;
         const d = `M ${end - 5} ${l.y1} H ${x + r} Q ${x} ${l.y1} ${x} ${l.y1 + dir * r} V ${mid - dir * gap} `
           + `M ${x} ${mid + dir * gap} V ${l.y2 - dir * r} Q ${x} ${l.y2} ${x + r} ${l.y2} H ${end - 5}`;
         const head = (y) => `${end - 6},${y - 5} ${end + 1},${y} ${end - 6},${y + 5}`;
@@ -633,7 +640,7 @@ function SwapArrows({ pairs, side, names }) {
             <polygon points={head(l.y1)} fill="currentColor" />
             <polygon points={head(l.y2)} fill="currentColor" />
             {/* the step number on the line's middle; the right lane is mirrored, so flip the text back */}
-            <text className="swap-n" x={side === "right" ? -x : x} y={mid} transform={side === "right" ? "scale(-1,1)" : undefined}>{l.n}</text>
+            {chained && <text className="swap-n" x={side === "right" ? -x : x} y={mid} transform={side === "right" ? "scale(-1,1)" : undefined}>{label[l.n]}</text>}
           </g>
         );
       })}
