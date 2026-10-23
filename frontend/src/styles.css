@@ -714,6 +714,8 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 /* a locked game: a thin green outline, a faint tint and a small padlock in place of "final"; dashed = a guessed lock */
 .game-chip.locked { border: 1px solid color-mix(in srgb, var(--ok) 75%, transparent); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
 .game-chip.locked.guess { border-style: dashed; }
+.game-chip.lockable { cursor: pointer; }   /* click to lock / unlock */
+.game-chip.lockable:hover { border-color: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 25%, transparent); }
 .gch-lock { width: 9px; height: 11px; margin-left: 2px; vertical-align: -1px; color: var(--ok); }
 .team-col { display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
 .team-col-row { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; }
