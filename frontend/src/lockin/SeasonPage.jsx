@@ -321,7 +321,8 @@ function RosterAlerts({ roster }) {
 // game while he sits on the bench (it won't count, and it's too late to start him).
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team }) {
+// onLock(date): click a final game that can still be locked to lock it, the locked one to unlock it ("").
+function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onLock }) {
   const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
@@ -330,9 +331,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
-        const m = findMatch(matches, g, team);
+        const m = g.state !== "post" ? findMatch(matches, g, team) : null;   // a finished game has nothing to watch
         const href = m ? watchUrl(m) : null;
         const Tag = href ? "a" : "span";
+        const toggle = onLock && (lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null);
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
@@ -341,12 +343,13 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
+          toggle === "" ? "click to unlock" : toggle && "click to lock",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
         return (
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
-            onClick={href ? (e) => e.stopPropagation() : undefined}
+            onClick={href ? (e) => e.stopPropagation() : toggle != null ? (e) => { e.stopPropagation(); onLock(toggle); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
+            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""} ${toggle != null ? "lockable" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : lockDate === g.date ? <LockIcon /> : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
@@ -445,10 +448,8 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
             {p.nick && showNicks() && <span className="nick" data-tip="Nickname set on Sleeper"> · “{p.nick}”</span>}</div>
         </div>
         </div>
-        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane} />
-        {mine && starter && locked && (
-          <span className="mu-call"><span className="ok small clickable" data-tip="Click if he isn't locked" onClick={() => setLock(r.sid, "")}> ✓</span></span>
-        )}
+        <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane}
+          onLock={setLock ? (date) => setLock(r.sid, date) : null} />
       </div>
     </div>
   );
@@ -532,7 +533,7 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
     <React.Fragment key={key}>
       <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} side="right" day={them.seg?.date} lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
     </React.Fragment>
   );
   return (
