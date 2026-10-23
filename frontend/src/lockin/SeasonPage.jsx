@@ -346,9 +346,9 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
             onClick={href ? (e) => e.stopPropagation() : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? "locked" : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
+            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""}`}
             data-tip={tip}>
-            <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : lockDate === g.date ? <LockIcon /> : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </Tag>
         );
@@ -365,6 +365,14 @@ const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").rep
 
 // His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
 const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
+
+// a small padlock: a locked game shows it where "final" would be
+const LockIcon = () => (
+  <svg className="gch-lock" viewBox="0 0 10 12" aria-label="locked">
+    <path d="M3 5.2V3.6a2 2 0 0 1 4 0v1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    <rect x="1" y="5" width="8" height="6.5" rx="1.6" fill="currentColor" />
+  </svg>
+);
 
 const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 
