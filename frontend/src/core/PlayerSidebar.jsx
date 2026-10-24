@@ -9,7 +9,7 @@ import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile
 // season averages, ranks, ownership, owner, status, news), Game log (every game this season), Team (his team card and
 // depth chart) and History (draft, keeper, moves). No draft parts (Fit, Worth, bid guide, keeper outlook, tier).
 const TABS = [["summary", "Summary"], ["log", "Game log"], ["team", "Team"], ["history", "History"]];
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose, onOpenGame }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -145,7 +145,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </nav>
         {!ready ? <div className="small muted">Loading…</div>
           : tab === "summary" ? <>
-            <SeasonSummary sea={sea} />
+            <SeasonSummary sea={sea} onOpenGame={onOpenGame} />
             <textarea rows="1" style={{ width: "100%", marginTop: 10 }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} />
           </>
           : tab === "log" ? <SeasonLog sea={sea} />

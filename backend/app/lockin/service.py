@@ -737,7 +737,9 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
     if last:
         wk = next((x for x in me.get("games", []) if x["date"] == last["date"]), None)
         last = {**last, "team": team_abbr, "state": wk["state"] if wk else "post", "detail": wk.get("detail") if wk else "Final",
-                "team_pts": (wk or {}).get("score") or last["team_pts"], "opp_pts": (wk or {}).get("opp_score") or last["opp_pts"]}
+                "team_pts": (wk or {}).get("score") or last["team_pts"], "opp_pts": (wk or {}).get("opp_score") or last["opp_pts"],
+                # ESPN's game id, so the box opens that game's card: this week's games carry it, older ones from that day's scoreboard
+                "event": (wk or {}).get("event") or (espn_day(fetch, last["date"], date.fromisoformat(view["today"])).get(team_abbr) or {}).get("event")}
     research = (fetch(f"{SLEEPER}/players/nba/research/regular/{year}/{view['week']}", WEEK_TTL) or {}).get(sid) or {}
 
     adp = sorted(((r.projection or {}).get("adp_std"), pid) for pid, r in session.players.items()

@@ -154,9 +154,9 @@ export default function SeasonPage({ leagueId }) {
       </section>
       <aside className="season-side">
         {selected
-          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
+          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} onOpenGame={openGame} />
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId} onOpen={open} onClose={() => setGame(null)} />
-          : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} />}
+          : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
       </aside>
     </div>
   );
@@ -254,7 +254,8 @@ function GamePanel({ sel, data, leagueId, onOpen, onClose }) {
 //   Swap windows, Injury watch - tonight's live-vs-later comparisons and questionable / out starters.
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 const lastName = (n) => n.split(" ").slice(1).join(" ") || n;
-function LockinGuide({ data, plan, leagueId, setLock }) {
+// open(sid): a player's name opens his profile.
+function LockinGuide({ data, plan, leagueId, setLock, open }) {
   const [rid, setRid] = useState(plan.roster_id);
   const [other, setOther] = useState(null);
   const mine = rid === plan.roster_id;
@@ -288,7 +289,7 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
   const signed = (x) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}`;
   // a guessed lock (?) can be answered here: ✓ locked / ✕ not locked (saved like your own lock answers)
   const chip = (r, value, guess) => (
-    <span key={r.sid} className="guide-chip"><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)} <strong>{value}{guess ? "?" : ""}</strong>
+    <span key={r.sid} className="guide-chip"><span className="clickable guide-who" onClick={() => open(r.sid)}><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)}</span> <strong>{value}{guess ? "?" : ""}</strong>
       {guess && setLock && <>
         <button className="chip-btn" onClick={() => setLock(r.sid, r.lock_date)} data-tip="He locked it">✓</button>
         <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked">✕</button>
@@ -335,7 +336,7 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
             <div key={r.sid} className={`guide-lock ${e >= 0 ? "lock" : "pass"}`}>
               <Headshot sleeperId={r.sid} name={r.name} size={38} />
               <div className="guide-lock-main">
-                <div className="guide-lock-top"><strong>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
+                <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
                 <div className="small muted">Open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
                 {r.win_lock != null && (() => {
                   // locked where he sits now, when that isn't the best slot: what skipping the move costs
@@ -367,7 +368,7 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
           <div key={w.backup_sid} className="guide-row">
             <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
             <div className="small">
-              <div><strong>{w.backup}</strong> <span className="muted">for</span> <strong>{w.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
+              <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
               <div className="muted">{w.est != null ? `${lastName(w.name)} projected finish ~${fp(w.est)} · ${lastName(w.backup)} ~${fp(w.swap)}` : `${lastName(w.name)} not started · ${lastName(w.backup)} ~${fp(w.swap)}`}</div>
               {w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
             </div>
@@ -378,7 +379,7 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
         <h4>Injury watch</h4>
         {injuries.map((w) => (
           <div key={`${w.kind}-${w.sid}`} className="guide-row"><Headshot sleeperId={w.sid} name={w.name} size={30} />
-            <div className="small"><strong>{w.name}</strong> <span className="muted">· {w.kind === "out" ? "out" : "questionable"}{w.slot ? ` · ${w.slot}` : ""}{w.by ? ` · tips ${when(w.by)}` : ""}</span>
+            <div className="small"><strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· {w.kind === "out" ? "out" : "questionable"}{w.slot ? ` · ${w.slot}` : ""}{w.by ? ` · tips ${when(w.by)}` : ""}</span>
               {w.backup && <div className="muted">Bench option: {w.backup}</div>}</div></div>
         ))}
       </>}
