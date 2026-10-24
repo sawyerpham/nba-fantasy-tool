@@ -859,8 +859,10 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .gch-lockbtn.corner { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: var(--panel); border: 1.5px solid color-mix(in srgb, var(--ok) 70%, transparent); color: var(--ok); text-decoration: none; z-index: 2;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
-.gch-lockbtn.corner .gch-lock { margin: 0; width: 11px; height: 13px; }
+.gch-lockbtn.corner .gch-lock { margin: 0; width: 11px; height: 13px; color: inherit; }
 .gch-lockbtn.corner:hover { background: var(--ok); color: var(--panel); }
+.gch-lockbtn.corner.unlock { background: var(--ok); color: var(--panel); border-color: var(--ok); }   /* locked: click to unlock */
+.gch-lockbtn.corner.unlock:hover { background: var(--panel); color: var(--ok); }
 .gch-lockbtn.corner.watch { background: var(--primary); border-color: var(--primary); color: #fff; }
 .gch-lockbtn.corner.watch:hover { filter: brightness(1.2); }
 .gch-play { width: 9px; height: 10px; margin-left: 1px; }
