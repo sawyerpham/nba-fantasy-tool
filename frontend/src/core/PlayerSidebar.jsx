@@ -3,12 +3,12 @@ import { PosList, PosTag, posClass, tierHue } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
-import InjuryTag from "./InjuryTag.jsx";
-import SeasonBlock from "../lockin/SeasonProfile.jsx";
+import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile.jsx";
 
-
-// season: the in-season profile (Season tab): no draft parts (Fit, Worth, bid guide, keeper outlook, tier); adds the
-// fantasy owner, this week's games, the game log, news, overall + position rank and the depth-chart grid.
+// season: the in-season profile (Season tab), like Sleeper's: four tabs under his name. Summary (his live / last game,
+// season averages, ranks, ownership, owner, status, news), Game log (every game this season), Team (his team card and
+// depth chart) and History (draft, keeper, moves). No draft parts (Fit, Worth, bid guide, keeper outlook, tier).
+const TABS = [["summary", "Summary"], ["log", "Game log"], ["team", "Team"], ["history", "History"]];
 export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
@@ -17,6 +17,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [sea, setSea] = useState(null);
+  const [tab, setTab] = useState("summary");   // season profile tab; stays put from player to player
 
   // All four requests are fetched together and applied in one update, so the card never rebuilds piece by piece;
   // the previous player stays on screen until the new one is ready, and late answers for an older click are dropped.
@@ -61,20 +62,16 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     }
   };
 
-  return (
-    <div className="panel scroll" data-testid="player-sidebar" style={{ position: "relative" }}>
+  const head = (
+    <>
       {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
         {rec_.full_name} <span className="muted">{rec_.fantasy?.number != null && `#${rec_.fantasy.number} `}{rec_.team_abbr || "FA"}</span>
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
-          {season && sea && sea.player_id === shownId && (
-            <span className="profile-ranks">
-              {data.team?.role && <span className={`role-tag ${data.team.role.star ? "star" : ""}`} data-testid="team-role">{data.team.role.star ? "★ " : ""}{data.team.role.label}</span>}
-              {sea.pos_rank && <span className={`pos-c ${posClass(sea.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{sea.pos_rank}</span>}
-              {sea.overall_rank && <span className="pos-c" data-tip="Overall rank by Sleeper's average draft position.">#{sea.overall_rank} overall</span>}
-            </span>
+          {season && data.team?.role && (
+            <span className="profile-ranks"><span className={`role-tag ${data.team.role.star ? "star" : ""}`} data-testid="team-role">{data.team.role.star ? "★ " : ""}{data.team.role.label}</span></span>
           )}
           {!season && (row?.pos_rank || row?.tier != null || data.team?.role) && (
             <span className="profile-ranks">
@@ -99,7 +96,68 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         {bio.years_exp != null ? ` · ${bio.years_exp} yrs exp` : ""}{bio.draft_year ? ` · drafted ${bio.draft_year} R${bio.draft_round} #${bio.draft_number}` : ""}
       </div>
       {error && <div className="error">{error}</div>}
-      {season && sea && sea.player_id === shownId && <SeasonBlock sea={sea} plan={plan} />}
+    </>
+  );
+
+  // his NBA team: logo, his rank on the team, the team's fantasy-talent rank; the depth chart (season) or teammates
+  const teamCard = data.team && (
+    <div className="team-card" data-testid="team-card">
+      <div className="team-card-head">
+        <img src={data.team.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+        <div>
+          <div className="team-name">{data.team.name}{data.team.conference && <span className={`conf conf-${data.team.conference}`}>{data.team.conference}</span>}</div>
+          <div className="small muted">
+            {data.team.player_rank && <><strong style={{ color: "var(--text)" }}>#{data.team.player_rank}</strong> on the team · </>}
+            <span title={`sum of the top 8 players' projected FP/G (${data.team.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
+              team <strong style={{ color: "var(--text)" }}>#{data.team.talent_rank}</strong> of {data.team.teams} in projected fantasy talent
+            </span>
+          </div>
+        </div>
+      </div>
+      {season && data.team.depth_grid ? <DepthGrid grid={data.team.depth_grid} onSelectPlayer={onSelectPlayer} /> : (
+      <div className="teammates">
+        {[["Starters", data.team.teammates.filter((m) => m.starter)], ["Next up", data.team.teammates.filter((m) => !m.starter)]].map(([label, list]) => (
+          <div key={label} className="teammate-col">
+            <div className="bid-label">{label}</div>
+            {list.map((m) => (
+              <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
+                onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
+                title={[m.pos.join("/"), m.min && `${m.min} min`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ")}>
+                <PosTag className="teammate-rank" text={m.depth || "—"} />
+                <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
+                <span className="teammate-name">{m.name}</span>
+                <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>)}
+    </div>
+  );
+
+  if (season) {
+    const ready = sea && sea.player_id === shownId;
+    return (
+      <div className="panel scroll" data-testid="player-sidebar" style={{ position: "relative" }}>
+        {head}
+        <nav className="profile-tabs" data-testid="profile-tabs">
+          {TABS.map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`profile-${id}`}>{label}</button>)}
+        </nav>
+        {!ready ? <div className="small muted">Loading…</div>
+          : tab === "summary" ? <>
+            <SeasonSummary sea={sea} />
+            <textarea rows="1" style={{ width: "100%", marginTop: 10 }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} />
+          </>
+          : tab === "log" ? <SeasonLog sea={sea} />
+          : tab === "team" ? (teamCard || <div className="small muted">No NBA team.</div>)
+          : <SeasonHistory sea={sea} />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel scroll" data-testid="player-sidebar" style={{ position: "relative" }}>
+      {head}
 
       {!season && fit && fit.player_id === shownId && (
         <div className={`fit-card ${fit.verdict}`} data-testid="team-fit">
@@ -168,51 +226,12 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
         <span className="muted">Status:</span>{" "}
-        {season && sea && sea.player_id === shownId ? (
-          sea.retired ? <strong className="warn-text">retired (always 0)</strong>
-            : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> · {sea.injury_note}</span>}</>
-            : <strong>healthy</strong>
-        ) : (
-          <><strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
-            {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}</>
-        )}
+        <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
+        {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
       </div>
       <div><textarea rows="1" style={{ width: "100%" }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} /></div>
 
-      {data.team && (
-        <div className="team-card" data-testid="team-card">
-          <div className="team-card-head">
-            <img src={data.team.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
-            <div>
-              <div className="team-name">{data.team.name}{data.team.conference && <span className={`conf conf-${data.team.conference}`}>{data.team.conference}</span>}</div>
-              <div className="small muted">
-                {data.team.player_rank && <><strong style={{ color: "var(--text)" }}>#{data.team.player_rank}</strong> on the team · </>}
-                <span title={`sum of the top 8 players' projected FP/G (${data.team.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
-                  team <strong style={{ color: "var(--text)" }}>#{data.team.talent_rank}</strong> of {data.team.teams} in projected fantasy talent
-                </span>
-              </div>
-            </div>
-          </div>
-          {season && data.team.depth_grid ? <DepthGrid grid={data.team.depth_grid} onSelectPlayer={onSelectPlayer} /> : (
-          <div className="teammates">
-            {[["Starters", data.team.teammates.filter((m) => m.starter)], ["Next up", data.team.teammates.filter((m) => !m.starter)]].map(([label, list]) => (
-              <div key={label} className="teammate-col">
-                <div className="bid-label">{label}</div>
-                {list.map((m) => (
-                  <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
-                    onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
-                    title={[m.pos.join("/"), m.min && `${m.min} min`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ")}>
-                    <PosTag className="teammate-rank" text={m.depth || "—"} />
-                    <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
-                    <span className="teammate-name">{m.name}</span>
-                    <span className="teammate-fpg">{m.fpg.toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>)}
-        </div>
-      )}
+      {teamCard}
 
       <h3>Fantasy points</h3>
       {row && (
