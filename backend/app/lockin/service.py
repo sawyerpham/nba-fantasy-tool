@@ -18,6 +18,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from nba_fantasy_shared.models.players import GameLine
+from nba_fantasy_shared.reconcile.names import normalize_name
 from nba_fantasy_shared.scoring import base_points
 from nba_fantasy_shared.scoring.formula import score_game
 
@@ -304,6 +305,8 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
     teams = []
     for t in (data.get("boxscore") or {}).get("players") or []:
         abbr = ESPN_TEAM.get(t["team"]["abbreviation"], t["team"]["abbreviation"])
+        # ESPN's names -> our player ids (any player, rostered or not, opens his profile); his own team's wins a shared name
+        ids = {normalize_name(r.full_name): pid for pid, r in sorted(session.players.items(), key=lambda x: x[1].team_abbr == abbr)}
         block = (t.get("statistics") or [{}])[0]
         keys, played, dnp = block.get("keys") or [], [], []
         for a in block.get("athletes") or []:
@@ -319,7 +322,7 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
                 elif k in ESPN_PAIRS and "-" in str(v):
                     m, att = str(v).split("-", 1)
                     st_[ESPN_PAIRS[k][0]], st_[ESPN_PAIRS[k][1]] = _num(m), _num(att)
-            played.append({"name": ath.get("displayName"), "pos": (ath.get("position") or {}).get("abbreviation"),
+            played.append({"name": ath.get("displayName"), "player_id": ids.get(normalize_name(ath.get("displayName"))), "pos": (ath.get("position") or {}).get("abbreviation"),
                            "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
                            "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
                            "fp": round(actual_fp(st_, session.league.scoring), 1), "lead": lead_stats(st_, session.league.scoring)})
