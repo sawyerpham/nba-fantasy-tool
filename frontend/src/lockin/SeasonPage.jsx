@@ -42,6 +42,7 @@ export default function SeasonPage({ leagueId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
+  const [game, setGame] = useState(null);   // the game card on the right: { game, team, sid, name, toggle } (GamePanel)
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
@@ -109,7 +110,8 @@ export default function SeasonPage({ leagueId }) {
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
   const pidOf = (sid) => data.players[sid]?.player_id;
-  const open = (sid) => { const pid = pidOf(sid); if (pid) setSelected(pid); };
+  const open = (sid) => { const pid = pidOf(sid); if (pid) { setGame(null); setSelected(pid); } };
+  const openGame = (g) => { setSelected(null); setGame(g); };
   const setLock = (sid, gameDate) => api.post(`/leagues/${leagueId}/season/locks`, { week: data.week, sleeper_id: sid, game_date: gameDate })
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
@@ -145,7 +147,7 @@ export default function SeasonPage({ leagueId }) {
           </div>
         ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} setLock={setLock} leagueId={leagueId} />}
+        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} leagueId={leagueId} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -153,8 +155,98 @@ export default function SeasonPage({ leagueId }) {
       <aside className="season-side">
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
+          : game ? <GamePanel key={game.game.event} sel={game} setSel={setGame} data={data} leagueId={leagueId} setLock={setLock} onOpen={open} onClose={() => setGame(null)} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} />}
       </aside>
+    </div>
+  );
+}
+
+// The right side when a game card is clicked: that NBA game (backend game_detail, ESPN's summary), live or past.
+// Score and status, a stream link (streamed.pk) while it's on, the lock / unlock button for the player whose card was
+// clicked, then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered
+// players tagged with their fantasy team and clickable for their profile) and its depth chart. Refreshes every minute.
+const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
+  ["STL", (r) => r.stats.stl], ["BLK", (r) => r.stats.blk], ["TO", (r) => r.stats.to], ["FG", (r) => `${r.stats.fgm}-${r.stats.fga}`],
+  ["3PT", (r) => `${r.stats.tpm}-${r.stats.tpa}`], ["FT", (r) => `${r.stats.ftm}-${r.stats.fta}`], ["PF", (r) => r.stats.pf]];
+const normName = (n) => (n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, "")
+  .replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
+function GamePanel({ sel, setSel, data, leagueId, setLock, onOpen, onClose }) {
+  const [g, setG] = useState(null);
+  const [error, setError] = useState("");
+  const { list: matches } = useNBAMatches();
+  useEffect(() => {
+    const load = () => api.get(`/leagues/${leagueId}/season/game` + qs({ event: sel.game.event })).then((x) => { setG(x); setError(""); }).catch((e) => setError(e.message));
+    load();
+    const t = setInterval(load, REFRESH_MS);
+    return () => clearInterval(t);
+  }, [leagueId, sel.game.event]);
+  // fantasy rosters by name (ESPN's names, Sleeper's ids): who owns each player in the box score
+  const owner = {}, mineSid = new Set();
+  for (const t of data.teams) for (const sid of t.players) {
+    const n = data.players[sid]?.name;
+    if (n) owner[normName(n)] = { sid, team: t.user || t.name, mine: t.is_user };
+    if (t.is_user) mineSid.add(sid);
+  }
+  const m = sel.game.state !== "post" ? findMatch(matches, sel.game, sel.team) : null;
+  const watch = m ? watchUrl(m) : null;
+  const when = g?.tip ? fmt(g.tip, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  const status = !g ? "" : g.state === "in" ? quarters(g.detail) : g.state === "post" ? "Final" : `Tips ${fmt(g.tip, { hour: "numeric", minute: "2-digit" })}`;
+  const toggle = sel.toggle;
+  const lock = () => { setLock(sel.sid, toggle); setSel({ ...sel, toggle: toggle === "" ? sel.game.date : "" }); };
+  return (
+    <div className="panel scroll game-panel" data-testid="game-panel">
+      <button className="sidebar-close" onClick={onClose} title="Close game" data-testid="game-close">✕</button>
+      {!g ? <div className="muted">{error || "Loading the game…"}</div> : <>
+        <div className="gp-score">
+          {g.teams.map((t, i) => (
+            <React.Fragment key={t.abbr}>
+              {i === 1 && <div className="gp-status"><span className={g.state === "in" ? "gp-live" : ""}>{status}</span><span className="small muted">{when}</span></div>}
+              <div className={`gp-team ${i ? "home" : ""}`}>
+                {t.logo && <img src={t.logo} alt="" width={40} height={40} />}
+                <div><div className="gp-abbr">{t.abbr}</div><div className="gp-pts">{t.score ?? "—"}</div></div>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="gp-actions">
+          {watch && <a className="gp-watch" href={watch} target="_blank" rel="noopener noreferrer">▶ Watch</a>}
+          {toggle != null && setLock && <button className={`small ${toggle === "" ? "ghost" : "primary"}`} onClick={lock} data-testid="game-lock">
+            {toggle === "" ? `Unlock ${sel.name}` : `Lock ${sel.name}'s ${fp(sel.game.fp)}`}</button>}
+        </div>
+        {g.teams.map((t) => {
+          const rows = [...t.players].sort((a, b) => b.starter - a.starter || b.min - a.min);
+          return (
+            <section key={t.abbr} className="gp-section">
+              <h4>{t.name}</h4>
+              {rows.length ? (
+                <table className="gp-box"><thead><tr><th>Player</th>{BOX_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}<th className="num">FP</th></tr></thead>
+                  <tbody>{rows.map((r) => {
+                    const own = owner[normName(r.name)];
+                    return (
+                      <tr key={r.name} className={own?.mine ? "gp-mine" : ""}>
+                        <td className={own ? "clickable" : ""} onClick={own ? () => onOpen(own.sid) : undefined}>
+                          <span className="gp-name">{r.name.split(" ").slice(1).join(" ") || r.name}</span>
+                          {own && <span className={`gp-owner ${own.mine ? "mine" : ""}`} data-tip={`On ${own.team}'s roster`}>{own.mine ? "you" : own.team}</span>}
+                        </td>
+                        {BOX_COLS.map(([h, f]) => <td key={h} className="num">{f(r)}</td>)}
+                        <td className="num"><strong>{fp(r.fp)}</strong></td>
+                      </tr>
+                    );
+                  })}</tbody></table>
+              ) : <div className="small muted">No minutes yet.</div>}
+              {t.dnp.some((d) => d.reason) && <div className="small muted gp-dnp">{g.state === "post" ? "DNP" : "Not in yet"}: {t.dnp.filter((d) => d.reason).map((d) => d.name).join(", ")}</div>}
+              <div className="gp-depth">{["PG", "SG", "SF", "PF", "C"].map((pos) => (
+                <div key={pos} className="gp-depth-row"><PosTag text={pos} />
+                  <span className="small">{(t.depth[pos] || []).map((d, i) => (
+                    <span key={d.sid || d.name} className={`${mineSid.has(d.sid) ? "gp-mine-name" : ""} ${i ? "muted" : ""}`}>{i ? " · " : ""}{d.name.split(" ").slice(1).join(" ") || d.name}</span>
+                  ))}{!(t.depth[pos] || []).length && <span className="muted">—</span>}</span>
+                </div>
+              ))}</div>
+            </section>
+          );
+        })}
+      </>}
     </div>
   );
 }
@@ -327,9 +419,9 @@ function RosterAlerts({ roster }) {
 // game while he sits on the bench (it won't count, and it's too late to start him).
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-// onLock(date): click a final game that can still be locked to lock it, the locked one to unlock it ("").
-function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onLock }) {
-  const { list: matches } = useNBAMatches();
+// onOpen(game, toggle): a click opens the game on the right (GamePanel) with what its lock button would do: the date
+// to lock (a final game he can still lock), "" to unlock (the locked one), or null (neither).
+function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen }) {
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
         // live: ESPN says in progress, or his stats are coming in before ESPN's state catches up; final only once ESPN says so
@@ -337,10 +429,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
-        const m = g.state !== "post" ? findMatch(matches, g, team) : null;   // a finished game has nothing to watch
-        const href = m ? watchUrl(m) : null;
-        const Tag = href ? "a" : "span";
-        const toggle = onLock && (lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null);
+        const toggle = lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
@@ -349,17 +438,15 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
-          toggle === "" ? "click to unlock" : toggle && "click to lock",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
         return (
-          <Tag key={g.date} {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
-            onClick={href ? (e) => e.stopPropagation() : toggle != null ? (e) => { e.stopPropagation(); onLock(toggle); } : undefined}
+          <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g, toggle); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${href ? "watch" : ""} ${dead ? "dead" : ""} ${toggle != null ? "lockable" : ""}`}
+            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : lockDate === g.date ? <LockIcon /> : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
-          </Tag>
+          </span>
         );
       });
   if (!lane) return <span className="chips-row">{chips}</span>;
@@ -438,7 +525,7 @@ function laneAt(xs, ms, start, end, width) {
 const EXP_TIP = "Expected final score: locked points plus what each slot is expected to add (each player's locked game, " +
   "else the better of locking his last game and waiting for his later ones).";
 
-function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
+function PlayerCard({ data, r, open, openGame, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const starter = r.slot !== "BN" && r.slot !== "IR";
@@ -455,7 +542,7 @@ function PlayerCard({ data, r, open, setLock, mine, side, day, lane }) {
         </div>
         </div>
         <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane}
-          onLock={setLock ? (date) => setLock(r.sid, date) : null} />
+          onOpen={openGame ? (g, toggle) => openGame({ game: g, team: p.team, sid: r.sid, name: r.name, toggle }) : null} />
       </div>
     </div>
   );
@@ -475,7 +562,7 @@ function bySlot(rows, positions, irSlots) {
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
-function WeekView({ data, plan, open, setLock, leagueId }) {
+function WeekView({ data, plan, open, openGame, leagueId }) {
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -537,9 +624,9 @@ function WeekView({ data, plan, open, setLock, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} side="right" day={them.seg?.date} lane={xs} /></div>
     </React.Fragment>
   );
   return (

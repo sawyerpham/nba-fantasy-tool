@@ -111,7 +111,7 @@ def espn_day(fetch: Fetch, day: str, today: date) -> dict[str, dict]:
         st = e["status"]["type"]
         for side, team in teams.items():
             other = "away" if side == "home" else "home"
-            out[team] = {"tip": e["date"], "state": st["state"], "detail": st.get("shortDetail", ""),
+            out[team] = {"tip": e["date"], "state": st["state"], "detail": st.get("shortDetail", ""), "event": e.get("id"),
                          "opp": teams[other], "home": side == "home",
                          "score": score[side] if st["state"] != "pre" else None, "opp_score": score[other] if st["state"] != "pre" else None,
                          "period": e["status"].get("period") or 0, "clock": float(e["status"].get("clock") or 0)}
@@ -223,7 +223,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                           "proj_min": round(float(p.get("sp") or 0) / 60, 1) if p else None,
                           "period": tip.get("period", 0), "clock": tip.get("clock", 0.0),
                           "score": tip.get("score"), "opp_score": tip.get("opp_score"),   # the game's score (live or final)
-                          "b2b": b2b(d, team),
+                          "b2b": b2b(d, team), "event": tip.get("event"),   # ESPN's game id (the game card on the right)
                           # his box score (live games too), for the game card's hover
                           "box": {k: int(st.get(k) or 0) for k in BOX_KEYS} if played else None})
             g = games[-1]
@@ -261,6 +261,64 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
             "team_games": team_games, "injury_tags": injury_tags, "faab_budget": faab_budget, "waiver": waiver,
             "teams": teams,
             "matchups": [sides for _, sides in sorted(pairs.items())], "players": players}
+
+
+ESPN_SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event={}"
+# ESPN box score columns (statistics[0].keys) -> Sleeper stat keys, so actual_fp scores them with the league's formula
+ESPN_BOX = {"points": "pts", "rebounds": "reb", "assists": "ast", "steals": "stl", "blocks": "blk", "turnovers": "to",
+            "offensiveRebounds": "oreb", "defensiveRebounds": "dreb", "fouls": "pf", "plusMinus": "plus_minus"}
+ESPN_PAIRS = {"fieldGoalsMade-fieldGoalsAttempted": ("fgm", "fga"), "threePointFieldGoalsMade-threePointFieldGoalsAttempted": ("tpm", "tpa"),
+              "freeThrowsMade-freeThrowsAttempted": ("ftm", "fta")}
+
+
+def _num(s) -> float:
+    try:
+        return float(str(s).replace("+", ""))
+    except ValueError:
+        return 0.0
+
+
+def game_detail(session, fetch: Fetch, event: str) -> dict:
+    """One NBA game for the right-side game card (ESPN's summary): status and date, then per team its name, logo and
+    score, every player's box score (players who got minutes; DNPs listed apart) with fantasy points in the league's
+    scoring, and the team's depth chart (Sleeper's, from the player pool): PG -> C, 1st / 2nd / 3rd."""
+    data = fetch(ESPN_SUMMARY.format(event), LIVE_TTL) or {}
+    comp = ((data.get("header") or {}).get("competitions") or [{}])[0]
+    st = (comp.get("status") or {}).get("type") or {}
+    score = {ESPN_TEAM.get(c["team"]["abbreviation"], c["team"]["abbreviation"]): (c.get("score"), c.get("homeAway") == "home")
+             for c in comp.get("competitors") or []}
+    teams = []
+    for t in (data.get("boxscore") or {}).get("players") or []:
+        abbr = ESPN_TEAM.get(t["team"]["abbreviation"], t["team"]["abbreviation"])
+        block = (t.get("statistics") or [{}])[0]
+        keys, played, dnp = block.get("keys") or [], [], []
+        for a in block.get("athletes") or []:
+            ath, vals = a.get("athlete") or {}, a.get("stats") or []
+            if a.get("didNotPlay") or not vals or _num(vals[0]) == 0:
+                dnp.append({"name": ath.get("displayName"), "reason": a.get("reason") if a.get("didNotPlay") else None})
+                continue
+            raw = dict(zip(keys, vals))
+            st_ = {"sp": _num(raw.get("minutes")) * 60}
+            for k, v in raw.items():
+                if k in ESPN_BOX:
+                    st_[ESPN_BOX[k]] = _num(v)
+                elif k in ESPN_PAIRS and "-" in str(v):
+                    m, att = str(v).split("-", 1)
+                    st_[ESPN_PAIRS[k][0]], st_[ESPN_PAIRS[k][1]] = _num(m), _num(att)
+            played.append({"name": ath.get("displayName"), "pos": (ath.get("position") or {}).get("abbreviation"),
+                           "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
+                           "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
+                           "fp": round(actual_fp(st_, session.league.scoring), 1)})
+        depth = {}
+        for pos in ("PG", "SG", "SF", "PF", "C"):
+            recs = [r for r in session.players.values() if r.team_abbr == abbr and r.fantasy
+                    and r.fantasy.depth_chart_position == pos and r.fantasy.depth_chart_order]
+            depth[pos] = [{"name": r.full_name, "sid": r.sleeper_id} for r in sorted(recs, key=lambda r: r.fantasy.depth_chart_order)[:3]]
+        s, home = score.get(abbr, (None, False))
+        teams.append({"abbr": abbr, "name": t["team"].get("displayName"), "logo": t["team"].get("logo"), "score": s, "home": home,
+                      "players": played, "dnp": dnp, "depth": depth})
+    teams.sort(key=lambda t: t["home"])   # away first, home second ("LAC @ LAL")
+    return {"event": event, "tip": comp.get("date"), "state": st.get("state"), "detail": st.get("shortDetail"), "teams": teams}
 
 
 def detect_lock(counted: float | None, games: list[dict], manual: str | None) -> tuple[str, str | None]:
