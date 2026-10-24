@@ -169,7 +169,7 @@ export default function SeasonPage({ leagueId }) {
         )}
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={close} onOpenGame={openGame} />
-          : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId} onOpen={open}
+          : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId}
             onOpenPid={setSelected} onClose={close} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
       </aside>
@@ -180,7 +180,7 @@ export default function SeasonPage({ leagueId }) {
 // The right side when a game card is clicked: that NBA game (backend game_detail, ESPN's summary), live or past.
 // Score and status, a stream link (streamed.pk) while it's on, each team's top 5 by fantasy points with their headline stats (like Sleeper's),
 // then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered players tagged with their fantasy
-// team and clickable for their profile) and its depth chart (the player profile's). Refreshes every minute.
+// team; any player matched to ours clickable for his profile) and its depth chart (the player profile's). Refreshes every minute.
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
   ["STL", (r) => r.stats.stl], ["BLK", (r) => r.stats.blk], ["TO", (r) => r.stats.to], ["FG", (r) => `${r.stats.fgm}-${r.stats.fga}`],
   ["3PT", (r) => `${r.stats.tpm}-${r.stats.tpa}`], ["FT", (r) => `${r.stats.ftm}-${r.stats.fta}`], ["PF", (r) => r.stats.pf]];
@@ -190,7 +190,7 @@ const normName = (n) => (n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLow
 const GpHead = ({ src, size }) => src
   ? <img className="gp-head" src={src} alt="" width={size} height={size} style={{ width: size, height: size }} loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
   : <span className="gp-head" style={{ width: size, height: size }} />;
-function GamePanel({ sel, data, leagueId, onOpen, onOpenPid, onClose }) {
+function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
   const [g, setG] = useState(null);
   const [error, setError] = useState("");
   const { list: matches } = useNBAMatches();
@@ -235,7 +235,7 @@ function GamePanel({ sel, data, leagueId, onOpen, onOpenPid, onClose }) {
                 {[...t.players].sort((a, b) => b.fp - a.fp).slice(0, 5).map((r) => {
                   const own = owner[normName(r.name)];
                   return (
-                    <div key={r.name} className={`gp-leader ${own ? "clickable" : ""}`} onClick={own ? () => onOpen(own.sid) : undefined}>
+                    <div key={r.name} className={`gp-leader ${r.player_id ? "clickable" : ""}`} onClick={r.player_id ? () => onOpenPid(r.player_id) : undefined}>
                       <GpHead src={r.head} size={34} />
                       <div>
                         <div className={`gp-name ${own?.mine ? "gp-mine-name" : ""}`}>{r.name}</div>
@@ -260,7 +260,7 @@ function GamePanel({ sel, data, leagueId, onOpen, onOpenPid, onClose }) {
                     const own = owner[normName(r.name)];
                     return (
                       <tr key={r.name} className={own?.mine ? "gp-mine" : ""}>
-                        <td className={own ? "clickable" : ""} onClick={own ? () => onOpen(own.sid) : undefined}>
+                        <td className={r.player_id ? "clickable" : ""} onClick={r.player_id ? () => onOpenPid(r.player_id) : undefined}>
                           <span className="gp-player">
                             <GpHead src={r.head} size={22} />
                             <span className="gp-name">{initialName(r.name)}</span>
