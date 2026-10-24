@@ -743,6 +743,10 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .matchup .mu-team.right { justify-content: flex-end; }
 .matchup .mc-name { font-size: 16px; } .matchup .mc-points { font-size: 26px; line-height: 1; }
 .matchup .mu-mid { flex-direction: row; gap: 8px; }
+/* ...on the lineup grid's columns (80px arrow lanes = 70px + the 10px gap, 46px slots): each score's inner edge lines up with the cards below */
+.matchup .mu-head:has(.mu-mid) { display: grid; grid-template-columns: 70px minmax(0, 1fr) 46px minmax(0, 1fr) 70px; column-gap: 10px; }
+.matchup .mu-head:has(.mu-mid) > .mu-arrow:last-child { justify-self: end; }
+.matchup .mu-head .mu-mid { flex-direction: column; gap: 2px; white-space: nowrap; }   /* "1/6" over "mine", in the 46px slot column */
 .mu-arrow { position: static; font-size: 15px; padding: 3px 10px; }
 .mu-grid { gap: 4px 8px; }
 .mu-card { padding: 3px 10px; }
