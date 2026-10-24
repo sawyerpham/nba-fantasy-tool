@@ -471,7 +471,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE"
-              : lockDate === g.date ? <LockIcon />
+              : lockDate === g.date && toggle !== "" ? <LockIcon />   /* the corner's unlock padlock says it otherwise */
               : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             {toggle && <button className="gch-lockbtn corner" onClick={lockClick} aria-label="Lock" data-testid="lock-game"><LockIcon open /></button>}
             {toggle === "" && <button className="gch-lockbtn corner unlock" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button>}
@@ -493,7 +493,7 @@ const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").rep
 // His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
 const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
 
-// a small padlock: a locked game shows it where "final" would be; open (shackle lifted) on the lock button
+// a small padlock: a locked game with no unlock button shows it where "final" would be; open (shackle lifted) on the lock button
 const LockIcon = ({ open }) => (
   <svg className="gch-lock" viewBox="0 0 10 12" aria-hidden="true">
     <path d={open ? "M3 5.2V2.6a2 2 0 0 1 4 0v.6" : "M3 5.2V3.6a2 2 0 0 1 4 0v1.6"} fill="none" stroke="currentColor" strokeWidth="1.4" />
