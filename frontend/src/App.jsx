@@ -20,7 +20,7 @@ const WALLPAPERS = [
   ["kawhi-dagger", "Kawhi dagger"],
   ["wemby-block", "Wemby block"],
   ["wemby-spurs", "Wemby"],
-  ["lebron-ft", "LeBron"],
+  ["lebron-ft", "Masked LeBron"],
   ["lin-calderon", "Lin over Calderón"],
   ["haliburton-msg", "Haliburton at MSG"],
   ["curry-okc", "Curry from deep"],
