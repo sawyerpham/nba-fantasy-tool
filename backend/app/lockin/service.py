@@ -444,6 +444,12 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     for q in players:   # every lockable game: which slot to lock him in (the one leaving the rest of the lineup most)
         if q.seat and q.x is not None and q.locked is None:
             q.lock_at = lock_slots(q, players, counts)
+            if theirs and q.win_lock is not None and q.lock_at:
+                # the win chance locked in each slot: win_lock assumes the best one; a worse slot costs the rest of
+                # the lineup (best team - that slot's team), e.g. locking where he sits instead of moving him first
+                mean, var = team_total(players, skip=q)
+                for o in q.lock_at:
+                    o["win"] = round(win_chance((mean + q.x - (q.lock_at[0]["team"] - o["team"]), var), theirs), 3)
     today = view.get("day", view["today"])
     t = plan_today(players, counts, today) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
