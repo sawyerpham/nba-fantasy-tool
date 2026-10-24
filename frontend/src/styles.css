@@ -710,7 +710,7 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .game-chip.dead { --x: color-mix(in srgb, var(--muted) 55%, transparent);
   background-image: linear-gradient(to top right, transparent calc(50% - 1px), var(--x) calc(50% - 1px), var(--x) calc(50% + 1px), transparent calc(50% + 1px)),
                     linear-gradient(to bottom right, transparent calc(50% - 1px), var(--x) calc(50% - 1px), var(--x) calc(50% + 1px), transparent calc(50% + 1px)); }
-.game-chip.live { border-color: var(--danger); } .game-chip.live .gch-time { color: var(--danger); font-weight: 800; font-size: calc(1em - 1px); }   /* LIVE: 1px under the quarter beside it */
+.game-chip.live .gch-time { color: var(--danger); font-weight: 800; font-size: calc(1em - 1px); }   /* LIVE: 1px under the quarter beside it */
 /* a locked game: a thin green outline, a faint tint and a small padlock in place of "final"; dashed = a guessed lock */
 .game-chip.locked { border: 1px solid color-mix(in srgb, var(--ok) 75%, transparent); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
 .game-chip.locked.guess { border-style: dashed; }
