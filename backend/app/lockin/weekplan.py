@@ -317,8 +317,29 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     plan_seat = {id(p): p.seat for p in players}
     for p in players:   # today's seating starts empty: nobody keeps a week-plan seat he isn't given today
         p.seat = None
-    seats = seat_players(tier1 + tier2 + tier3, slot_counts, pinned)
+    order = tier1 + tier2 + tier3
+    seats = seat_players(order, slot_counts, pinned)
     today_seat = {id(p): p.seat for p in players}
+    watch = today_watch(players, today, today_seat)
+    # A SWAP call (a starter's game in progress headed below a later bench player's): the lineup makes it, so the
+    # arrows and the timeline show it, not just the swap window. The backup is pinned into the starter's slot, he sits.
+    by_sid = {p.sid: p for p in players}
+    swaps = {}   # starter sid -> (backup, slot); one backup per starter
+    for w in watch:
+        if w["kind"] == "swap" and w["decision"] == "SWAP" and w["sid"] not in swaps:
+            swaps[w["sid"]] = (by_sid[w["backup_sid"]], w["slot"])
+    if swaps:
+        sat = {id(by_sid[s]) for s in swaps}
+        backups = [(b, slot, b.slot) for b, slot in swaps.values()]
+        for b, slot, _ in backups:
+            b.slot = slot
+        for p in players:
+            p.seat = None
+        seats = seat_players([p for p in order if id(p) not in sat and all(p is not b for b, _, _ in backups)], slot_counts,
+                             [p for p in pinned if id(p) not in sat] + [b for b, _, _ in backups])
+        for b, _, was in backups:
+            b.slot = was
+        today_seat = {id(p): p.seat for p in players}
     for p in players:   # leave the week plan's seats on the players
         p.seat = plan_seat[id(p)]
 
@@ -330,8 +351,7 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
             moves.append({"sid": p.sid, "name": p.name, "from": p.slot, "to": to,
                           "by": g.tip if g and not g.started else None})
     moves.sort(key=lambda m: (m["by"] or "~", m["to"] == "BN"))
-    return TodayLineup(seats={s: [p.sid for p in ps] for s, ps in seats.items()}, moves=moves,
-                       watch=today_watch(players, today, today_seat))
+    return TodayLineup(seats={s: [p.sid for p in ps] for s, ps in seats.items()}, moves=moves, watch=watch)
 
 
 GAME_SECONDS, QUARTER_SECONDS, PRIOR_MINUTES = 48 * 60, 12 * 60, 10.0

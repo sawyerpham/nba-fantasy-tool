@@ -151,8 +151,12 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
     sab = pp("sabonis", ["PF", "C"], "BN", [Game(today, 13.7, tip="2026-10-22T02:30Z", proj_min=34)] + future(14.0))
     players, pf = [wig, grant, sab], {"PF": 2}
     plan_week(players, pf)
-    w = next(x for x in plan_today(players, pf, today).watch if x["kind"] == "swap")
+    t = plan_today(players, pf, today)
+    w = next(x for x in t.watch if x["kind"] == "swap")
     assert (w["decision"], w["name"], w["backup"]) == ("SWAP", "wiggins", "sabonis")
+    # the lineup makes the swap while Wiggins is still playing (Sabonis tips before his game ends), not after
+    assert sorted(t.seats["PF"]) == ["grant", "sabonis"]
+    assert {m["sid"]: (m["from"], m["to"]) for m in t.moves} == {"wiggins": ("PF", "BN"), "sabonis": ("BN", "PF")}
 
     for g in wig.games[:1] + grant.games[:1]:   # the timeline's check after their games: free to move, same scores
         g.live = False
