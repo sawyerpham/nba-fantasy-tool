@@ -567,6 +567,12 @@ body { background: #000; }
 th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
 [data-theme="light"] body { background: #f6f7fb; }
+/* the wallpaper (Settings tab): a pixelated photo fixed behind everything, top to bottom of the window, dimmed so the
+   panels over it stay readable; its own layer so image-rendering doesn't pixelate the headshots too */
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--wall, none) center bottom / auto 100% no-repeat; image-rendering: pixelated; opacity: 0.3; }
+[data-theme="light"] body::before { opacity: 0.25; }
+.wall-pick { display: flex; align-items: center; gap: 14px; } .wall-pick h3 { margin: 0; }
 /* small pills and inputs: a darker backing so their colours stay legible */
 :root:not([data-theme="light"]) :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: inset 0 0 0 999px rgba(10, 12, 16, 0.45); }
 .tip, .dropdown, .modal, .toast, input, select, textarea { text-shadow: none; }
