@@ -13,13 +13,17 @@ const quarters = (d) => (d || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $
 
 // Summary: his live / last game (both teams, score, quarter + clock, his FP and line), season averages, then ranks,
 // ownership and FP per game; owner and injury status under them.
-export function SeasonSummary({ sea }) {
+// onOpenGame(game): the live / last game box opens that game's card (GamePanel) on the right.
+export function SeasonSummary({ sea, onOpenGame }) {
   const g = sea.last_game, a = sea.averages, live = g?.state === "in";
   const stat = (label, value) => <div className="sp-stat"><span>{label}</span><strong>{value}</strong></div>;
+  const openable = g?.event && onOpenGame;
   return (
     <div data-testid="season-summary">
       {g && (
-        <div className={`sp-game ${live ? "live" : ""}`}>
+        <div className={`sp-game ${live ? "live" : ""} ${openable ? "clickable" : ""}`} data-testid="last-game"
+          onClick={openable ? () => onOpenGame({ game: g, team: g.team, sid: sea.sleeper_id }) : undefined}
+          data-tip={openable ? "Open the game" : undefined}>
           <div className="sp-game-top">
             <span className="small muted">{live ? <span className="sp-live">LIVE</span> : "Last game"} · {mmdd(g.date)}</span>
             <span className="small">{live ? quarters(g.detail) : "Final"}</span>
