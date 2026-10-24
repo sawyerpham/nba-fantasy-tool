@@ -168,6 +168,7 @@ export default function SeasonPage({ leagueId }) {
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
   ["STL", (r) => r.stats.stl], ["BLK", (r) => r.stats.blk], ["TO", (r) => r.stats.to], ["FG", (r) => `${r.stats.fgm}-${r.stats.fga}`],
   ["3PT", (r) => `${r.stats.tpm}-${r.stats.tpa}`], ["FT", (r) => `${r.stats.ftm}-${r.stats.fta}`], ["PF", (r) => r.stats.pf]];
+const initialName = (n) => { const [first, ...rest] = (n || "").split(" "); return rest.length ? `${first[0]}. ${rest.join(" ")}` : n; };   // "R. Hachimura"
 const normName = (n) => (n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, "")
   .replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
 function GamePanel({ sel, data, leagueId, onOpen, onClose }) {
@@ -213,17 +214,20 @@ function GamePanel({ sel, data, leagueId, onOpen, onClose }) {
             <section key={t.abbr} className="gp-section">
               <h4>{t.name}</h4>
               {rows.length ? (
-                <table className="gp-box"><thead><tr><th>Player</th>{BOX_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}<th className="num">FP</th></tr></thead>
+                <table className="gp-box"><thead><tr><th>Player</th><th className="num">FP</th>{BOX_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
                   <tbody>{rows.map((r) => {
                     const own = owner[normName(r.name)];
                     return (
                       <tr key={r.name} className={own?.mine ? "gp-mine" : ""}>
                         <td className={own ? "clickable" : ""} onClick={own ? () => onOpen(own.sid) : undefined}>
-                          <span className="gp-name">{r.name.split(" ").slice(1).join(" ") || r.name}</span>
-                          {own && <span className={`gp-owner ${own.mine ? "mine" : ""}`} data-tip={`On ${own.team}'s roster`}>{own.mine ? "you" : own.team}</span>}
+                          <span className="gp-player">
+                            {r.head ? <img className="gp-head" src={r.head} alt="" width={22} height={22} loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                              : <span className="gp-head" />}
+                            <span className="gp-name">{initialName(r.name)}</span>
+                          </span>
                         </td>
-                        {BOX_COLS.map(([h, f]) => <td key={h} className="num">{f(r)}</td>)}
                         <td className="num"><strong>{fp(r.fp)}</strong></td>
+                        {BOX_COLS.map(([h, f]) => <td key={h} className="num">{f(r)}</td>)}
                       </tr>
                     );
                   })}</tbody></table>

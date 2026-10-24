@@ -843,7 +843,8 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .gp-box td { padding: 4px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space: nowrap; }
 .gp-box .num { text-align: right; } .gp-box th:first-child { text-align: left; }
 .gp-name { font-weight: 600; } .gp-mine td { background: var(--primary-soft); }
-.gp-owner { margin-left: 5px; font-size: 9.5px; color: var(--muted); } .gp-owner.mine { color: var(--primary); font-weight: 700; }
+.gp-player { display: inline-flex; align-items: center; gap: 6px; }
+.gp-head { width: 22px; height: 22px; flex: none; border-radius: 50%; object-fit: cover; background: var(--panel-2); }
 .gp-dnp { margin-top: 4px; }
 .gp-depth { margin-top: 8px; display: grid; gap: 3px; }
 .gp-depth-row { display: grid; grid-template-columns: 30px 1fr; align-items: center; }
