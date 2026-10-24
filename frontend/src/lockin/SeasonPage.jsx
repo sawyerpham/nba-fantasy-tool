@@ -41,8 +41,15 @@ export default function SeasonPage({ leagueId }) {
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [game, setGame] = useState(null);   // the game card on the right: { game, team, sid, name } (GamePanel)
+  // The right side's history, like a browser's: each entry a player profile { pid }, a game card { game: { game, team, sid, name } }
+  // (GamePanel) or null (the guide); ‹ › step through it, opening something new drops what was ahead.
+  const [nav, setNav] = useState({ stack: [null], i: 0 });
+  const cur = nav.stack[nav.i], selected = cur?.pid ?? null, game = cur?.game ?? null;
+  const go = (entry) => setNav(({ stack, i }) => {
+    const same = (a, b) => a === b || (a?.pid && a.pid === b?.pid) || (a?.game && a.game.game.event === b?.game?.game.event);
+    return same(stack[i], entry) ? { stack, i } : { stack: [...stack.slice(0, i + 1), entry], i: i + 1 };
+  });
+  const setSelected = (pid) => go(pid ? { pid } : null);
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
@@ -110,8 +117,8 @@ export default function SeasonPage({ leagueId }) {
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
   const pidOf = (sid) => data.players[sid]?.player_id;
-  const open = (sid) => { const pid = pidOf(sid); if (pid) { setGame(null); setSelected(pid); } };
-  const openGame = (g) => { setSelected(null); setGame(g); };
+  const open = (sid) => { const pid = pidOf(sid); if (pid) setSelected(pid); };
+  const openGame = (g) => go({ game: g });
   const setLock = (sid, gameDate) => api.post(`/leagues/${leagueId}/season/locks`, { week: data.week, sleeper_id: sid, game_date: gameDate })
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
@@ -153,10 +160,16 @@ export default function SeasonPage({ leagueId }) {
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
       <aside className="season-side">
+        {nav.stack.length > 1 && (
+          <span className="side-nav">
+            <button onClick={() => setNav((n) => ({ ...n, i: n.i - 1 }))} disabled={!nav.i} title="Back" aria-label="Back" data-testid="side-back">‹</button>
+            <button onClick={() => setNav((n) => ({ ...n, i: n.i + 1 }))} disabled={nav.i === nav.stack.length - 1} title="Forward" aria-label="Forward" data-testid="side-forward">›</button>
+          </span>
+        )}
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} onOpenGame={openGame} />
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId} onOpen={open}
-            onOpenPid={(pid) => { setGame(null); setSelected(pid); }} onClose={() => setGame(null)} />
+            onOpenPid={setSelected} onClose={() => go(null)} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
       </aside>
     </div>
