@@ -252,7 +252,13 @@ function LockinGuide({ data, plan, leagueId, setLock }) {
               <div className="guide-lock-main">
                 <div className="guide-lock-top"><strong>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
                 <div className="small muted">Open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
-                {r.win_lock != null && <div className="small muted">Win % locked <span className="guide-hi">{pct(r.win_lock)}</span> · open <span className="guide-hi">{pct(r.win_wait)}</span></div>}
+                {r.win_lock != null && (() => {
+                  // locked where he sits now, when that isn't the best slot: what skipping the move costs
+                  const here = r.lock_at?.find((o) => o.slot === r.slot && o !== r.lock_at[0] && o.win != null);
+                  return <div className="small muted">Win % locked <span className="guide-hi">{pct(r.win_lock)}</span>{here ? ` at ${r.lock_at[0].slot}` : ""}
+                    {here && <> · <span className="warn-text">{pct(here.win)} at {here.slot}</span> where he sits</>}
+                    {" "}· open <span className="guide-hi">{pct(r.win_wait)}</span></div>;
+                })()}
                 {r.lock_at?.length > 0 && (() => {
                   // which slot to lock him in: the rest of the lineup's value with him locked in each slot he can play
                   const [best, ...rest] = r.lock_at;
