@@ -41,15 +41,16 @@ export default function SeasonPage({ leagueId }) {
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  // The right side's history, like a browser's: each entry a player profile { pid }, a game card { game: { game, team, sid, name } }
-  // (GamePanel) or null (the guide); ‹ › step through it, opening something new drops what was ahead.
-  const [nav, setNav] = useState({ stack: [null], i: 0 });
+  // The right side's history, like a browser's: each entry a player profile { pid } or a game card { game: { game, team, sid, name } }
+  // (GamePanel); ‹ › step through it, opening something new drops what was ahead. ✕ clears it back to the guide.
+  const [nav, setNav] = useState({ stack: [], i: -1 });
   const cur = nav.stack[nav.i], selected = cur?.pid ?? null, game = cur?.game ?? null;
   const go = (entry) => setNav(({ stack, i }) => {
-    const same = (a, b) => a === b || (a?.pid && a.pid === b?.pid) || (a?.game && a.game.game.event === b?.game?.game.event);
+    const same = (a, b) => (a?.pid && a.pid === b.pid) || (a?.game && a.game.game.event === b.game?.game.event);
     return same(stack[i], entry) ? { stack, i } : { stack: [...stack.slice(0, i + 1), entry], i: i + 1 };
   });
-  const setSelected = (pid) => go(pid ? { pid } : null);
+  const close = () => setNav({ stack: [], i: -1 });
+  const setSelected = (pid) => (pid ? go({ pid }) : close());
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
@@ -159,17 +160,17 @@ export default function SeasonPage({ leagueId }) {
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
-      <aside className="season-side">
-        {nav.stack.length > 1 && (
+      <aside className={`season-side ${cur ? "has-nav" : ""}`}>
+        {cur && (
           <span className="side-nav">
             <button onClick={() => setNav((n) => ({ ...n, i: n.i - 1 }))} disabled={!nav.i} title="Back" aria-label="Back" data-testid="side-back">‹</button>
             <button onClick={() => setNav((n) => ({ ...n, i: n.i + 1 }))} disabled={nav.i === nav.stack.length - 1} title="Forward" aria-label="Forward" data-testid="side-forward">›</button>
           </span>
         )}
         {selected
-          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} onOpenGame={openGame} />
+          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={close} onOpenGame={openGame} />
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId} onOpen={open}
-            onOpenPid={setSelected} onClose={() => go(null)} />
+            onOpenPid={setSelected} onClose={close} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
       </aside>
     </div>

@@ -657,8 +657,9 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .tl-bar input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--primary); border: 2px solid var(--text); }
 .tl-time { position: absolute; top: 22px; transform: translateX(-50%); font-size: 12.5px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .sidebar-close { position: absolute; top: 10px; right: 10px; z-index: 1; padding: 2px 9px; font-size: 16px; line-height: 1.4; }
-/* the season page's right side: back / forward through the profiles and game cards opened there, left of the ✕ */
-.side-nav { position: absolute; top: 10px; right: 50px; z-index: 2; display: flex; gap: 4px; }
+/* the season page's right side: back / forward through the profiles and game cards opened there, top left, level with the ✕ */
+.side-nav { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 4px; }
+.season-side.has-nav > .panel { padding-top: 46px; }   /* the card starts below them */
 .side-nav button { padding: 2px 9px; font-size: 16px; line-height: 1.4; }
 .news-filters { flex: none; position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; }
 .news-filters input[type="search"] { flex: 1; min-width: 200px; } .news-filters label.inline { margin: 0 4px; white-space: nowrap; }
@@ -834,7 +835,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 
 /* the right side's game card (a game card clicked): score, actions, then per team a box score and a depth chart */
 .game-panel { position: relative; }
-.gp-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 30px 0 12px; }   /* below the ✕, full width */
+.gp-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 0 0 12px; }   /* the card's padding clears the ✕ and ‹ ›: full width */
 .gp-team { display: flex; align-items: center; gap: 10px; } .gp-team.home { flex-direction: row-reverse; text-align: right; }   /* row-reverse starts at the right edge */
 .gp-abbr { font-size: 13px; font-weight: 700; color: var(--muted); } .gp-pts { font-size: 30px; font-weight: 900; line-height: 1; }
 .gp-status { display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 700; text-align: center; }
