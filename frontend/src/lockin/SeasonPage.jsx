@@ -418,8 +418,8 @@ function RosterAlerts({ roster }) {
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
 // onOpen(game): a click opens that game on the right (GamePanel).
-// onLock(date): the padlock locks / unlocks: on a final game he can still lock it shows on hover in the corner (lock
-// it); on the locked game it's the padlock in place of "final" (unlock: "").
+// onLock(date): the corner padlock locks / unlocks: open on a final game he can still lock (lock it), filled on the
+// locked game (unlock: "").
 // The stream (streamed.pk) of a game that's on or about to start: a ▶ in the same corner (a final game has none).
 function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen, onLock }) {
   const { list: matches } = useNBAMatches();
@@ -451,9 +451,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE"
-              : lockDate === g.date ? (toggle === "" ? <button className="gch-lockbtn" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button> : <LockIcon />)
+              : lockDate === g.date ? <LockIcon />
               : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
             {toggle && <button className="gch-lockbtn corner" onClick={lockClick} aria-label="Lock" data-testid="lock-game"><LockIcon open /></button>}
+            {toggle === "" && <button className="gch-lockbtn corner unlock" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button>}
             {watch && <a className="gch-lockbtn corner watch" href={watch} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Watch" data-testid="watch-game"><svg className="gch-play" viewBox="0 0 9 10" aria-hidden="true"><path d="M0 0L9 5L0 10Z" fill="currentColor" /></svg></a>}
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </span>
