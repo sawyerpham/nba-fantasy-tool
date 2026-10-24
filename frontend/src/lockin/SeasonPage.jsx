@@ -789,8 +789,7 @@ function Timeline({ tl, nowMs, atMs, setAt }) {
   const next = tl.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
   const mins = next ? Math.ceil((next - nowMs) / 60000) : 0;
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
-  const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
-  const until = d ? `${plural(d, "day")}, ${plural(h, "hour")}` : h ? `${plural(h, "hour")}, ${plural(m, "minute")}` : plural(m, "minute");
+  const until = d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
   return (
     <div className="timeline" data-testid="timeline">
       <div className="tl-main">
@@ -806,7 +805,8 @@ function Timeline({ tl, nowMs, atMs, setAt }) {
       <button className="tl-next" onClick={() => next && setAt(next)} disabled={!next} data-testid="next-check"
         data-tip="The next time the lineup changes: open Sleeper then and make every swap at once. Click to show that lineup.">
         {/* two short lines, as tall as the timeline beside it */}
-        <span><span className="tl-next-label">Next check-in</span> <span className="small muted">{next ? `in ${until}` : "none left this week"}</span></span>
+        <span className="tl-next-head"><span className="tl-next-label">Next check-in</span>{next && <span className="tl-next-in">in {until}</span>}</span>
+        {!next && <span className="small muted">None left this week</span>}
         {next && <strong>{fmt(next, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>}
       </button>
     </div>
