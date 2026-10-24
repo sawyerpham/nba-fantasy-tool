@@ -21,6 +21,11 @@ const WALLPAPERS = [
   ["wemby-block", "Wemby block"],
   ["wemby-spurs", "Wemby"],
   ["lebron-ft", "LeBron"],
+  ["lin-calderon", "Lin over Calderón"],
+  ["haliburton-msg", "Haliburton at MSG"],
+  ["curry-okc", "Curry from deep"],
+  ["lebron-block", "LeBron chase-down block"],
+  ["lebron-chalk", "LeBron chalk toss"],
 ];
 
 export default function App() {
