@@ -253,8 +253,8 @@ def test_beat_chance_is_one_minus_every_game_missing():
 def test_safe_locks_every_game_risky_waits_on_every_later_one():
     from app.lockin.weekplan import scenario_total
 
-    a = pp("a", ["PG"], "PG", [], x=17.5, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
-    done = pp("done", ["PG"], "PG", [], x=9.0, w=0.0, swing=0.3, seat="PG")   # no games left: locks either way
+    a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
+    done = pp("done", ["PG"], "PG", [], x=9.0, x_final=True, w=0.0, swing=0.3, seat="PG")   # no games left: locks either way
     assert scenario_total([a, done], True) == (26.5, 0.0)                  # certain
     mean, var = scenario_total([a, done], False)
     assert mean == 24.5 and var > 0                                        # waits on a's later games, with their spread
@@ -293,3 +293,14 @@ def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
     assert [o["slot"] for o in best] == ["PF", "C"]       # at C he'd push Okongwu out (11) for Watson's PF (9)
     assert best[0]["team"] - best[1]["team"] == pytest.approx(2.0)
     assert sab.slot == "PF" and c2.slot == "BN"           # the lineup it tried is undone
+
+
+def test_a_game_still_in_progress_gets_no_lock_call():
+    # a big night that isn't over yet: nothing to lock until it's final
+    live = pp("a", ["PG"], "PG", [Game("2026-10-23", 10.0, fp=25.0, started=True, live=True, period=3, clock=300),
+                                    Game("2026-10-25", 10.0)])
+    plan_week([live], {"PG": 1})
+    assert live.x == 25.0 and not live.x_final and live.action == "LIVE"
+    live.games[0] = Game("2026-10-23", 10.0, fp=25.0, started=True, final=True)
+    plan_week([live], {"PG": 1})
+    assert live.x_final and live.action == "LOCK"   # once final: 25 beats waiting on a 10-proj game

@@ -76,7 +76,8 @@ class PlanPlayer:
     injury: str = "healthy"
     locked: float | None = None # locked score, if he's locked this week
     # filled by plan_week
-    x: float | None = None      # lockable now
+    x: float | None = None      # his latest game's score (counting now; lockable once that game is final)
+    x_final: bool = False       # that game is over: only then can it be locked (no LOCK / PASS call before)
     w: float = 0.0              # value of waiting
     value: float = 0.0
     seat: str | None = None
@@ -214,12 +215,12 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
     for p in players:
         played = [g for g in p.games if g.fp is not None]
         remaining = [g for g in p.games if not g.started]
-        p.x = None
+        p.x, p.x_final = None, False
         if p.locked is None and p.slot in starting and played:
             last = played[-1]
             later_started = any(g.started for g in p.games if g.date > last.date)
             if not later_started:
-                p.x = last.fp
+                p.x, p.x_final = last.fp, not last.live   # a played game not in progress is over
         p.w = wait_value(remaining, p.swing, p.injury) if p.locked is None else 0.0
         p.value = p.locked if p.locked is not None else max(p.x or 0.0, p.w)
 
@@ -237,6 +238,8 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
         elif p.seat is None:
             p.action = "DONE" if p.value <= 0 else "BENCH"
             p.why = "no games left" if p.value <= 0 else "his games aren't worth a slot this week"
+        elif p.x is not None and not p.x_final:   # his game is still going: nothing to lock yet
+            p.action, p.why = "LIVE", "his game isn't over: it can only be locked once it's final"
         elif p.x is not None and p.x >= p.slot_w:
             p.action = "LOCK"
             move = f" (move him {p.slot} → {p.seat} first)" if p.seat != p.slot else ""
@@ -530,7 +533,7 @@ def scenario_total(players: list[PlanPlayer], lock_all: bool) -> tuple[float, fl
     for p in players:
         if p.seat is None:
             continue
-        m, v = slot_spread(p, lock=p.x is not None and (lock_all or p.w <= 0))
+        m, v = slot_spread(p, lock=p.x is not None and p.x_final and (lock_all or p.w <= 0))
         mean, var = mean + m, var + v
     return mean, var
 
@@ -545,7 +548,7 @@ def win_chance(mine: tuple[float, float], theirs: tuple[float, float]) -> float:
 def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float]) -> float:
     """Re-decide every lockable seated player (LOCK vs PASS) by the chance to win, and return the team's chance."""
     for p in players:
-        if p.seat is None or p.locked is not None or p.x is None:
+        if p.seat is None or p.locked is not None or p.x is None or not p.x_final:   # only a final game can be locked
             continue
         mean, var = team_total(players, skip=p)
         p.win_lock = win_chance((mean + p.x, var), theirs)

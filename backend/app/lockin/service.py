@@ -500,7 +500,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                "players": [_player_out(q, olocks) for q in sorted(oplan.players, key=lambda q: (q.seat is None, -q.value))]}
 
     for q in players:   # every lockable game: which slot to lock him in (the one leaving the rest of the lineup most)
-        if q.seat and q.x is not None and q.locked is None:
+        if q.seat and q.x is not None and q.x_final and q.locked is None:
             q.lock_at = lock_slots(q, players, counts)
             if theirs and q.win_lock is not None and q.lock_at:
                 # the win chance locked in each slot: win_lock assumes the best one; a worse slot costs the rest of
@@ -561,7 +561,7 @@ def _player_out(q, locks: dict) -> dict:
             "win_lock": round(q.win_lock, 3) if q.win_lock is not None else None,
             "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None,
             "slot_w": round(q.slot_w, 2) if q.slot_w is not None else None, "slot_from": [list(d) for d in q.slot_from],
-            "lock_at": q.lock_at}
+            "lock_at": q.lock_at, "x_final": q.x_final}
 
 
 # ---- one player's season page --------------------------------------------------------------------------

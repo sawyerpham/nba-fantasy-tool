@@ -283,7 +283,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
   const watch = p.today?.watch || [];
   const o = p.opponent, out = p.outlook;
   const edge = (r) => (r.win_lock ?? 0) - (r.win_wait ?? 0);   // win probability locked minus open
-  const lockable = p.players.filter((r) => r.seat && r.x != null && r.lock_status !== "locked" && r.lock_status !== "guess")
+  const lockable = p.players.filter((r) => r.seat && r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess")   // final games only
     .sort((a, b) => edge(b) - edge(a));
   const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
   const remaining = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 4);
