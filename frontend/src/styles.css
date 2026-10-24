@@ -567,9 +567,9 @@ body { background: #000; }
 th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
 [data-theme="light"] body { background: #f6f7fb; }
-/* the wallpaper (Settings tab): a pixelated photo fixed behind everything, a 40px border from the window's edges, dimmed so the
+/* the wallpaper (Settings tab): a pixelated photo fixed behind everything, an 80px border from the window's edges, dimmed so the
    panels over it stay readable; its own layer so image-rendering doesn't pixelate the headshots too */
-body::before { content: ""; position: fixed; inset: 40px; z-index: -1; pointer-events: none;
+body::before { content: ""; position: fixed; inset: 80px; z-index: -1; pointer-events: none;
   background: var(--wall, none) center bottom / auto 100% no-repeat; image-rendering: pixelated; opacity: 0.3; }
 [data-theme="light"] body::before { opacity: 0.25; }
 .wall-pick { display: flex; align-items: center; gap: 14px; } .wall-pick h3 { margin: 0; }
