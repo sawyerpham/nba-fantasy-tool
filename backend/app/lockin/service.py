@@ -633,18 +633,38 @@ def trending(fetch: Fetch) -> list[str]:
     return out
 
 
+def _last_season_draft(fetch: Fetch, prev_lid: str | None, sid: str) -> list[dict]:
+    """His pick in the previous season's draft of this league (Sleeper's previous_league_id): price, team, draft date."""
+    if not prev_lid:
+        return []
+    prev = fetch(f"{SLEEPER}/v1/league/{prev_lid}", WEEK_TTL) or {}
+    draft_id = prev.get("draft_id")
+    pk = next((p for p in (fetch(f"{SLEEPER}/v1/draft/{draft_id}/picks", WEEK_TTL) or []) if p.get("player_id") == sid), None) if draft_id else None
+    if not pk:
+        return []
+    users = {u["user_id"]: u.get("display_name") for u in fetch(f"{SLEEPER}/v1/league/{prev_lid}/users", WEEK_TTL) or []}
+    owner = {r["roster_id"]: users.get(r.get("owner_id")) for r in fetch(f"{SLEEPER}/v1/league/{prev_lid}/rosters", WEEK_TTL) or []}
+    amount = (pk.get("metadata") or {}).get("amount")
+    return [{"kind": "drafted", "team": owner.get(pk.get("roster_id")), "price": int(amount) if amount else None,
+             "when": (fetch(f"{SLEEPER}/v1/draft/{draft_id}", WEEK_TTL) or {}).get("start_time"), "season": prev.get("season")}]
+
+
 def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:
     """How he changed hands this season: the draft (auction price, keeper flag) from Sleeper's draft picks, then every
     completed transaction in order: waiver claims (FAAB bid), free-agent pickups, trades (to whom) and drops."""
     lid = session.league.sleeper_league_id
     team = {t["roster_id"]: t.get("user") or t["name"] for t in view["teams"]}   # usernames, not team names
     out = []
-    draft_id = (fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}).get("draft_id")
+    league = fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
+    draft_id = league.get("draft_id")
+    drafted_at = (fetch(f"{SLEEPER}/v1/draft/{draft_id}", DAY_TTL) or {}).get("start_time") if draft_id else None
     for pk in (fetch(f"{SLEEPER}/v1/draft/{draft_id}/picks", DAY_TTL) or []) if draft_id else []:
         if pk.get("player_id") == sid:
             amount = (pk.get("metadata") or {}).get("amount")
+            if pk.get("is_keeper"):   # a keeper: what he went for in last season's draft first
+                out += _last_season_draft(fetch, league.get("previous_league_id"), sid)
             out.append({"kind": "keeper" if pk.get("is_keeper") else "drafted", "team": team.get(pk.get("roster_id")),
-                        "price": int(amount) if amount else None, "when": None})
+                        "price": int(amount) if amount else None, "when": drafted_at})
     moves = []
     for w in range(1, view["week"] + 1):
         moves += fetch(f"{SLEEPER}/v1/league/{lid}/transactions/{w}", LIVE_TTL if w == view["week"] else DAY_TTL) or []
@@ -681,9 +701,44 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             st = e["stats"]
             log.append({"date": e["date"], "opp": e.get("opponent"), "fp": round(actual_fp(st, session.league.scoring), 2),
                         "min": round(float(st.get("sp") or 0) / 60, 1), "pts": st.get("pts"), "reb": st.get("reb"),
-                        "ast": st.get("ast"), "stl": st.get("stl"), "blk": st.get("blk"), "to": st.get("to")})
+                        "ast": st.get("ast"), "stl": st.get("stl"), "blk": st.get("blk"), "to": st.get("to"),
+                        "pf": st.get("pf"), "pm": st.get("plus_minus")})
         if len(log) >= GAME_LOG:
             break
+
+    # every game his team plays this season (Sleeper's schedule), his box score where he played (the weeks' logs above
+    # only go back GAME_LOG games, so this reads every past week): the Game log tab, and the Summary's averages
+    team_abbr = me.get("team") or rec.team_abbr
+    played = {}
+    for w in range(1, view["week"] + 1):
+        for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == view["week"] else DAY_TTL) or []:
+            if str(e.get("player_id")) == sid and (e.get("stats") or {}).get("sp"):
+                played[e["date"]] = e["stats"]
+    season_log = []
+    for g in sorted(fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or [], key=lambda g: g["date"]):
+        side = "home" if g["home"]["team"] == team_abbr else "away" if g["away"]["team"] == team_abbr else None
+        if not side:
+            continue
+        other = g["away" if side == "home" else "home"]
+        st = played.get(g["date"])
+        row = {"week": int(g["week"]), "date": g["date"], "opp": other["team"], "home": side == "home", "status": g.get("status"),
+               "team_pts": g[side].get("points"), "opp_pts": other.get("points")}
+        if st:
+            row.update({"fp": round(actual_fp(st, session.league.scoring), 2), "min": round(float(st.get("sp") or 0) / 60, 1),
+                        **{k: int(st.get(k) or 0) for k in ("pts", "reb", "ast", "stl", "blk", "to", "pf")},
+                        "pm": int(st.get("plus_minus") or 0)})
+        season_log.append(row)
+    games_played = [r for r in season_log if "fp" in r]
+    done = [r for r in games_played if r["status"] == "complete"]   # averages: finished games only (not a half-played one)
+    averages = {k: round(sum(r[k] for r in done) / len(done), 1) for k in ("min", "pts", "reb", "ast", "stl", "blk", "to", "fp")} \
+        if done else None
+    # his latest game (live or last final), with both teams' scores; this week's from ESPN (quarter + clock)
+    last = games_played[-1] if games_played else None
+    if last:
+        wk = next((x for x in me.get("games", []) if x["date"] == last["date"]), None)
+        last = {**last, "team": team_abbr, "state": wk["state"] if wk else "post", "detail": wk.get("detail") if wk else "Final",
+                "team_pts": (wk or {}).get("score") or last["team_pts"], "opp_pts": (wk or {}).get("opp_score") or last["opp_pts"]}
+    research = (fetch(f"{SLEEPER}/players/nba/research/regular/{year}/{view['week']}", WEEK_TTL) or {}).get(sid) or {}
 
     adp = sorted(((r.projection or {}).get("adp_std"), pid) for pid, r in session.players.items()
                  if (r.projection or {}).get("adp_std"))
@@ -698,6 +753,8 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             "injury_note": me.get("injury_note", ""),
             "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
             "acquired": acquisitions(session, fetch, view, sid),
+            "season_log": season_log, "averages": averages, "games_played": len(done), "last_game": last,
+            "owned": research.get("owned"), "started": research.get("started"),
             "news": player_news(fetch, sid)}
 
 

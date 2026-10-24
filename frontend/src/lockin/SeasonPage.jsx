@@ -42,7 +42,7 @@ export default function SeasonPage({ leagueId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
-  const [game, setGame] = useState(null);   // the game card on the right: { game, team, sid, name, toggle } (GamePanel)
+  const [game, setGame] = useState(null);   // the game card on the right: { game, team, sid, name } (GamePanel)
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
@@ -155,7 +155,7 @@ export default function SeasonPage({ leagueId }) {
       <aside className="season-side">
         {selected
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={() => setSelected(null)} />
-          : game ? <GamePanel key={game.game.event} sel={game} setSel={setGame} data={data} leagueId={leagueId} setLock={setLock} onOpen={open} onClose={() => setGame(null)} />
+          : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId} onOpen={open} onClose={() => setGame(null)} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} />}
       </aside>
     </div>
@@ -163,15 +163,14 @@ export default function SeasonPage({ leagueId }) {
 }
 
 // The right side when a game card is clicked: that NBA game (backend game_detail, ESPN's summary), live or past.
-// Score and status, a stream link (streamed.pk) while it's on, the lock / unlock button for the player whose card was
-// clicked, then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered
+// Score and status, a stream link (streamed.pk) while it's on, then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered
 // players tagged with their fantasy team and clickable for their profile) and its depth chart. Refreshes every minute.
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
   ["STL", (r) => r.stats.stl], ["BLK", (r) => r.stats.blk], ["TO", (r) => r.stats.to], ["FG", (r) => `${r.stats.fgm}-${r.stats.fga}`],
   ["3PT", (r) => `${r.stats.tpm}-${r.stats.tpa}`], ["FT", (r) => `${r.stats.ftm}-${r.stats.fta}`], ["PF", (r) => r.stats.pf]];
 const normName = (n) => (n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, "")
   .replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
-function GamePanel({ sel, setSel, data, leagueId, setLock, onOpen, onClose }) {
+function GamePanel({ sel, data, leagueId, onOpen, onClose }) {
   const [g, setG] = useState(null);
   const [error, setError] = useState("");
   const { list: matches } = useNBAMatches();
@@ -192,8 +191,6 @@ function GamePanel({ sel, setSel, data, leagueId, setLock, onOpen, onClose }) {
   const watch = m ? watchUrl(m) : null;
   const when = g?.tip ? fmt(g.tip, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
   const status = !g ? "" : g.state === "in" ? quarters(g.detail) : g.state === "post" ? "Final" : `Tips ${fmt(g.tip, { hour: "numeric", minute: "2-digit" })}`;
-  const toggle = sel.toggle;
-  const lock = () => { setLock(sel.sid, toggle); setSel({ ...sel, toggle: toggle === "" ? sel.game.date : "" }); };
   return (
     <div className="panel scroll game-panel" data-testid="game-panel">
       <button className="sidebar-close" onClick={onClose} title="Close game" data-testid="game-close">✕</button>
@@ -209,11 +206,7 @@ function GamePanel({ sel, setSel, data, leagueId, setLock, onOpen, onClose }) {
             </React.Fragment>
           ))}
         </div>
-        <div className="gp-actions">
-          {watch && <a className="gp-watch" href={watch} target="_blank" rel="noopener noreferrer">▶ Watch</a>}
-          {toggle != null && setLock && <button className={`small ${toggle === "" ? "ghost" : "primary"}`} onClick={lock} data-testid="game-lock">
-            {toggle === "" ? `Unlock ${sel.name}` : `Lock ${sel.name}'s ${fp(sel.game.fp)}`}</button>}
-        </div>
+        {watch && <div className="gp-actions"><a className="gp-watch" href={watch} target="_blank" rel="noopener noreferrer">▶ Watch</a></div>}
         {g.teams.map((t) => {
           const rows = [...t.players].sort((a, b) => b.starter - a.starter || b.min - a.min);
           return (
@@ -419,8 +412,7 @@ function RosterAlerts({ roster }) {
 // game while he sits on the bench (it won't count, and it's too late to start him).
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
-// onOpen(game, toggle): a click opens the game on the right (GamePanel) with what its lock button would do: the date
-// to lock (a final game he can still lock), "" to unlock (the locked one), or null (neither).
+// onOpen(game): a click opens that game on the right (GamePanel).
 function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen }) {
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
@@ -429,7 +421,6 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
-        const toggle = lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
@@ -440,7 +431,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
         return (
-          <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g, toggle); } : undefined}
+          <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
@@ -542,7 +533,7 @@ function PlayerCard({ data, r, open, openGame, mine, side, day, lane }) {
         </div>
         </div>
         <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane}
-          onOpen={openGame ? (g, toggle) => openGame({ game: g, team: p.team, sid: r.sid, name: r.name, toggle }) : null} />
+          onOpen={openGame ? (g) => openGame({ game: g, team: p.team, sid: r.sid, name: r.name }) : null} />
       </div>
     </div>
   );

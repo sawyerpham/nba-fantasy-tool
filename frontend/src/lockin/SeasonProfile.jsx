@@ -1,59 +1,52 @@
 import React from "react";
-import { fmt, timeOf, tzAbbr } from "./tz.js";
+import { fmt } from "./tz.js";
+import InjuryTag from "../core/InjuryTag.jsx";
 
-const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
+// The in-season player profile's tabs (backend season_player): Summary, Game log and History; the Team tab (depth
+// chart) is drawn by PlayerSidebar, which already has his team card.
 
-// Season profile: owner, your call on him this week, his games this week, game log and news.
-export default function SeasonBlock({ sea, plan }) {
-  const mine = plan?.players?.find((p) => p.sid === sea.sleeper_id);
+const f1 = (x) => (x == null ? "—" : Number(x).toFixed(1));
+const mmdd = (d) => d.slice(5).replace("-", "/");   // "2026-10-23" -> "10/23"
+const longDate = (ms) => fmt(ms, { month: "short", day: "numeric", year: "numeric" }).replace(",", "");   // "Oct 15 2026"
+// "3:14 - 1st" -> "Q1 3:14" (ESPN's live status in quarters)
+const quarters = (d) => (d || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1").replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
+
+// Summary: his live / last game (both teams, score, quarter + clock, his FP and line), season averages, then ranks,
+// ownership and FP per game; owner and injury status under them.
+export function SeasonSummary({ sea }) {
+  const g = sea.last_game, a = sea.averages, live = g?.state === "in";
+  const stat = (label, value) => <div className="sp-stat"><span>{label}</span><strong>{value}</strong></div>;
   return (
-    <div className="season-block" data-testid="season-profile">
-      <div className="small" style={{ margin: "6px 0" }}>
-        <span className="muted">Owner:</span>{" "}
-        {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
+    <div data-testid="season-summary">
+      {g && (
+        <div className={`sp-game ${live ? "live" : ""}`}>
+          <div className="sp-game-top">
+            <span className="small muted">{live ? <span className="sp-live">LIVE</span> : "Last game"} · {mmdd(g.date)}</span>
+            <span className="small">{live ? quarters(g.detail) : "Final"}</span>
+          </div>
+          <div className="sp-game-mid">
+            <div className="sp-score"><strong>{g.team}</strong> {g.team_pts ?? "—"} <span className="muted">{g.home ? "vs" : "@"}</span> <strong>{g.opp}</strong> {g.opp_pts ?? "—"}</div>
+            <div className="sp-fp"><span>{f1(g.fp)}</span><small>FP</small></div>
+          </div>
+          <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to</div>
+        </div>
+      )}
+      <div className="bid-label sp-head">Season averages <span className="muted">· {sea.games_played} GP</span></div>
+      {a ? <div className="sp-grid">{stat("MPG", f1(a.min))}{stat("PTS", f1(a.pts))}{stat("REB", f1(a.reb))}{stat("AST", f1(a.ast))}
+        {stat("STL", f1(a.stl))}{stat("BLK", f1(a.blk))}{stat("TO", f1(a.to))}</div> : <div className="small muted">No finished games yet.</div>}
+      <div className="sp-grid sp-grid-5">
+        {stat("Pos rank", sea.pos_rank || "—")}{stat("Overall", sea.overall_rank ? `#${sea.overall_rank}` : "—")}
+        {stat("Owned", sea.owned != null ? `${Math.round(sea.owned)}%` : "—")}{stat("Started", sea.started != null ? `${Math.round(sea.started)}%` : "—")}
+        {stat("FP/G", f1(a?.fp))}
       </div>
-      {sea.acquired?.length > 0 && (
-        <div className="small" style={{ margin: "0 0 6px" }} data-testid="season-acquired">
-          {sea.acquired.map((a, i) => (
-            <div key={i}>
-              <span className="muted">{a.kind[0].toUpperCase() + a.kind.slice(1)}</span>{" "}
-              {a.kind !== "traded to" && "by "}<strong>{a.team || "?"}</strong>
-              {a.price != null && <> for <strong>${a.price}</strong></>}
-              {a.when && <span className="muted"> · {fmt(a.when, { month: "2-digit", day: "2-digit", year: "2-digit" })}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-      {mine && (
-        <div className="small" style={{ marginBottom: 6 }} data-testid="season-call">
-          <span className="verdict info">{mine.action}</span> <span className="muted">{mine.why}</span>
-        </div>
-      )}
-      <div className="bid-label">Week {sea.week} games</div>
-      {sea.games.length ? (
-        <table className="small">
-          <thead><tr><th>Day</th><th>Opp</th><th>Tip ({tzAbbr()})</th><th className="num">Proj</th><th className="num">FP</th><th className="num">Min</th></tr></thead>
-          <tbody>{sea.games.map((g) => (
-            <tr key={g.date} className={g.date === sea.today ? "you-need" : ""}><td>{dayName(g.date)} {g.date.slice(5)}</td><td>{g.home ? "vs" : "@"} {g.opp}</td>
-              <td>{g.state === "in" ? <span className="warn-text">live</span> : g.state === "post" ? "final" : timeOf(g.tip)}</td>
-              <td className="num">{g.proj != null ? g.proj.toFixed(1) : ""}</td><td className="num"><strong>{g.fp != null ? g.fp.toFixed(1) : ""}</strong></td>
-              <td className="num">{g.min ?? ""}</td></tr>))}</tbody>
-        </table>
-      ) : <div className="small muted">No games this week.</div>}
-      {sea.game_log.length > 0 && (
-        <>
-          <div className="bid-label" style={{ marginTop: 8 }}>Last {sea.game_log.length} games</div>
-          <table className="small">
-            <thead><tr><th>Date</th><th>Opp</th><th className="num">FP</th><th className="num">Min</th><th className="num">PTS</th><th className="num">REB</th><th className="num">AST</th><th className="num">STL</th><th className="num">BLK</th><th className="num">TO</th></tr></thead>
-            <tbody>{sea.game_log.map((g) => (
-              <tr key={g.date}><td>{g.date.slice(5)}</td><td>{g.opp}</td><td className="num"><strong>{g.fp.toFixed(1)}</strong></td><td className="num">{g.min}</td>
-                <td className="num">{g.pts}</td><td className="num">{g.reb}</td><td className="num">{g.ast}</td><td className="num">{g.stl}</td><td className="num">{g.blk}</td><td className="num">{g.to}</td></tr>))}</tbody>
-          </table>
-        </>
-      )}
+      <div className="small sp-meta">
+        <span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
+        <span className="muted"> · Status</span> {sea.retired ? <strong className="warn-text">retired</strong>
+          : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> {sea.injury_note}</span>}</> : <strong>healthy</strong>}
+      </div>
       {sea.news.length > 0 && (
         <>
-          <div className="bid-label" style={{ marginTop: 8 }}>Latest news</div>
+          <div className="bid-label sp-head">Latest news</div>
           {sea.news.map((n, i) => (
             <div key={i} className="news-item small">
               <strong>{n.headline}</strong> <span className="muted">{n.published ? new Date(n.published).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</span>
@@ -63,5 +56,41 @@ export default function SeasonBlock({ sea, plan }) {
         </>
       )}
     </div>
+  );
+}
+
+// Game log: every game his team plays this season; his line where he played (blank for games to come / he missed).
+const LOG_COLS = [["FPTS", (r) => f1(r.fp)], ["MIN", (r) => r.min], ["PTS", (r) => r.pts], ["REB", (r) => r.reb], ["AST", (r) => r.ast],
+  ["STL", (r) => r.stl], ["BLK", (r) => r.blk], ["TO", (r) => r.to], ["PF", (r) => r.pf], ["+/-", (r) => (r.pm > 0 ? `+${r.pm}` : r.pm)]];
+export function SeasonLog({ sea }) {
+  return (
+    <table className="sp-log" data-testid="season-log">
+      <thead><tr><th>WK</th><th>OPP</th><th>DATE</th>{LOG_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
+      <tbody>{sea.season_log.map((r) => (
+        <tr key={r.date} className={`${r.week === sea.week ? "this-week" : ""} ${r.fp == null ? "muted" : ""}`}>
+          <td>{r.week}</td><td>{r.home ? r.opp : `@${r.opp}`}</td><td>{mmdd(r.date)}</td>
+          {LOG_COLS.map(([h, f]) => <td key={h} className="num">{r.fp == null ? "" : h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</td>)}
+        </tr>
+      ))}</tbody>
+    </table>
+  );
+}
+
+// History: how he changed hands (draft, keeper, claims, pickups, trades, drops), oldest first; a keeper also shows
+// last season's draft. Type | what happened | Month Day Year, in a table without lines.
+const KIND = { drafted: "Drafted", keeper: "Keeper", claimed: "Claimed", "picked up": "Added", "traded to": "Trade", dropped: "Dropped", added: "Added" };
+export function SeasonHistory({ sea }) {
+  const what = (a) => {
+    const by = a.team || "?", price = a.price != null ? ` for $${a.price}` : "";
+    return a.kind === "keeper" ? `kept by ${by}${price}` : a.kind === "drafted" ? `drafted by ${by}${price}${a.season ? ` (${a.season})` : ""}`
+      : a.kind === "claimed" ? `claimed by ${by}${price}` : a.kind === "traded to" ? `traded to ${by}` : a.kind === "dropped" ? `dropped by ${by}` : `added by ${by}`;
+  };
+  if (!sea.acquired?.length) return <div className="small muted">No transactions this season: he hasn't been drafted, kept or moved.</div>;
+  return (
+    <table className="sp-history" data-testid="season-history">
+      <tbody>{sea.acquired.map((a, i) => (
+        <tr key={i}><td><strong>{KIND[a.kind] || a.kind}</strong></td><td>{what(a)}</td><td className="muted">{a.when ? longDate(a.when) : ""}</td></tr>
+      ))}</tbody>
+    </table>
   );
 }
