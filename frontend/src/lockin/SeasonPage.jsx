@@ -147,7 +147,7 @@ export default function SeasonPage({ leagueId }) {
           </div>
         ))}
         <RosterAlerts roster={plan.roster} />
-        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} leagueId={leagueId} />}
+        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -418,7 +418,11 @@ function RosterAlerts({ roster }) {
 // Games off the lineup day dim, except the locked game and a final game he can still lock.
 // lane (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs).
 // onOpen(game): a click opens that game on the right (GamePanel).
-function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen }) {
+// onLock(date): the padlock locks / unlocks: on a final game he can still lock it shows on hover in the corner (lock
+// it); on the locked game it's the padlock in place of "final" (unlock: "").
+// The stream (streamed.pk) of a game that's on or about to start: a ▶ in the same corner (a final game has none).
+function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen, onLock }) {
+  const { list: matches } = useNBAMatches();
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
         // live: ESPN says in progress, or his stats are coming in before ESPN's state catches up; final only once ESPN says so
@@ -426,6 +430,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
+        const toggle = !onLock ? null : lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
+        const lockClick = (e) => { e.stopPropagation(); onLock(toggle); };
+        const m = g.state !== "post" ? findMatch(matches, g, team) : null;
+        const watch = m ? watchUrl(m) : null;
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
@@ -434,13 +442,19 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
+          toggle === "" ? "padlock: unlock" : toggle && "padlock: lock",
+          watch && "▶: watch",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
         return (
           <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { transform: `translateY(-50%) scale(${lane.scale})` }) } : undefined}
             className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
-            <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE" : lockDate === g.date ? <LockIcon /> : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE"
+              : lockDate === g.date ? (toggle === "" ? <button className="gch-lockbtn" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button> : <LockIcon />)
+              : played ? "final" : timeOf(g.tip).replace(":00", "").replace(" PM", "p").replace(" AM", "a")}</span></span>
+            {toggle && <button className="gch-lockbtn corner" onClick={lockClick} aria-label="Lock" data-testid="lock-game"><LockIcon open /></button>}
+            {watch && <a className="gch-lockbtn corner watch" href={watch} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Watch" data-testid="watch-game">▶</a>}
             <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
           </span>
         );
@@ -458,10 +472,10 @@ const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").rep
 // His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
 const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
 
-// a small padlock: a locked game shows it where "final" would be
-const LockIcon = () => (
-  <svg className="gch-lock" viewBox="0 0 10 12" aria-label="locked">
-    <path d="M3 5.2V3.6a2 2 0 0 1 4 0v1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+// a small padlock: a locked game shows it where "final" would be; open (shackle lifted) on the lock button
+const LockIcon = ({ open }) => (
+  <svg className="gch-lock" viewBox="0 0 10 12" aria-hidden="true">
+    <path d={open ? "M3 5.2V2.6a2 2 0 0 1 4 0v.6" : "M3 5.2V3.6a2 2 0 0 1 4 0v1.6"} fill="none" stroke="currentColor" strokeWidth="1.4" />
     <rect x="1" y="5" width="8" height="6.5" rx="1.6" fill="currentColor" />
   </svg>
 );
@@ -521,7 +535,7 @@ function laneAt(xs, ms, start, end, width) {
 const EXP_TIP = "Expected final score: locked points plus what each slot is expected to add (each player's locked game, " +
   "else the better of locking his last game and waiting for his later ones).";
 
-function PlayerCard({ data, r, open, openGame, mine, side, day, lane }) {
+function PlayerCard({ data, r, open, openGame, setLock, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const starter = r.slot !== "BN" && r.slot !== "IR";
@@ -538,7 +552,8 @@ function PlayerCard({ data, r, open, openGame, mine, side, day, lane }) {
         </div>
         </div>
         <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane}
-          onOpen={openGame ? (g) => openGame({ game: g, team: p.team, sid: r.sid, name: r.name }) : null} />
+          onOpen={openGame ? (g) => openGame({ game: g, team: p.team, sid: r.sid, name: r.name }) : null}
+          onLock={setLock ? (date) => setLock(r.sid, date) : null} />
       </div>
     </div>
   );
@@ -558,7 +573,7 @@ function bySlot(rows, positions, irSlots) {
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
-function WeekView({ data, plan, open, openGame, leagueId }) {
+function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   const [other, setOther] = useState(null);
@@ -620,9 +635,9 @@ function WeekView({ data, plan, open, openGame, leagueId }) {
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} side="right" day={them.seg?.date} lane={xs} /></div>
+      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
     </React.Fragment>
   );
   return (
