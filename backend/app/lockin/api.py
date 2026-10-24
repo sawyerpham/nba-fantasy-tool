@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..core.services.app_state import AppState
-from .service import _cache, http_fetch, read_locks, season_news, season_player, team_plan, trending, waivers, week_view, write_lock
+from .service import _cache, game_detail, http_fetch, read_locks, season_news, season_player, team_plan, trending, waivers, week_view, write_lock
 from ..core.api.deps import _session, get_state
 
 router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
@@ -42,6 +42,12 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
         return team_plan(session, view, roster_id, manual)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.get("/game")
+def game(league_id: str, event: str = Query(..., pattern=r"^\d+$"), state: AppState = Depends(get_state)) -> dict:
+    """One NBA game (ESPN event id) for the game card: score, box scores in league FP, depth charts."""
+    return game_detail(_session(state, league_id), _fetch(state), event)
 
 
 @router.post("/sync")
