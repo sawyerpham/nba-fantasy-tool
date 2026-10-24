@@ -308,3 +308,16 @@ def test_a_game_still_in_progress_gets_no_lock_call():
     live.games[0] = Game("2026-10-23", 10.0, fp=25.0, started=True, final=True)
     plan_week([live], {"PG": 1})
     assert live.x_final and live.action == "LOCK"   # once final: 25 beats waiting on a 10-proj game
+
+
+def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_far():
+    today = "2026-10-24"
+    tipped = pp("harden", ["PG"], "PG", [Game(today, 10.7, started=True, live=True)])            # just tipped, no stats yet
+    cold = pp("wiggins", ["PF"], "PF", [Game(today, 8.1, fp=3.0, started=True, live=True, min=20, proj_min=32,
+                                             period=3, clock=550)])
+    benched = pp("watson", ["PF"], "BN", [Game(today, 8.2, started=True, live=True)])            # on the bench: can't count
+    plan = plan_week([tipped, cold, benched], {"PG": 1, "PF": 1})
+    assert tipped.value == pytest.approx(10.7) and tipped.seat == "PG"
+    assert 3.0 < cold.value < 8.1 and cold.seat == "PF"
+    assert benched.value == 0
+    assert plan.expected == pytest.approx(tipped.value + cold.value, abs=0.1)

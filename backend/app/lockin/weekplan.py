@@ -45,6 +45,8 @@ B2B_PLAY = 0.85
 
 def play_chance(g: "Game", injury: str, first: bool) -> float:
     """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night."""
+    if g.started:   # it has tipped: he's in it (a live game counted in plan_week)
+        return 1.0
     nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
     return (nxt if first else later) * (B2B_PLAY if g.b2b else 1.0)
 
@@ -215,6 +217,12 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
     for p in players:
         played = [g for g in p.games if g.fp is not None]
         remaining = [g for g in p.games if not g.started]
+        live = next((g for g in p.games if g.live), None)
+        if live and p.locked is None and p.slot in starting:
+            # a starter's game in progress counts where it's headed (no stats yet: its projection), not his points so far
+            # ponytail: valued like a game still to come, so its spread is too wide late in the game; shrink by _share_left if it matters
+            now = live_estimate(live) if live.fp is not None else max(0.0, live.proj or 0.0)
+            remaining = [replace(live, proj=now)] + remaining
         p.x, p.x_final = None, False
         if p.locked is None and p.slot in starting and played:
             last = played[-1]
