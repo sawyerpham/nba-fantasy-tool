@@ -832,7 +832,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 /* the right side's game card (a game card clicked): score, actions, then per team a box score and a depth chart */
 .game-panel { position: relative; }
 .gp-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 30px 0 12px; }   /* below the ✕, full width */
-.gp-team { display: flex; align-items: center; gap: 10px; } .gp-team.home { justify-content: flex-end; flex-direction: row-reverse; text-align: right; }
+.gp-team { display: flex; align-items: center; gap: 10px; } .gp-team.home { flex-direction: row-reverse; text-align: right; }   /* row-reverse starts at the right edge */
 .gp-abbr { font-size: 13px; font-weight: 700; color: var(--muted); } .gp-pts { font-size: 30px; font-weight: 900; line-height: 1; }
 .gp-status { display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 700; text-align: center; }
 .gp-live { color: var(--danger); }
