@@ -278,10 +278,24 @@ def _num(s) -> float:
         return 0.0
 
 
+LEAD_STATS = (("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("STL", "stl"), ("BLK", "blk"), ("3PM", "tpm"))
+
+
+def lead_stats(stats: dict, scoring) -> list[list]:
+    """A player's headline stat line (the game card's top performers, like Sleeper's): points always, then up to 4
+    more by the fantasy points each is worth in the league's scoring, leaving out any worth under 1 FP (0 STL, 1 AST)."""
+    worth = {k: actual_fp({k: stats.get(k, 0)}, scoring) for _, k in LEAD_STATS[1:]}
+    rest = sorted((x for x in LEAD_STATS[1:] if worth[x[1]] >= 1), key=lambda x: -worth[x[1]])[:4]   # ponytail: 1 FP floor, tune here
+    return [[label, int(stats.get(k, 0))] for label, k in [LEAD_STATS[0], *rest]]
+
+
 def game_detail(session, fetch: Fetch, event: str) -> dict:
     """One NBA game for the right-side game card (ESPN's summary): status and date, then per team its name, logo and
     score, every player's box score (players who got minutes; DNPs listed apart) with fantasy points in the league's
-    scoring, and the team's depth chart (Sleeper's, from the player pool): PG -> C, 1st / 2nd / 3rd."""
+    scoring and a headline stat line, and the team's depth chart (the player profile's, Sleeper's): PG -> C, 1st / 2nd / 3rd."""
+    from ..core.api.players import depth_grid, team_rosters
+
+    by_team = team_rosters(session)[0]
     data = fetch(ESPN_SUMMARY.format(event), LIVE_TTL) or {}
     comp = ((data.get("header") or {}).get("competitions") or [{}])[0]
     st = (comp.get("status") or {}).get("type") or {}
@@ -308,15 +322,10 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
             played.append({"name": ath.get("displayName"), "pos": (ath.get("position") or {}).get("abbreviation"),
                            "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
                            "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
-                           "fp": round(actual_fp(st_, session.league.scoring), 1)})
-        depth = {}
-        for pos in ("PG", "SG", "SF", "PF", "C"):
-            recs = [r for r in session.players.values() if r.team_abbr == abbr and r.fantasy
-                    and r.fantasy.depth_chart_position == pos and r.fantasy.depth_chart_order]
-            depth[pos] = [{"name": r.full_name, "sid": r.sleeper_id} for r in sorted(recs, key=lambda r: r.fantasy.depth_chart_order)[:3]]
+                           "fp": round(actual_fp(st_, session.league.scoring), 1), "lead": lead_stats(st_, session.league.scoring)})
         s, home = score.get(abbr, (None, False))
         teams.append({"abbr": abbr, "name": t["team"].get("displayName"), "logo": t["team"].get("logo"), "score": s, "home": home,
-                      "players": played, "dnp": dnp, "depth": depth})
+                      "players": played, "dnp": dnp, "depth_grid": depth_grid(session, by_team.get(abbr, []))})
     teams.sort(key=lambda t: t["home"])   # away first, home second ("LAC @ LAL")
     return {"event": event, "tip": comp.get("date"), "state": st.get("state"), "detail": st.get("shortDetail"), "teams": teams}
 

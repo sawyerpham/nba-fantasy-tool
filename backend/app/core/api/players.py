@@ -162,13 +162,28 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         "talent_fpg": round(talent.get(abbr, 0.0), 1),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
         "teammates": [mate(fpg_of[pid], pid) for pid in shown],
-        # Sleeper's depth chart: PG -> C, 1st / 2nd / 3rd option at each spot
-        "depth_grid": {pos: [mate(fpg_of[pid], pid) for pid in sorted(
-            (pid for _, pid in roster if (session.players[pid].fantasy and session.players[pid].fantasy.depth_chart_position == pos
-                                         and session.players[pid].fantasy.depth_chart_order)),
-            key=lambda pid: session.players[pid].fantasy.depth_chart_order)[:3]] for pos in pos_order},
+        "depth_grid": depth_grid(session, roster, player_id),
         "role": _team_role(session, roster, player_id),
     }
+
+
+def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = None) -> dict:
+    """Sleeper's depth chart for one NBA team (roster: team_rosters' [(projected FP/G, player id)]): PG -> C,
+    1st / 2nd / 3rd option at each spot. Shared by the player profile's Team tab and the season game card."""
+    drafted = {p.player_id: p.manager_id for p in session.draft.picks}
+    names = {m.manager_id: m.name for m in session.managers}
+    fpg_of = {pid: f for f, pid in roster}
+
+    def cell(pid: int) -> dict:
+        rec = session.players[pid]
+        return {"player_id": pid, "name": rec.full_name, "sleeper_id": rec.sleeper_id, "fpg": round(fpg_of[pid], 1),
+                "drafted_by": names.get(drafted.get(pid)), "is_self": pid == self_id}
+
+    def at(pos: str) -> list[int]:
+        f = lambda pid: session.players[pid].fantasy
+        return sorted((pid for pid in fpg_of if f(pid) and f(pid).depth_chart_position == pos and f(pid).depth_chart_order),
+                      key=lambda pid: f(pid).depth_chart_order)[:3]
+    return {pos: [cell(pid) for pid in at(pos)] for pos in ("PG", "SG", "SF", "PF", "C")}
 
 
 def _team_role(session, roster: list[tuple[float, int]], player_id: int) -> dict | None:

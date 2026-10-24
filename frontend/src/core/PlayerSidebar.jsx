@@ -282,8 +282,8 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   );
 }
 
-// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top.
-function DepthGrid({ grid, onSelectPlayer }) {
+// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top. Also the season game card's.
+export function DepthGrid({ grid, onSelectPlayer }) {
   return (
     <table className="depth-grid small" data-testid="depth-grid">
       <thead><tr><th></th><th>1st</th><th>2nd</th><th>3rd</th></tr></thead>

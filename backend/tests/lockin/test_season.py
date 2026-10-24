@@ -205,3 +205,12 @@ def test_timeline_does_a_nights_swaps_at_one_check_in_and_never_moves_a_player_m
     assert [(sorted(x["seats"]["C"]), x["to"][:16]) for x in segs] == [
         (["6:00", "6:30", "7:00"], "2026-10-21T20:45"),   # the early games start; one check at 8:45 PM ...
         (["7:00", "9:00", "9:30"], "2026-10-26T00:00")]   # ... swaps in the 9:00 AND 9:30 games; 7:00 is still playing
+
+
+def test_lead_stats_points_first_then_what_is_worth_fantasy_points(fixture_world):
+    from app.lockin.service import lead_stats
+
+    s = make_session(fixture_world)
+    lead = lead_stats({"pts": 20, "reb": 10, "ast": 1, "stl": 0, "blk": 3, "tpm": 0}, s.league.scoring)
+    assert lead[0] == ["PTS", 20] and ["BLK", 3] in lead and ["REB", 10] in lead
+    assert not any(label in ("STL", "3PM", "AST") for label, _ in lead)   # zeros and a lone assist aren't worth showing
