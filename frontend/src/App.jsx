@@ -14,6 +14,15 @@ const TABS = [
   ["season", "Season"],
 ];
 
+// pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
+const WALLPAPERS = [
+  ["", "No wallpaper"],
+  ["kawhi-dagger", "Kawhi dagger"],
+  ["wemby-block", "Wemby block"],
+  ["wemby-spurs", "Wemby"],
+  ["lebron-ft", "LeBron"],
+];
+
 export default function App() {
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem("da.tab");
@@ -21,6 +30,7 @@ export default function App() {
   });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
+  const [wall, setWall] = useState(() => localStorage.getItem("da.wall") || "");
   const [health, setHealth] = useState(null);
 
   const setLeagueId = useCallback((id) => {
@@ -37,6 +47,11 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("da.theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--wall", wall ? `url(/wallpapers/${wall}.png)` : "none");
+    localStorage.setItem("da.wall", wall);
+  }, [wall]);
 
   const refreshHealth = useCallback(() => {
     api.get("/health").then(setHealth).catch(() => setHealth({ ok: false }));
@@ -73,7 +88,14 @@ export default function App() {
       </header>
       <main>
         {tab === "league" && <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />}
-        {tab === "settings" && <><DataPage onPoolChanged={refreshHealth} /><SettingsPage leagueId={leagueId} /></>}
+        {tab === "settings" && <>
+          <div className="panel wall-pick"><h3>Wallpaper</h3>
+            <select value={wall} onChange={(e) => setWall(e.target.value)} data-testid="wallpaper">
+              {WALLPAPERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </div>
+          <DataPage onPoolChanged={refreshHealth} /><SettingsPage leagueId={leagueId} />
+        </>}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
         {tab === "season" && <SeasonPage leagueId={leagueId} />}
       </main>

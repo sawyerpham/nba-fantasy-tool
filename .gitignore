@@ -80,3 +80,6 @@ frontend/e2e/*.log
 *.csv
 !**/tests/fixtures/**/*.csv
 screenshots/
+
+# wallpaper photos: Getty images, kept local (backgroundimages/pixelate.py makes them)
+frontend/public/wallpapers/
