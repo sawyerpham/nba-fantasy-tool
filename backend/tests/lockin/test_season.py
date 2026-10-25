@@ -286,3 +286,18 @@ def test_game_card_shows_both_teams_before_the_tip_with_their_ranks(fixture_worl
     assert g["state"] == "pre" and (away["abbr"], home["abbr"]) == ("LAL", "UTA")      # ESPN's UTAH -> UTA, away first
     assert home["name"] == "Utah Jazz" and home["record"] == "1-1" and home["logo"] == "https://logo/UTAH.png"
     assert home["players"] == [] and home["ranks"]["offense"]["pts"]["rank"] == 2 and away["ranks"]["offense"]["pts"]["rank"] == 1
+
+
+def test_sleeper_injuries_tag_every_hurt_player_red_or_yellow():
+    from app.lockin.service import sleeper_injuries
+
+    feed = {"1": {"full_name": "Zach Edey", "team": "MEM", "injury_status": "Out", "injury_body_part": "Ankle"},
+            "2": {"full_name": "Cedric Coward", "team": "MEM", "injury_status": "GTD", "injury_body_part": "Wrist"},
+            "3": {"full_name": "Healthy Guy", "team": "MEM", "injury_status": None},
+            "4": {"full_name": "Free Agent", "team": None, "injury_status": "Out"},
+            "5": {"full_name": "Long Term", "team": "BKN", "injury_status": "IR"}}
+    hurt = sleeper_injuries(lambda url, ttl: feed)
+    assert set(hurt) == {"1", "2", "5"}                                   # healthy and teamless players left out
+    assert (hurt["1"]["group"], hurt["2"]["group"], hurt["5"]["group"]) == ("out", "q", "out")
+    assert hurt["1"]["body"] == "Ankle" and hurt["2"]["team"] == "MEM"
+    assert sleeper_injuries(lambda url, ttl: (_ for _ in ()).throw(OSError("down"))) == {}   # Sleeper down: no colours, no crash

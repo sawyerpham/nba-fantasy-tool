@@ -154,7 +154,7 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
         **team_header(state, session, abbr, rosters),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
         "teammates": [mate(fpg_of[pid], pid) for pid in shown],
-        "depth_grid": depth_grid(session, roster, player_id),
+        "depth_grid": depth_grid(session, roster, player_id, inj=live_injuries(state)),
         "role": _team_role(session, roster, player_id),
     }
 
@@ -174,12 +174,23 @@ def team_header(state: AppState, session, abbr: str, rosters=None) -> dict:
             "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
             "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
             "talent_fpg": round(talent.get(abbr, 0.0), 1),
-            "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True))}
+            "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True), inj=live_injuries(state))}
 
 
-def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = None) -> dict:
+def live_injuries(state: AppState) -> dict[str, dict]:
+    """Sleeper's injury tags right now (lockin sleeper_injuries, re-read every few minutes); {} without Sleeper."""
+    from ...lockin.service import http_fetch, sleeper_injuries
+
+    if state.platform is None or not hasattr(state.platform, "session"):
+        return {}
+    return sleeper_injuries(http_fetch(state.platform))
+
+
+def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = None, inj: dict | None = None) -> dict:
     """Sleeper's depth chart for one NBA team (roster: team_rosters' [(projected FP/G, player id)]): PG -> C,
-    1st / 2nd / 3rd option at each spot. Shared by the player profile's Team tab and the season game card."""
+    1st / 2nd / 3rd option at each spot, each with his injury tag right now (inj: sleeper_injuries). Shared by the
+    player profile's Team tab, the season game card and the Team card."""
+    inj = inj or {}
     drafted = {p.player_id: p.manager_id for p in session.draft.picks}
     names = {m.manager_id: m.name for m in session.managers}
     fpg_of = {pid: f for f, pid in roster}
@@ -187,7 +198,8 @@ def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = N
     def cell(pid: int) -> dict:
         rec = session.players[pid]
         return {"player_id": pid, "name": rec.full_name, "sleeper_id": rec.sleeper_id, "fpg": round(fpg_of[pid], 1),
-                "drafted_by": names.get(drafted.get(pid)), "is_self": pid == self_id}
+                "drafted_by": names.get(drafted.get(pid)), "is_self": pid == self_id,
+                **{k: (inj.get(rec.sleeper_id) or {}).get(f) for k, f in (("injury", "status"), ("health", "group"), ("injury_body", "body"))}}
 
     def at(pos: str) -> list[int]:
         f = lambda pid: session.players[pid].fantasy
