@@ -298,7 +298,9 @@ function TeamRanks({ r }) {
         <div key={side} className="team-ranks-side">
           <div className="team-ranks-head"><span>{title}</span>{rank(r[side].pts)}</div>
           {RANK_STATS.map(([k, label]) => (
-            <div key={k} className="team-ranks-row small"><span>{label}</span>{rank(r[side][k])}</div>
+            <div key={k} className="team-ranks-row small">
+              <span>{side === "offense" ? label : k === "to" ? "Turnovers forced" : `${label} allowed`}</span>{rank(r[side][k])}
+            </div>
           ))}
         </div>
       ))}
