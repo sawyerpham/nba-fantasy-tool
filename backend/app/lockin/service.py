@@ -308,7 +308,7 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
     (team_ranks) and its depth chart (the player profile's, Sleeper's): PG -> C, 1st / 2nd / 3rd."""
     from ..core.api.players import depth_grid, team_rosters
 
-    by_team = team_rosters(session)[0]
+    by_team, hurt = team_rosters(session)[0], sleeper_injuries(fetch)
     data = fetch(ESPN_SUMMARY.format(event), LIVE_TTL) or {}
     comp = ((data.get("header") or {}).get("competitions") or [{}])[0]
     st = (comp.get("status") or {}).get("type") or {}
@@ -344,7 +344,7 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
                       "score": c.get("score"), "home": c.get("homeAway") == "home",
                       "record": next((r.get("summary") for r in c.get("record") or [] if r.get("type") == "total"), None),
                       "players": played, "dnp": dnp, "ranks": team_ranks(rows, abbr, done),
-                      "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True))})
+                      "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True), inj=hurt)})
     teams.sort(key=lambda t: t["home"])   # away first, home second ("LAC @ LAL")
     return {"event": event, "tip": comp.get("date"), "state": st.get("state"), "detail": st.get("shortDetail"), "teams": teams}
 
@@ -590,6 +590,27 @@ def _player_out(q, locks: dict) -> dict:
             "win_wait": round(q.win_wait, 3) if q.win_wait is not None else None,
             "slot_w": round(q.slot_w, 2) if q.slot_w is not None else None, "slot_from": [list(d) for d in q.slot_from],
             "lock_at": q.lock_at, "x_final": q.x_final}
+
+
+# ---- injuries, league-wide -------------------------------------------------------------------------------
+SLEEPER_PLAYERS = SLEEPER + "/v1/players/nba"
+INJURY_TTL = 10 * 60   # Sleeper's player list (every player's injury tag) is re-read this often: the depth charts stay live
+OUT_TAGS = {"Out", "IR", "Sus", "Doubtful"}   # red; any other tag (Questionable, GTD, DTD, Probable) is yellow
+
+
+def sleeper_injuries(fetch: Fetch) -> dict[str, dict]:
+    """Every NBA player Sleeper tags as hurt right now: sleeper id -> {sid, name, team, pos, status, group, body, note}.
+    group "out" (Out, IR, suspended, doubtful) or "q" (questionable / game-time / day-to-day). Colours the depth
+    charts' names and fills the Team card's Injuries tab and the News tab's teams report; {} if Sleeper fails."""
+    try:
+        feed = fetch(SLEEPER_PLAYERS, INJURY_TTL) or {}
+    except Exception:   # a depth chart must still show without it
+        return {}
+    return {sid: {"sid": sid, "name": p.get("full_name") or f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                  "team": p["team"], "pos": p.get("fantasy_positions") or [], "status": p["injury_status"],
+                  "group": "out" if p["injury_status"] in OUT_TAGS else "q",
+                  "body": p.get("injury_body_part"), "note": p.get("injury_notes")}
+            for sid, p in feed.items() if p.get("injury_status") and p.get("team")}
 
 
 # ---- one player's season page --------------------------------------------------------------------------

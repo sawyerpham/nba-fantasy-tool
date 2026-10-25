@@ -318,7 +318,8 @@ export function TeamRanks({ r }) {
   );
 }
 
-// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top. Also the season game card's.
+// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top; names coloured by
+// injury (backend depth_grid: health "q" yellow, "out" red; the tag and body part on hover). Also the season game card's.
 export function DepthGrid({ grid, onSelectPlayer }) {
   return (
     <table className="depth-grid small" data-testid="depth-grid">
@@ -328,8 +329,9 @@ export function DepthGrid({ grid, onSelectPlayer }) {
           {[0, 1, 2].map((i) => {
             const m = grid[pos]?.[i];
             return <td key={i} className={m ? `dg-cell ${m.is_self ? "self" : "clickable"}` : "muted"} onClick={() => m && !m.is_self && onSelectPlayer?.(m.player_id)}
-              data-tip={m ? `${m.fpg} FP/G${m.drafted_by ? ` · drafted by ${m.drafted_by}` : ""}` : ""}>
-              {m ? <><Headshot sleeperId={m.sleeper_id} name={m.name} size={22} /> <span className="dg-name">{m.name.split(" ")[0][0]}. {m.name.split(" ").slice(1).join(" ")}</span></> : "—"}
+              data-tip={m ? [m.injury && `${m.injury}${m.injury_body ? ` (${m.injury_body})` : ""}`, `${m.fpg} FP/G`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ") : ""}>
+              {/* the name coloured by his injury tag right now: yellow questionable / day-to-day, red out */}
+              {m ? <><Headshot sleeperId={m.sleeper_id} name={m.name} size={22} /> <span className={`dg-name ${m.health ? `health-${m.health}` : ""}`}>{m.name.split(" ")[0][0]}. {m.name.split(" ").slice(1).join(" ")}</span></> : "—"}
             </td>;
           })}
         </tr>))}</tbody>
