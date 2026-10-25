@@ -114,7 +114,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             {list.map((m) => (
               <div key={m.player_id} className={`teammate ${m.is_self ? "self" : ""} ${m.drafted_by ? "taken" : ""}`}
                 onClick={() => !m.is_self && onSelectPlayer?.(m.player_id)}
-                title={[m.pos.join("/"), m.min && `${m.min} min`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ")}>
+                title={[m.pos.join(" "), m.min && `${m.min} min`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ")}>
                 <PosTag className="teammate-rank" text={m.depth || "—"} />
                 <Headshot sleeperId={m.sleeper_id} name={m.name} size={30} />
                 <span className="teammate-name">{m.name}</span>
