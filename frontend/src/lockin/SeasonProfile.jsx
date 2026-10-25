@@ -1,4 +1,5 @@
 import React from "react";
+import TeamLink from "../core/TeamLink.jsx";
 import { fmt } from "./tz.js";
 import InjuryTag from "../core/InjuryTag.jsx";
 
@@ -29,7 +30,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
             <span className="small">{live ? quarters(g.detail) : "Final"}</span>
           </div>
           <div className="sp-game-mid">
-            <div className="sp-score"><strong>{g.team}</strong> {g.team_pts ?? "—"} <span className="muted">{g.home ? "vs" : "@"}</span> <strong>{g.opp}</strong> {g.opp_pts ?? "—"}</div>
+            <div className="sp-score"><strong><TeamLink abbr={g.team} /></strong> {g.team_pts ?? "—"} <span className="muted">{g.home ? "vs" : "@"}</span> <strong><TeamLink abbr={g.opp} /></strong> {g.opp_pts ?? "—"}</div>
             <div className="sp-fp"><span>{f1(g.fp)}</span><small>FP</small></div>
           </div>
           <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to</div>
@@ -72,7 +73,7 @@ export function SeasonLog({ sea }) {
       <thead><tr><th>WK</th><th>OPP</th><th>DATE</th>{LOG_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
       <tbody>{sea.season_log.map((r) => (
         <tr key={r.date} className={`${r.week === sea.week ? "this-week" : ""} ${r.fp == null ? "muted" : ""}`}>
-          <td>{r.week}</td><td>{r.home ? r.opp : `@${r.opp}`}</td><td>{mmdd(r.date)}</td>
+          <td>{r.week}</td><td>{r.home ? "" : "@"}<TeamLink abbr={r.opp} /></td><td>{mmdd(r.date)}</td>
           {LOG_COLS.map(([h, f]) => <td key={h} className="num">{r.fp == null ? "" : h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</td>)}
         </tr>
       ))}</tbody>

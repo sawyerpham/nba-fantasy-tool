@@ -290,21 +290,35 @@ def lead_stats(stats: dict, scoring) -> list[list]:
     return [[label, int(stats.get(k, 0))] for label, k in [LEAD_STATS[0], *rest]]
 
 
+def team_stat_rows(fetch: Fetch, year: str) -> tuple[list[dict], set[str]]:
+    """This season's per-game Sleeper rows (every week that has a finished game) and the finished games' ids: what
+    team_ranks reads."""
+    schedule = fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
+    done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
+    last = max((int(g["week"]) for g in schedule if g.get("status") == "complete"), default=0)
+    rows = [e for w in range(1, last + 1)
+            for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == last else DAY_TTL) or []]
+    return rows, done
+
+
 def game_detail(session, fetch: Fetch, event: str) -> dict:
-    """One NBA game for the right-side game card (ESPN's summary): status and date, then per team its name, logo and
-    score, every player's box score (players who got minutes; DNPs listed apart) with fantasy points in the league's
-    scoring and a headline stat line, and the team's depth chart (the player profile's, Sleeper's): PG -> C, 1st / 2nd / 3rd."""
+    """One NBA game for the right-side game card (ESPN's summary): status and date, then both teams (before the tip
+    too): name, logo, record and score, every player's box score once it starts (players who got minutes; DNPs listed
+    apart) with fantasy points in the league's scoring and a headline stat line, the team's offense / defense ranks
+    (team_ranks) and its depth chart (the player profile's, Sleeper's): PG -> C, 1st / 2nd / 3rd."""
     from ..core.api.players import depth_grid, team_rosters
 
     by_team = team_rosters(session)[0]
     data = fetch(ESPN_SUMMARY.format(event), LIVE_TTL) or {}
     comp = ((data.get("header") or {}).get("competitions") or [{}])[0]
     st = (comp.get("status") or {}).get("type") or {}
-    score = {ESPN_TEAM.get(c["team"]["abbreviation"], c["team"]["abbreviation"]): (c.get("score"), c.get("homeAway") == "home")
-             for c in comp.get("competitors") or []}
+    rows, done = team_stat_rows(fetch, session.league.roster_season.split("-")[0])
+    box = {ESPN_TEAM.get(t["team"]["abbreviation"], t["team"]["abbreviation"]): t
+           for t in (data.get("boxscore") or {}).get("players") or []}
     teams = []
-    for t in (data.get("boxscore") or {}).get("players") or []:
-        abbr = ESPN_TEAM.get(t["team"]["abbreviation"], t["team"]["abbreviation"])
+    for c in comp.get("competitors") or []:
+        abbr = ESPN_TEAM.get(c["team"]["abbreviation"], c["team"]["abbreviation"])
+        t = box.get(abbr) or {}   # no box score before the tip
         # ESPN's names -> our player ids (any player, rostered or not, opens his profile); his own team's wins a shared name
         ids = {normalize_name(r.full_name): pid for pid, r in sorted(session.players.items(), key=lambda x: x[1].team_abbr == abbr)}
         block = (t.get("statistics") or [{}])[0]
@@ -326,9 +340,11 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
                            "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
                            "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
                            "fp": round(actual_fp(st_, session.league.scoring), 1), "lead": lead_stats(st_, session.league.scoring)})
-        s, home = score.get(abbr, (None, False))
-        teams.append({"abbr": abbr, "name": t["team"].get("displayName"), "logo": t["team"].get("logo"), "score": s, "home": home,
-                      "players": played, "dnp": dnp, "depth_grid": depth_grid(session, by_team.get(abbr, []))})
+        teams.append({"abbr": abbr, "name": c["team"].get("displayName"), "logo": ((c["team"].get("logos") or [{}])[0]).get("href"),
+                      "score": c.get("score"), "home": c.get("homeAway") == "home",
+                      "record": next((r.get("summary") for r in c.get("record") or [] if r.get("type") == "total"), None),
+                      "players": played, "dnp": dnp, "ranks": team_ranks(rows, abbr, done),
+                      "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True))})
     teams.sort(key=lambda t: t["home"])   # away first, home second ("LAC @ LAL")
     return {"event": event, "tip": comp.get("date"), "state": st.get("state"), "detail": st.get("shortDetail"), "teams": teams}
 

@@ -4,7 +4,8 @@ import { createPortal } from "react-dom";
 import { api, qs } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 import { PosList, PosTag } from "../core/Pos.jsx";
-import PlayerSidebar, { DepthGrid } from "../core/PlayerSidebar.jsx";
+import PlayerSidebar, { DepthGrid, TeamHead, TeamRanks } from "../core/PlayerSidebar.jsx";
+import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
@@ -41,12 +42,13 @@ export default function SeasonPage({ leagueId }) {
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  // The right side's history, like a browser's: each entry a player profile { pid } or a game card { game: { game, team, sid, name } }
-  // (GamePanel); ‹ › step through it, opening something new drops what was ahead. ✕ clears it back to the guide.
+  // The right side's history, like a browser's: each entry a player profile { pid }, a game card { game: { game, team,
+  // sid, name } } (GamePanel) or an NBA team's card { team: abbr } (TeamPanel); ‹ › step through it, opening something
+  // new drops what was ahead. ✕ clears it back to the guide.
   const [nav, setNav] = useState({ stack: [], i: -1 });
-  const cur = nav.stack[nav.i], selected = cur?.pid ?? null, game = cur?.game ?? null;
+  const cur = nav.stack[nav.i], selected = cur?.pid ?? null, game = cur?.game ?? null, team = cur?.team ?? null;
   const go = (entry) => setNav(({ stack, i }) => {
-    const same = (a, b) => (a?.pid && a.pid === b.pid) || (a?.game && a.game.game.event === b.game?.game.event);
+    const same = (a, b) => (a?.pid && a.pid === b.pid) || (a?.game && a.game.game.event === b.game?.game.event) || (a?.team && a.team === b.team);
     return same(stack[i], entry) ? { stack, i } : { stack: [...stack.slice(0, i + 1), entry], i: i + 1 };
   });
   const close = () => setNav({ stack: [], i: -1 });
@@ -120,6 +122,7 @@ export default function SeasonPage({ leagueId }) {
   const pidOf = (sid) => data.players[sid]?.player_id;
   const open = (sid) => { const pid = pidOf(sid); if (pid) setSelected(pid); };
   const openGame = (g) => go({ game: g });
+  const openTeam = (abbr) => go({ team: abbr });
   const setLock = (sid, gameDate) => api.post(`/leagues/${leagueId}/season/locks`, { week: data.week, sleeper_id: sid, game_date: gameDate })
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
@@ -145,6 +148,7 @@ export default function SeasonPage({ leagueId }) {
         </div>
   );
   return (
+    <TeamLinkContext.Provider value={openTeam}>
     <div className="season-grid">
       <section className="season-main">
         {headerSlot ? createPortal(bar, headerSlot) : bar}
@@ -171,8 +175,30 @@ export default function SeasonPage({ leagueId }) {
           ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={close} onOpenGame={openGame} />
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId}
             onOpenPid={setSelected} onClose={close} />
+          : team ? <TeamPanel key={team} abbr={team} leagueId={leagueId} onOpenPid={setSelected} onClose={close} />
           : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
       </aside>
+    </div>
+    </TeamLinkContext.Provider>
+  );
+}
+
+// The right side's Team card (a team's name clicked anywhere on the Season tab): the profile's team card on its own,
+// head (talent rank), offense / defense ranks and depth chart (backend /season/team).
+function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
+  const [t, setT] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { api.get(`/leagues/${leagueId}/season/team` + qs({ abbr })).then(setT).catch((e) => setError(e.message)); }, [leagueId, abbr]);
+  return (
+    <div className="panel scroll team-panel" data-testid="team-panel">
+      <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close">✕</button>
+      {!t ? <div className="muted">{error || `Loading ${abbr}…`}</div> : (
+        <div className="team-card">
+          <TeamHead t={t} />
+          {t.ranks && <TeamRanks r={t.ranks} />}
+          <DepthGrid grid={t.depth_grid} onSelectPlayer={onOpenPid} />
+        </div>
+      )}
     </div>
   );
 }
@@ -180,7 +206,8 @@ export default function SeasonPage({ leagueId }) {
 // The right side when a game card is clicked: that NBA game (backend game_detail, ESPN's summary), live or past.
 // Score and status, a stream link (streamed.pk) while it's on, each team's top 5 by fantasy points with their headline stats (like Sleeper's),
 // then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered players tagged with their fantasy
-// team; any player matched to ours clickable for his profile) and its depth chart (the player profile's). Refreshes every minute.
+// team; any player matched to ours clickable for his profile), its offense / defense ranks and depth chart (the Team card's).
+// Before the tip: both teams with their records, ranks and depth charts. Team names open the Team card. Refreshes every minute.
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
   ["STL", (r) => r.stats.stl], ["BLK", (r) => r.stats.blk], ["TO", (r) => r.stats.to], ["FG", (r) => `${r.stats.fgm}-${r.stats.fga}`],
   ["3PT", (r) => `${r.stats.tpm}-${r.stats.tpa}`], ["FT", (r) => `${r.stats.ftm}-${r.stats.fta}`], ["PF", (r) => r.stats.pf]];
@@ -219,8 +246,10 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
             <React.Fragment key={t.abbr}>
               {i === 1 && <div className="gp-status"><span className={g.state === "in" ? "gp-live" : ""}>{status}</span><span className="small muted">{when}</span></div>}
               <div className={`gp-team ${i ? "home" : ""}`}>
-                {t.logo && <img src={t.logo} alt="" width={40} height={40} />}
-                <div><div className="gp-abbr">{t.abbr}</div><div className="gp-pts">{t.score ?? "—"}</div></div>
+                {t.logo && <TeamLink abbr={t.abbr}><img src={t.logo} alt="" width={40} height={40} /></TeamLink>}
+                {/* before the tip: the team's record where the score will go */}
+                <div><div className="gp-abbr"><TeamLink abbr={t.abbr} /></div>
+                  {g.state === "pre" ? <div className="gp-record">{t.record || "—"}</div> : <div className="gp-pts">{t.score ?? "—"}</div>}</div>
               </div>
             </React.Fragment>
           ))}
@@ -231,7 +260,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
             <h4>Top performers</h4>
             <div className="gp-leaders">{g.teams.map((t) => (
               <div key={t.abbr}>
-                <div className="gp-leaders-team">{t.logo && <img src={t.logo} alt="" width={18} height={18} />}{t.abbr}</div>
+                <div className="gp-leaders-team">{t.logo && <img src={t.logo} alt="" width={18} height={18} />}<TeamLink abbr={t.abbr} /></div>
                 {[...t.players].sort((a, b) => b.fp - a.fp).slice(0, 5).map((r) => {
                   const own = owner[normName(r.name)];
                   return (
@@ -253,8 +282,8 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
           const rows = [...t.players].sort((a, b) => b.starter - a.starter || b.min - a.min);
           return (
             <section key={t.abbr} className="gp-section">
-              <h4>{t.name}</h4>
-              {rows.length ? (
+              <h4><TeamLink abbr={t.abbr}>{t.name}</TeamLink></h4>
+              {g.state === "pre" ? null : rows.length ? (
                 <table className="gp-box"><thead><tr><th>Player</th><th className="num">FP</th>{BOX_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
                   <tbody>{rows.map((r) => {
                     const own = owner[normName(r.name)];
@@ -273,6 +302,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
                   })}</tbody></table>
               ) : <div className="small muted">No minutes yet.</div>}
               {t.dnp.some((d) => d.reason) && <div className="small muted gp-dnp">{g.state === "post" ? "DNP" : "Not in yet"}: {t.dnp.filter((d) => d.reason).map((d) => d.name).join(", ")}</div>}
+              {t.ranks && <TeamRanks r={t.ranks} />}
               <DepthGrid grid={t.depth_grid} onSelectPlayer={onOpenPid} />
             </section>
           );
@@ -880,7 +910,7 @@ function NewsNote({ n, open, owner }) {
           <Headshot sleeperId={n.sid} name={n.name} size={28} /> <strong>{n.name}</strong>
         </span>
         <InjuryTag tag={n.injury_tag} note={n.injury_note} />
-        {n.team && <span className="small muted">{n.team}</span>}
+        {n.team && <span className="small muted"><TeamLink abbr={n.team} /></span>}
         {owner && <span className="small muted">· {n.owner}</span>}
         <span className="small muted news-time">{newsTime(n.published)}</span>
       </div>
@@ -1027,7 +1057,7 @@ function WaiversView({ leagueId, onSelect }) {
           <tbody>{w.claims.map((c) => (
             <tr key={c.player_id} className="clickable" onClick={() => onSelect(c.player_id)}>
               <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={44} />
-                <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted">{c.team} · <PosList list={c.pos} /></div>
+                <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted"><TeamLink abbr={c.team} /> · <PosList list={c.pos} /></div>
                   {/* his season so far, per game (finished games, league scoring) */}
                   <div className="wv-stats" data-testid="waiver-stats">{c.season ? <>
                     <span className="wv-fp">{c.season.fp} FP/G</span>

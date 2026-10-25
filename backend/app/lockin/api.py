@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..core.services.app_state import AppState
-from .service import _cache, game_detail, http_fetch, read_locks, season_news, season_player, team_plan, trending, waivers, week_view, write_lock
+from .service import (_cache, game_detail, http_fetch, read_locks, season_news, season_player, team_plan, team_ranks,
+                      team_stat_rows, trending, waivers, week_view, write_lock)
 from ..core.api.deps import _session, get_state
 
 router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
@@ -48,6 +49,19 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
 def game(league_id: str, event: str = Query(..., pattern=r"^\d+$"), state: AppState = Depends(get_state)) -> dict:
     """One NBA game (ESPN event id) for the game card: score, box scores in league FP, depth charts."""
     return game_detail(_session(state, league_id), _fetch(state), event)
+
+
+@router.get("/team")
+def team(league_id: str, abbr: str = Query(..., pattern=r"^[A-Z]{2,4}$"), state: AppState = Depends(get_state)) -> dict:
+    """One NBA team for the Team card: name, logo, fantasy-talent rank, offense / defense ranks and depth chart."""
+    from ..core.api.players import team_header
+
+    session = _session(state, league_id)
+    head = team_header(state, session, abbr)
+    if head["talent_rank"] is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown team {abbr}")
+    rows, done = team_stat_rows(_fetch(state), session.league.roster_season.split("-")[0])
+    return {**head, "ranks": team_ranks(rows, abbr, done)}
 
 
 @router.post("/sync")

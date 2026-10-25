@@ -264,3 +264,25 @@ def test_season_averages_count_finished_games_in_league_scoring(fixture_world):
     a = season_averages(rows, {"7"}, {"g1", "g2", "g3"}, s.league.scoring)
     assert set(a) == {"7"} and a["7"]["gp"] == 2 and a["7"]["pts"] == 15.0 and a["7"]["reb"] == 8.0
     assert a["7"]["fp"] == round((actual_fp(box, s.league.scoring) + actual_fp({**box, "pts": 10, "reb": 6}, s.league.scoring)) / 2, 1)
+
+
+def test_game_card_shows_both_teams_before_the_tip_with_their_ranks(fixture_world):
+    from app.lockin.service import game_detail
+
+    s = make_session(fixture_world)
+    team = lambda abbr, name, ha, rec: {"homeAway": ha, "team": {"abbreviation": abbr, "displayName": name,
+                                                                "logos": [{"href": f"https://logo/{abbr}.png"}]},
+                                       "record": [{"type": "total", "summary": rec}]}
+    canned = {
+        "summary?event=9": {"header": {"competitions": [{"date": "2026-10-25T22:00Z", "status": {"type": {"state": "pre"}},
+                                                         "competitors": [team("UTAH", "Utah Jazz", "home", "1-1"), team("LAL", "Los Angeles Lakers", "away", "2-0")]}]}},
+        "schedule/nba/regular/2026": [{"date": "2026-10-21", "week": 1, "status": "complete", "game_id": "g1",
+                                       "home": {"team": "UTA"}, "away": {"team": "LAL"}}],
+        "stats/nba/2026/1": [{"player_id": "TEAM_UTA", "team": "UTA", "opponent": "LAL", "game_id": "g1", "stats": {"pts": 100}},
+                             {"player_id": "TEAM_LAL", "team": "LAL", "opponent": "UTA", "game_id": "g1", "stats": {"pts": 110}}],
+    }
+    g = game_detail(s, lambda url, ttl: next((v for k, v in canned.items() if k in url), None), "9")
+    away, home = g["teams"]
+    assert g["state"] == "pre" and (away["abbr"], home["abbr"]) == ("LAL", "UTA")      # ESPN's UTAH -> UTA, away first
+    assert home["name"] == "Utah Jazz" and home["record"] == "1-1" and home["logo"] == "https://logo/UTAH.png"
+    assert home["players"] == [] and home["ranks"]["offense"]["pts"]["rank"] == 2 and away["ranks"]["offense"]["pts"]["rank"] == 1
