@@ -613,6 +613,87 @@ def sleeper_injuries(fetch: Fetch) -> dict[str, dict]:
             for sid, p in feed.items() if p.get("injury_status") and p.get("team")}
 
 
+def injury_report(hurt: dict[str, dict]) -> list[dict]:
+    """The News tab's teams report: every team with an injured player, most first (then most ruled out):
+    {abbr, out, q, players: [sleeper_injuries entries]}."""
+    teams: dict[str, list[dict]] = {}
+    for h in hurt.values():
+        teams.setdefault(h["team"], []).append(h)
+    return sorted(({"abbr": t, "out": sum(h["group"] == "out" for h in ps), "q": sum(h["group"] == "q" for h in ps),
+                    "players": sorted(ps, key=lambda h: (h["group"] != "out", h["name"]))} for t, ps in teams.items()),
+                  key=lambda t: (-(t["out"] + t["q"]), -t["out"], t["abbr"]))
+
+
+# ---- an NBA team's card ----------------------------------------------------------------------------------
+TEAM_STAT_KEYS = ("pts", "reb", "ast", "stl", "blk", "to", "pf", "fgm", "fga", "ftm", "fta", "tpm", "tpa")
+
+
+def team_schedule(schedule: list[dict], abbr: str) -> list[dict]:
+    """The Team card's Schedule tab, from Sleeper's season schedule: every game in date order, home or away, the
+    opponent and, once it's over, both scores and W / L."""
+    out = []
+    for g in sorted(schedule, key=lambda g: g["date"]):
+        side = "home" if g["home"]["team"] == abbr else "away" if g["away"]["team"] == abbr else None
+        if not side:
+            continue
+        other = g["away" if side == "home" else "home"]
+        us, them = g[side].get("points"), other.get("points")
+        over = g.get("status") == "complete" and us is not None and them is not None
+        out.append({"date": g["date"], "home": side == "home", "opp": other["team"], "status": g.get("status"),
+                    "pts": us, "opp_pts": them, "result": ("W" if us > them else "L") if over else None})
+    return out
+
+
+def team_player_stats(session, rows: list[dict], done: set[str], abbr: str) -> list[dict]:
+    """The Team card's Stats tab: every player's per-game line for this team (Sleeper's per-game rows, finished games
+    only; a traded player counts only his games here): MIN PTS REB AST FG% FT% 3P% STL BLK TO PF, most minutes first.
+    His current roster too, at 0 GP before they've played."""
+    sums: dict[str, dict | None] = {}
+    for e in rows:
+        st = e.get("stats") or {}
+        if (e.get("team") == abbr and e.get("game_id") in done and st.get("sp")
+                and not str(e.get("player_id", "")).startswith("TEAM_")):
+            sid = str(e["player_id"])
+            s = sums[sid] = sums.get(sid) or dict.fromkeys(("gp", "sp") + TEAM_STAT_KEYS, 0.0)
+            s["gp"] += 1
+            s["sp"] += float(st["sp"])
+            for k in TEAM_STAT_KEYS:
+                s[k] += float(st.get(k) or 0)
+    for r in session.players.values():
+        if r.team_abbr == abbr and r.sleeper_id:
+            sums.setdefault(r.sleeper_id, None)
+    by_sid = {r.sleeper_id: (pid, r) for pid, r in session.players.items() if r.sleeper_id}
+    out = []
+    for sid, s in sums.items():
+        if sid not in by_sid:   # not in the player pool: no name or position to show
+            continue
+        pid, r = by_sid[sid]
+        ov = session.overrides.get(pid)
+        row = {"player_id": pid, "sleeper_id": sid, "name": r.full_name, "pos": list(ov.eligibility) if ov else [], "gp": int(s["gp"]) if s else 0}
+        if s:
+            g = s["gp"]
+            pct = lambda m, a: round(100 * s[m] / s[a], 1) if s[a] else None
+            row.update({"min": round(s["sp"] / 60 / g, 1), **{k: round(s[k] / g, 1) for k in ("pts", "reb", "ast", "stl", "blk", "to", "pf")},
+                        "fg_pct": pct("fgm", "fga"), "ft_pct": pct("ftm", "fta"), "tp_pct": pct("tpm", "tpa")})
+        out.append(row)
+    return sorted(out, key=lambda x: (-(x.get("min") or 0), x["name"]))
+
+
+def team_news(session, fetch: Fetch, abbr: str) -> list[dict]:
+    """The Team card's News tab: the News tab's notes (player_news, RotoWire via Sleeper) on every player of this
+    team, newest first. One request per player, in parallel, cached NEWS_TTL."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    hurt = sleeper_injuries(fetch)
+    roster = [(pid, r) for pid, r in session.players.items() if r.team_abbr == abbr and r.sleeper_id]
+    with ThreadPoolExecutor(8) as pool:
+        notes = list(pool.map(lambda x: player_news(fetch, x[1].sleeper_id), roster))
+    out = [{**n, "sid": r.sleeper_id, "player_id": pid, "name": r.full_name, "team": abbr,
+            "injury_tag": (hurt.get(r.sleeper_id) or {}).get("status"), "injury_note": (hurt.get(r.sleeper_id) or {}).get("body")}
+           for (pid, r), ns in zip(roster, notes) for n in ns]
+    return sorted(out, key=lambda n: n["published"] or "", reverse=True)
+
+
 # ---- one player's season page --------------------------------------------------------------------------
 SLEEPER_NEWS = "https://api.sleeper.com/players/nba/{}/news"   # undocumented: the feed the Sleeper app shows
 NEWS_TTL = 15 * 60

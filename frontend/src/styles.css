@@ -626,6 +626,17 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 /* the News column scrolls as one (panels keep their natural height, so collapsed My team is a single bar) and is
    inset on the left by the player profile's width (500px column + 12px gap), centering it between equal margins */
 .news-col { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; margin-left: 512px; }
+/* the News tab: the teams report in the left band, the news beside it */
+.news-wrap { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.news-wrap > .news-col { margin-left: 0; }
+.news-teams { flex: none; width: 500px; min-height: 0; overflow: auto; margin-bottom: 0; }
+.news-teams h3 { margin: 0 0 8px; }
+.tr-team { display: grid; grid-template-columns: 20px 24px 1fr; gap: 8px; align-items: start; padding: 7px 4px; border-radius: 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.tr-team:hover { background: var(--hover); }
+.tr-rank { text-align: right; padding-top: 2px; }
+.tr-top { display: flex; align-items: baseline; gap: 8px; } .tr-counts { margin-left: auto; display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; }
+.tr-names { margin-top: 2px; line-height: 1.4; }
+@media (max-width: 1500px) { .news-wrap { flex-direction: column; } .news-teams { width: auto; max-height: 40vh; } }
 .waivers { margin-left: 512px; }   /* same inset as News */
 @media (max-width: 1500px) { .news-col, .waivers { margin-left: 0; } }
 .wv-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; } .wv-head h3 { margin: 0 6px 0 0; }
@@ -698,6 +709,23 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 table.depth-grid { width: 100%; margin-top: 8px; }
 /* injury colours (Sleeper's tag right now): questionable / GTD / DTD yellow, out / IR red */
 .health-q { color: #facc15; } .health-out { color: #f87171; }
+/* the right side's Team card (TeamPanel): head, then Schedule / Roster / Stats / News / Injuries tabs */
+.team-panel { position: relative; }
+.team-panel .profile-tabs { grid-template-columns: repeat(5, 1fr); }   /* five tabs on one row */
+.tp-head { display: flex; align-items: center; gap: 12px; margin: 30px 0 10px; }
+.tp-name { margin: 0; font-size: 20px; }
+.tp-game { display: grid; grid-template-columns: 82px 22px 24px 1fr auto; align-items: center; gap: 8px; padding: 6px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.tp-date { white-space: nowrap; } .tp-at { text-align: center; } .tp-result { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tp-stats-wrap { overflow-x: auto; }   /* a narrow window scrolls the table, not the card */
+.tp-stats { width: 100%; font-size: 11px; border-collapse: collapse; }
+.tp-stats th { font-size: 10px; font-weight: 700; color: var(--muted); padding: 4px 2px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.tp-stats td { padding: 3px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space: nowrap; }
+.tp-stats .num { text-align: right; }
+.tp-player { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.tp-player .pos-list, .tp-player .pos-tag { font-size: 10px; }
+.tp-inj { margin-bottom: 14px; } .tp-inj h4 { margin: 4px 0 6px; font-size: 14px; }
+.tp-inj-row { display: grid; grid-template-columns: 28px auto 1fr; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.tp-inj-tag { color: var(--muted); text-align: right; }
 [data-theme="light"] .health-q { color: #a16207; } [data-theme="light"] .health-out { color: #dc2626; }
 table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .dg-cell { white-space: nowrap; } .dg-cell.self { background: var(--primary-soft); border-radius: 6px; font-weight: 800; }

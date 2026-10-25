@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { useNBAMatches, findMatch, watchUrl } from "./streams.jsx";
 import { createPortal } from "react-dom";
 import { api, qs } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 import { PosList, PosTag } from "../core/Pos.jsx";
-import PlayerSidebar, { DepthGrid, TeamHead, TeamRanks } from "../core/PlayerSidebar.jsx";
+import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
@@ -183,22 +183,88 @@ export default function SeasonPage({ leagueId }) {
   );
 }
 
-// The right side's Team card (a team's name clicked anywhere on the Season tab): the profile's team card on its own,
-// head (talent rank), offense / defense ranks and depth chart (backend /season/team).
+// The right side's Team card (a team's name clicked anywhere on the Season tab, or a team in the News tab's report):
+// logo and name, then tabs (backend /season/team):
+//   Schedule  every game: vs / @ the opponent, and W / L with the score once it's played;
+//   Roster    offense / defense ranks and the depth chart (names coloured by injury);
+//   Stats     every player's per-game line for this team;
+//   News      the News tab's notes, on this team's players only (loaded when the tab opens);
+//   Injuries  yellow: questionable / game-time / day-to-day; red: out / IR.
+const TEAM_TABS = [["schedule", "Schedule"], ["roster", "Roster"], ["stats", "Stats"], ["news", "News"], ["injuries", "Injuries"]];
+const teamLogo = (abbr) => `https://sleepercdn.com/images/team_logos/nba/${abbr.toLowerCase()}.png`;
+const shortName = (n) => { const [first, ...rest] = (n || "").split(" "); return rest.length ? `${first[0]}. ${rest.join(" ")}` : n; };
 function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
   const [t, setT] = useState(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("schedule");
+  const [news, setNews] = useState(null);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/team` + qs({ abbr })).then(setT).catch((e) => setError(e.message)); }, [leagueId, abbr]);
+  useEffect(() => {
+    if (tab === "news" && !news) api.get(`/leagues/${leagueId}/season/team/news` + qs({ abbr })).then((x) => setNews(x.news)).catch(() => setNews([]));
+  }, [tab, news, leagueId, abbr]);
   return (
     <div className="panel scroll team-panel" data-testid="team-panel">
       <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close">✕</button>
-      {!t ? <div className="muted">{error || `Loading ${abbr}…`}</div> : (
-        <div className="team-card">
-          <TeamHead t={t} />
-          {t.ranks && <TeamRanks r={t.ranks} />}
-          <DepthGrid grid={t.depth_grid} onSelectPlayer={onOpenPid} />
+      {!t ? <div className="muted">{error || `Loading ${abbr}…`}</div> : <>
+        <div className="tp-head">
+          <img src={t.logo} alt="" width={52} height={52} onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+          <div>
+            <h3 className="tp-name">{t.name}{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</h3>
+            <div className="small muted">team <strong style={{ color: "var(--text)" }}>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent</div>
+          </div>
         </div>
-      )}
+        <nav className="profile-tabs" data-testid="team-tabs">
+          {TEAM_TABS.map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`team-tab-${id}`}>{label}</button>)}
+        </nav>
+        {tab === "schedule" && (
+          <div className="tp-schedule" data-testid="team-schedule">{t.schedule.map((g) => (
+            <div key={g.date} className="tp-game">
+              <span className="small muted tp-date">{dayName(g.date)} {md(g.date)}</span>
+              <span className="muted tp-at">{g.home ? "vs" : "@"}</span>
+              <img src={teamLogo(g.opp)} alt="" width={22} height={22} />
+              <TeamLink abbr={g.opp}>{t.names[g.opp] || g.opp}</TeamLink>
+              {g.result && <span className="tp-result"><strong className={g.result === "W" ? "ok" : "warn-text"}>{g.result}</strong> {g.pts}-{g.opp_pts}</span>}
+            </div>
+          ))}</div>
+        )}
+        {tab === "roster" && (
+          <div className="team-card">
+            {t.ranks && <TeamRanks r={t.ranks} />}
+            <DepthGrid grid={t.depth_grid} onSelectPlayer={onOpenPid} />
+          </div>
+        )}
+        {tab === "stats" && (
+          <div className="tp-stats-wrap"><table className="tp-stats" data-testid="team-stats">
+            <thead><tr><th>{t.name}</th>{["MIN", "PTS", "REB", "AST", "FG%", "FT%", "3P%", "STL", "BLK", "TO", "PF"].map((h) => <th key={h} className="num">{h}</th>)}</tr></thead>
+            <tbody>{t.stats.map((r) => (
+              <tr key={r.sleeper_id} className="clickable" onClick={() => onOpenPid(r.player_id)}>
+                <td><span className="tp-player"><Headshot sleeperId={r.sleeper_id} name={r.name} size={22} /><span>{shortName(r.name)}</span> <PosList list={r.pos} /></span></td>
+                {r.gp ? ["min", "pts", "reb", "ast", "fg_pct", "ft_pct", "tp_pct", "stl", "blk", "to", "pf"].map((k) => <td key={k} className="num">{r[k] ?? "—"}</td>)
+                  : <td className="num muted" colSpan={11}>no games yet</td>}
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        {tab === "news" && (news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
+          : <div className="muted">Loading news…</div>)}
+        {tab === "injuries" && (
+          <div data-testid="team-injuries">{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
+            const list = t.injuries.filter((h) => h.group === g);
+            return (
+              <section key={g} className={`tp-inj health-box-${g}`}>
+                <h4 className={`health-${g}`}>{title} <span className="small muted">· {sub} ({list.length})</span></h4>
+                {list.length ? list.map((h) => (
+                  <div key={h.sid} className={`tp-inj-row ${h.player_id ? "clickable" : ""}`} onClick={() => h.player_id && onOpenPid(h.player_id)}>
+                    <Headshot sleeperId={h.sid} name={h.name} size={28} />
+                    <span><strong className={`health-${g}`}>{h.name}</strong> <span className="small muted">{h.pos.join("/")}</span></span>
+                    <span className="small tp-inj-tag">{h.status}{h.body ? ` · ${h.body}` : ""}{h.note ? ` · ${h.note}` : ""}</span>
+                  </div>
+                )) : <div className="small muted">None.</div>}
+              </section>
+            );
+          })}</div>
+        )}
+      </>}
     </div>
   );
 }
@@ -922,6 +988,30 @@ function NewsNote({ n, open, owner }) {
 
 const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 
+// Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most first;
+// red counts out / IR, yellow questionable / day-to-day, the names under it. A team opens its Team card on the right.
+function TeamsReport({ leagueId, refreshKey }) {
+  const [r, setR] = useState(null);
+  const openTeam = useContext(TeamLinkContext);
+  useEffect(() => { api.get(`/leagues/${leagueId}/season/injuries`).then(setR).catch(() => setR({ teams: [], names: {} })); }, [leagueId, refreshKey]);
+  return (
+    <div className="panel news-teams" data-testid="teams-report">
+      <h3>Teams report <span className="small muted">most injured first</span></h3>
+      {!r ? <div className="muted">Loading injuries…</div> : r.teams.map((t, i) => (
+        <div key={t.abbr} className="tr-team clickable" onClick={() => openTeam?.(t.abbr)} data-testid={`report-${t.abbr}`}>
+          <span className="muted tr-rank">{i + 1}</span>
+          <img src={teamLogo(t.abbr)} alt="" width={24} height={24} />
+          <div className="tr-body">
+            <div className="tr-top"><strong>{r.names[t.abbr] || t.abbr}</strong>
+              <span className="tr-counts">{t.out > 0 && <span className="health-out">{t.out} out</span>}{t.q > 0 && <span className="health-q">{t.q} questionable</span>}</span></div>
+            <div className="small tr-names">{t.players.map((h, j) => <span key={h.sid} className={`health-${h.group}`}>{j ? ", " : ""}{h.name}</span>)}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NewsView({ leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
   const [error, setError] = useState("");
@@ -940,6 +1030,8 @@ function NewsView({ leagueId, open, refreshKey }) {
   const nbaTeams = [...new Set([...news.mine, ...news.league, ...news.free].map((n) => n.team).filter(Boolean))].sort();
   const managers = [...new Set(news.league.map((n) => n.user))].sort((a, b) => a.localeCompare(b));
   return (
+    <div className="news-wrap">
+    <TeamsReport leagueId={leagueId} refreshKey={refreshKey} />
     <div className="news-col">
       <div className="panel news-filters" data-testid="news-filters">
         <input type="search" placeholder="Search player, team, manager or note…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="news-search" />
@@ -966,6 +1058,7 @@ function NewsView({ leagueId, open, refreshKey }) {
         {league.length ? league.slice(0, LEAGUE_NEWS).map((n, i) => <NewsNote key={i} n={n} open={open} owner />)
           : <div className="muted">No notes match.</div>}
       </div>
+    </div>
     </div>
   );
 }
