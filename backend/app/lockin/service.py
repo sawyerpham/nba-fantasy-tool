@@ -599,7 +599,8 @@ OUT_TAGS = {"Out", "IR", "Sus", "Doubtful"}   # red; any other tag (Questionable
 
 
 def sleeper_injuries(fetch: Fetch) -> dict[str, dict]:
-    """Every NBA player Sleeper tags as hurt right now: sleeper id -> {sid, name, team, pos, status, group, body, note}.
+    """Every NBA player Sleeper tags as hurt right now: sleeper id -> {sid, name, team, pos, status, group, body, note,
+    starter (first on Sleeper's depth chart at his spot)}.
     group "out" (Out, IR, suspended, doubtful) or "q" (questionable / game-time / day-to-day). Colours the depth
     charts' names and fills the Team card's Injuries tab and the News tab's teams report; {} if Sleeper fails."""
     try:
@@ -609,19 +610,23 @@ def sleeper_injuries(fetch: Fetch) -> dict[str, dict]:
     return {sid: {"sid": sid, "name": p.get("full_name") or f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                   "team": p["team"], "pos": p.get("fantasy_positions") or [], "status": p["injury_status"],
                   "group": "out" if p["injury_status"] in OUT_TAGS else "q",
-                  "body": p.get("injury_body_part"), "note": p.get("injury_notes")}
+                  "body": p.get("injury_body_part"), "note": p.get("injury_notes"), "starter": p.get("depth_chart_order") == 1}
             for sid, p in feed.items() if p.get("injury_status") and p.get("team")}
 
 
 def injury_report(hurt: dict[str, dict]) -> list[dict]:
-    """The News tab's teams report: every team with an injured player, most first (then most ruled out):
-    {abbr, out, q, players: [sleeper_injuries entries]}."""
+    """The News tab's teams report: every team with an injured player, most starters out first (then starters
+    questionable, then everyone out, then everyone hurt): {abbr, starters_out, starters_q, out, q, players: starters
+    first, out before questionable}."""
     teams: dict[str, list[dict]] = {}
     for h in hurt.values():
         teams.setdefault(h["team"], []).append(h)
-    return sorted(({"abbr": t, "out": sum(h["group"] == "out" for h in ps), "q": sum(h["group"] == "q" for h in ps),
-                    "players": sorted(ps, key=lambda h: (h["group"] != "out", h["name"]))} for t, ps in teams.items()),
-                  key=lambda t: (-(t["out"] + t["q"]), -t["out"], t["abbr"]))
+    count = lambda ps, group, starter=False: sum(h["group"] == group and (h.get("starter") or not starter) for h in ps)
+    return sorted(({"abbr": t, "starters_out": count(ps, "out", True), "starters_q": count(ps, "q", True),
+                    "out": count(ps, "out"), "q": count(ps, "q"),
+                    "players": sorted(ps, key=lambda h: (not h.get("starter"), h["group"] != "out", h["name"]))}
+                   for t, ps in teams.items()),
+                  key=lambda t: (-t["starters_out"], -t["starters_q"], -t["out"], -(t["out"] + t["q"]), t["abbr"]))
 
 
 # ---- an NBA team's card ----------------------------------------------------------------------------------

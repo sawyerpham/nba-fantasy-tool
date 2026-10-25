@@ -988,23 +988,29 @@ function NewsNote({ n, open, owner }) {
 
 const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 
-// Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most first;
-// red counts out / IR, yellow questionable / day-to-day, the names under it. A team opens its Team card on the right.
+// Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most starters
+// out first; red counts out / IR, yellow questionable / day-to-day, the names under it (starters bold, first). A team
+// opens its Team card on the right.
 function TeamsReport({ leagueId, refreshKey }) {
   const [r, setR] = useState(null);
   const openTeam = useContext(TeamLinkContext);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/injuries`).then(setR).catch(() => setR({ teams: [], names: {} })); }, [leagueId, refreshKey]);
   return (
     <div className="panel news-teams" data-testid="teams-report">
-      <h3>Teams report <span className="small muted">most injured first</span></h3>
+      <h3>Teams report <span className="small muted">most starters out first</span></h3>
       {!r ? <div className="muted">Loading injuries…</div> : r.teams.map((t, i) => (
         <div key={t.abbr} className="tr-team clickable" onClick={() => openTeam?.(t.abbr)} data-testid={`report-${t.abbr}`}>
           <span className="muted tr-rank">{i + 1}</span>
           <img src={teamLogo(t.abbr)} alt="" width={24} height={24} />
           <div className="tr-body">
             <div className="tr-top"><strong>{r.names[t.abbr] || t.abbr}</strong>
-              <span className="tr-counts">{t.out > 0 && <span className="health-out">{t.out} out</span>}{t.q > 0 && <span className="health-q">{t.q} questionable</span>}</span></div>
-            <div className="small tr-names">{t.players.map((h, j) => <span key={h.sid} className={`health-${h.group}`}>{j ? ", " : ""}{h.name}</span>)}</div>
+              <span className="tr-counts">
+                {t.starters_out > 0 && <span className="health-out">{t.starters_out} starter{t.starters_out > 1 ? "s" : ""} out</span>}
+                {t.starters_q > 0 && <span className="health-q">{t.starters_q} starter{t.starters_q > 1 ? "s" : ""} ?</span>}
+              </span></div>
+            <div className="small tr-names">{t.players.map((h, j) => (
+              <span key={h.sid} className={`health-${h.group} ${h.starter ? "tr-starter" : ""}`} title={h.starter ? "starter" : undefined}>{j ? ", " : ""}{h.name}</span>))}
+              <span className="muted"> · {[t.out && `${t.out} out`, t.q && `${t.q} questionable`].filter(Boolean).join(", ")}</span></div>
           </div>
         </div>
       ))}
