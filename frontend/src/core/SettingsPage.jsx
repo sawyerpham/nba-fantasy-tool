@@ -114,6 +114,15 @@ export default function SettingsPage({ leagueId }) {
           <label>Time zone <select value={s.timezone || "America/Chicago"} onChange={(e) => set({ timezone: e.target.value })} data-testid="timezone">
             {TIMEZONES.map(([z, label]) => <option key={z} value={z}>{label}</option>)}</select>
             <span className="muted small">Every in-season time (tips, alarms, news, the timeline) and when "today" ends.</span></label>
+          <label>Waiver runs
+            <span className="day-pick" data-testid="waiver-days">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => {
+              const days = s.waiver_days || [5, 6], on = days.includes(i);
+              return <button key={d} type="button" className={on ? "active" : ""} disabled={on && days.length === 1}
+                onClick={() => set({ waiver_days: on ? days.filter((x) => x !== i) : [...days, i].sort() })}>{d}</button>;
+            })}</span>
+            <select value={s.waiver_hour ?? 2} onChange={(e) => set({ waiver_hour: Number(e.target.value) })} data-testid="waiver-hour">
+              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${h % 12 || 12}:00 ${h < 12 ? "AM" : "PM"}`}</option>)}</select>
+            <span className="muted small">When Sleeper processes waiver claims (your time zone): the Waivers tab counts a claim's games from the next run.</span></label>
           <label>You are <select value={managers.find((m) => m.is_user)?.manager_id || ""} onChange={(e) => markMe(e.target.value)} data-testid="you-are">
             {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name}</option>)}</select>
             <span className="muted small">Your team: your side of the matchup, waivers, news. Saves at once.</span></label>

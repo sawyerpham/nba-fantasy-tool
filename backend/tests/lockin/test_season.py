@@ -244,10 +244,11 @@ def test_next_waiver_run_is_the_coming_saturday_or_sunday_at_2_am():
 
     ct = ZoneInfo("America/Chicago")
     at = lambda *a: datetime(*a, tzinfo=ct)
-    assert next_waiver_run(at(2026, 10, 21, 15, 0)) == at(2026, 10, 24, 2, 0)    # Wed -> Sat 2 AM
-    assert next_waiver_run(at(2026, 10, 24, 1, 59)) == at(2026, 10, 24, 2, 0)    # Sat just before the run
-    assert next_waiver_run(at(2026, 10, 24, 18, 0)) == at(2026, 10, 25, 2, 0)    # Sat evening -> Sun 2 AM
-    assert next_waiver_run(at(2026, 10, 25, 2, 0)) == at(2026, 10, 31, 2, 0)     # Sun's run just went -> next Sat
+    assert next_waiver_run(at(2026, 10, 21, 15, 0), [5, 6], 2) == at(2026, 10, 24, 2, 0)    # Wed -> Sat 2 AM
+    assert next_waiver_run(at(2026, 10, 24, 1, 59), [5, 6], 2) == at(2026, 10, 24, 2, 0)    # Sat just before the run
+    assert next_waiver_run(at(2026, 10, 24, 18, 0), [5, 6], 2) == at(2026, 10, 25, 2, 0)    # Sat evening -> Sun 2 AM
+    assert next_waiver_run(at(2026, 10, 25, 2, 0), [5, 6], 2) == at(2026, 10, 31, 2, 0)     # Sun's run just went -> next Sat
+    assert next_waiver_run(at(2026, 10, 24, 18, 0), [2], 0) == at(2026, 10, 28, 0, 0)   # a league set to Wed midnight
 
 
 def test_season_averages_count_finished_games_in_league_scoring(fixture_world):

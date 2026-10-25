@@ -137,6 +137,8 @@ class LeagueSettings(BaseModel):
     stats_season: str = "2025-26"
     game_mode: GameMode = "lock_in"
     timezone: str = "America/Chicago"   # IANA zone every in-season time is shown in (and "today" is judged by)
+    waiver_days: list[int] = Field(default_factory=lambda: [5, 6])   # days waiver claims process (Mon = 0): Sat, Sun
+    waiver_hour: int = 2                # ...at this hour, league time
     scoring_format: ScoringFormat = "h2h_points"
     draft_type: DraftType = "auction"
     nomination_order_type: NominationOrder = "fixed_rotation"
@@ -158,6 +160,20 @@ class LeagueSettings(BaseModel):
             ZoneInfo(v)
         except Exception as exc:   # ZoneInfoNotFoundError is not a ValueError: make it a validation error (400)
             raise ValueError(f"unknown time zone {v!r}") from exc
+        return v
+
+    @field_validator("waiver_days")
+    @classmethod
+    def _waiver_days(cls, v: list[int]) -> list[int]:
+        if not v or any(d not in range(7) for d in v):
+            raise ValueError("waiver_days: pick at least one day, 0 (Mon) to 6 (Sun)")
+        return sorted(set(v))
+
+    @field_validator("waiver_hour")
+    @classmethod
+    def _waiver_hour(cls, v: int) -> int:
+        if v not in range(24):
+            raise ValueError("waiver_hour must be 0 to 23")
         return v
 
     @model_validator(mode="after")

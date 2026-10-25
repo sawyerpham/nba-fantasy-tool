@@ -817,19 +817,19 @@ WAIVER_SHOW = 12
 # no data on rivals' bids, so it is a guide, not a price.
 
 
-WAIVER_RUNS = (5, 6)   # claims process Saturday and Sunday (Mon = 0)...
-WAIVER_HOUR = 2        # ...at 2 AM league time
-# ponytail: the run days are set here, from the league manager; Sleeper's daily_waivers_days bitmask is undocumented
+# When claims process: the league's waiver_days / waiver_hour (Settings tab); Sleeper's daily_waivers_days bitmask
+# is undocumented, so the days are set by hand
+DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 AVG_STATS = ("pts", "reb", "ast", "stl", "blk", "tpm", "to")
 
 
-def next_waiver_run(now: datetime) -> datetime:
-    """The next time claims process after `now` (aware, league time): a WAIVER_RUNS day at WAIVER_HOUR."""
+def next_waiver_run(now: datetime, days: list[int], hour: int) -> datetime:
+    """The next time claims process after `now` (aware, league time): one of `days` (Mon = 0) at `hour`."""
     for d in range(8):
-        t = (now + timedelta(days=d)).replace(hour=WAIVER_HOUR, minute=0, second=0, microsecond=0)
-        if t.weekday() in WAIVER_RUNS and t > now:
+        t = (now + timedelta(days=d)).replace(hour=hour, minute=0, second=0, microsecond=0)
+        if t.weekday() in days and t > now:
             return t
-    raise AssertionError("no waiver run day set")
+    raise ValueError("no waiver run day set")
 
 
 def season_averages(rows: list[dict], sids: set[str], done: set[str], scoring) -> dict[str, dict]:
@@ -849,13 +849,16 @@ def season_averages(rows: list[dict], sids: set[str], done: set[str], scoring) -
 
 def waivers(session, fetch: Fetch, view: dict) -> dict:
     """Free agents worth claiming: rest-of-season value (the draft value: projection, Lock-In ceiling, availability),
-    his season averages, the games he plays once he lands (claims process at the next waiver run, Saturday and Sunday
-    2 AM: this week's games after it and next week's), the player of yours to drop and a suggested blind bid."""
+    his season averages, the games he plays once he lands (claims process at the next waiver run, the league's
+    waiver_days at waiver_hour: this week's games after it and next week's), the player of yours to drop and a
+    suggested blind bid."""
     waiver = view.get("waiver")
     if waiver is None:
         return {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
     tz = ZoneInfo(view.get("tz") or "America/Chicago")
-    run = next_waiver_run(datetime.fromisoformat(view["now"]).astimezone(tz) if view.get("now") else datetime.now(tz))
+    lg = session.league
+    run = next_waiver_run(datetime.fromisoformat(view["now"]).astimezone(tz) if view.get("now") else datetime.now(tz),
+                          lg.waiver_days, lg.waiver_hour)
     lands = run.date().isoformat()
     year, week = session.league.roster_season.split("-")[0], view["week"]
     schedule = fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
@@ -896,4 +899,4 @@ def waivers(session, fetch: Fetch, view: dict) -> dict:
     return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "sleeper_id": drop.sleeper_id, "name": drop.full_name,
                                              "value": round(drop.value, 2)} if drop else None,
             "claims": out, "budget": budget if faab else None, "type": waiver["type"],
-            "next_run": run.isoformat(), "runs": [{5: "Sat", 6: "Sun"}.get(d, d) for d in WAIVER_RUNS], "run_hour": WAIVER_HOUR}
+            "next_run": run.isoformat(), "runs": [DAY_NAMES[d] for d in lg.waiver_days], "run_hour": lg.waiver_hour}
