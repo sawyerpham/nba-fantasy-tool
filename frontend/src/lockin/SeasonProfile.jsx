@@ -7,6 +7,7 @@ import InjuryTag from "../core/InjuryTag.jsx";
 // chart) is drawn by PlayerSidebar, which already has his team card.
 
 const f1 = (x) => (x == null ? "—" : Number(x).toFixed(1));
+const f2 = (x) => (x == null ? "—" : Number(x).toFixed(2));   // fantasy points: 2 decimals, like Sleeper
 const mmdd = (d) => d.slice(5).replace("-", "/");   // "2026-10-23" -> "10/23"
 const longDate = (ms) => fmt(ms, { month: "short", day: "numeric", year: "numeric" }).replace(",", "");   // "Oct 15 2026"
 // "3:14 - 1st" -> "Q1 3:14" (ESPN's live status in quarters)
@@ -31,7 +32,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
           </div>
           <div className="sp-game-mid">
             <div className="sp-score"><strong><TeamLink abbr={g.team} /></strong> {g.team_pts ?? "—"} <span className="muted">{g.home ? "vs" : "@"}</span> <strong><TeamLink abbr={g.opp} /></strong> {g.opp_pts ?? "—"}</div>
-            <div className="sp-fp"><span>{f1(g.fp)}</span><small>FP</small></div>
+            <div className="sp-fp"><span>{f2(g.fp)}</span><small>FP</small></div>
           </div>
           <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to</div>
         </div>
@@ -42,7 +43,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
       <div className="sp-grid sp-grid-5">
         {stat("Pos rank", sea.pos_rank || "—")}{stat("Overall", sea.overall_rank ? `#${sea.overall_rank}` : "—")}
         {stat("Owned", sea.owned != null ? `${Math.round(sea.owned)}%` : "—")}{stat("Started", sea.started != null ? `${Math.round(sea.started)}%` : "—")}
-        {stat("FP/G", f1(a?.fp))}
+        {stat("FP/G", f2(a?.fp))}
       </div>
       <div className="small sp-meta">
         <span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
@@ -66,7 +67,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
 
 // Game log: every game his team plays this season; his line where he played (blank for games to come / he missed).
 // [header, shown value, raw key]
-const LOG_COLS = [["FPTS", (r) => f1(r.fp), "fp"], ["MIN", (r) => r.min, "min"], ["PTS", (r) => r.pts, "pts"], ["REB", (r) => r.reb, "reb"],
+const LOG_COLS = [["FPTS", (r) => f2(r.fp), "fp"], ["MIN", (r) => r.min, "min"], ["PTS", (r) => r.pts, "pts"], ["REB", (r) => r.reb, "reb"],
   ["AST", (r) => r.ast, "ast"], ["STL", (r) => r.stl, "stl"], ["BLK", (r) => r.blk, "blk"], ["TO", (r) => r.to, "to"], ["PF", (r) => r.pf, "pf"],
   ["+/-", (r) => (r.pm > 0 ? `+${r.pm}` : r.pm), "pm"]];
 // Each game's stat against his own season average: green above it, yellow about it (within 8 %), red below it

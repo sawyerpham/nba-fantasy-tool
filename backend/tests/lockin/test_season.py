@@ -266,7 +266,7 @@ def test_season_averages_count_finished_games_in_league_scoring(fixture_world):
             {"player_id": "8", "game_id": "g1", "stats": box}]                        # not asked for
     a = season_averages(rows, {"7"}, {"g1", "g2", "g3"}, s.league.scoring)
     assert set(a) == {"7"} and a["7"]["gp"] == 2 and a["7"]["pts"] == 15.0 and a["7"]["reb"] == 8.0
-    assert a["7"]["fp"] == round((actual_fp(box, s.league.scoring) + actual_fp({**box, "pts": 10, "reb": 6}, s.league.scoring)) / 2, 1)
+    assert a["7"]["fp"] == round((actual_fp(box, s.league.scoring) + actual_fp({**box, "pts": 10, "reb": 6}, s.league.scoring)) / 2, 2)   # FP to 2 decimals, like Sleeper
 
 
 def test_game_card_shows_both_teams_before_the_tip_with_their_ranks(fixture_world):

@@ -258,7 +258,7 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
         else:
             p.action, p.why = "WAIT", f"{p.seat} slot: his games are worth ~{p.w:.1f}"
     expected = sum(p.value for s in seats.values() for p in s)
-    return WeekPlan(players=players, expected=round(expected, 1), slots=dict(slot_counts))
+    return WeekPlan(players=players, expected=round(expected, 2), slots=dict(slot_counts))
 
 
 # ---- today's lineup ------------------------------------------------------------------------------------------

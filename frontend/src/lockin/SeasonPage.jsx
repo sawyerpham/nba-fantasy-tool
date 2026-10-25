@@ -20,7 +20,7 @@ const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["
 
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 const md = (d) => d.slice(5).replace("-", "/");   // "2026-10-20" -> "10/20"
-const fp = (x) => (x == null ? "" : x.toFixed(1));
+const fp = (x) => (x == null ? "" : x.toFixed(2));   // fantasy points: 2 decimals, like Sleeper
 // Player nicknames the managers set on Sleeper: shown unless switched off (Settings > General, this browser only).
 const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off"; } catch { return true; } };
 
@@ -1159,7 +1159,7 @@ function WaiversView({ leagueId, onSelect }) {
                 <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted"><TeamLink abbr={c.team} /> · <PosList list={c.pos} /></div>
                   {/* his season so far, per game (finished games, league scoring) */}
                   <div className="wv-stats" data-testid="waiver-stats">{c.season ? <>
-                    <span className="wv-fp">{c.season.fp} FP/G</span>
+                    <span className="wv-fp">{c.season.fp.toFixed(2)} FP/G</span>
                     {[["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tpm", "3PM"]].map(([k, l]) => <span key={k}><strong>{c.season[k]}</strong> {l}</span>)}
                     <span className="muted">{c.season.gp} GP</span>
                   </> : <span className="muted">No games played yet</span>}</div>
