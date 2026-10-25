@@ -326,6 +326,9 @@ def test_team_card_schedule_stats_and_injury_report(fixture_world):
     assert j["gp"] == 2 and j["pts"] == 25.0 and j["min"] == 35.0 and j["fg_pct"] == 50.0 and j["ft_pct"] == 80.0
 
     hurt = {"1": {"name": "A", "team": "MEM", "group": "out"}, "2": {"name": "B", "team": "MEM", "group": "q"},
-            "3": {"name": "C", "team": "BKN", "group": "out"}, "4": {"name": "D", "team": "LAL", "group": "q"}}
+            "3": {"name": "C", "team": "BKN", "group": "out", "starter": True}, "4": {"name": "D", "team": "LAL", "group": "q"},
+            "5": {"name": "E", "team": "LAL", "group": "q", "starter": True}}
     rep = injury_report(hurt)
-    assert [t["abbr"] for t in rep] == ["MEM", "BKN", "LAL"] and (rep[0]["out"], rep[0]["q"]) == (1, 1)   # most hurt, then most out
+    # a starter out beats a starter questionable beats bench injuries, however many
+    assert [t["abbr"] for t in rep] == ["BKN", "LAL", "MEM"] and rep[0]["starters_out"] == 1 and rep[1]["starters_q"] == 1
+    assert (rep[2]["out"], rep[2]["q"], rep[2]["starters_out"]) == (1, 1, 0) and rep[1]["players"][0]["name"] == "E"   # starters listed first
