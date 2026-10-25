@@ -125,7 +125,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
         </div>
         <div className="live-card pass" data-testid="live-pass">
           <div className="live-card-title">Next best players</div>
-          {next.length ? next.map((r) => <div key={r.player_id} className="clip">{r.full_name} <span className="muted">{r.eligibility.join("/")}</span> <strong>{r.worth != null ? `$${r.worth}` : ""}</strong>{r.fit && <> · <Term k="fit">Fit</Term> <strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong></>}</div>)
+          {next.length ? next.map((r) => <div key={r.player_id} className="clip">{r.full_name} <span className="muted">{r.eligibility.join(" ")}</span> <strong>{r.worth != null ? `$${r.worth}` : ""}</strong>{r.fit && <> · <Term k="fit">Fit</Term> <strong className={`fit-num ${r.fit.score >= 70 ? "hi" : r.fit.score >= 45 ? "mid" : "lo"}`}>{r.fit.score}</strong></>}</div>)
             : <div className="muted">Nobody else left for that spot.</div>}
         </div>
         <div className="live-card lockin" data-testid="live-lockin">

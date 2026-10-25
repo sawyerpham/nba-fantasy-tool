@@ -256,7 +256,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
                 {list.length ? list.map((h) => (
                   <div key={h.sid} className={`tp-inj-row ${h.player_id ? "clickable" : ""}`} onClick={() => h.player_id && onOpenPid(h.player_id)}>
                     <Headshot sleeperId={h.sid} name={h.name} size={28} />
-                    <span><strong className={`health-${g}`}>{h.name}</strong> <span className="small muted">{h.pos.join("/")}</span></span>
+                    <span><strong className={`health-${g}`}>{h.name}</strong> <span className="small muted">{h.pos.join(" ")}</span></span>
                     <span className="small tp-inj-tag">{h.status}{h.body ? ` · ${h.body}` : ""}{h.note ? ` · ${h.note}` : ""}</span>
                   </div>
                 )) : <div className="small muted">None.</div>}

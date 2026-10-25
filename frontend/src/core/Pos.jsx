@@ -10,8 +10,8 @@ export const posClass = (text) => {
   return m ? `pos-c pos-${m[0]}` : "";
 };
 
-// "PG/SF/PF" with each position in its colour.
-export function PosList({ list, sep = "/" }) {
+// "PG SF PF" with each position in its colour (spaces, no slashes).
+export function PosList({ list, sep = " " }) {
   return (list || []).map((p, i) => (
     <React.Fragment key={p}>{i > 0 && sep}<span className={posClass(p)}>{p}</span></React.Fragment>
   ));
