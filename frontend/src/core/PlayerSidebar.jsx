@@ -10,7 +10,7 @@ import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile
 // season: the in-season profile (Season tab), like Sleeper's: four tabs under his name. Summary (his live / last game,
 // season averages, ranks, ownership, owner, status, news), Game log (every game this season), Team (his team card and
 // depth chart) and History (draft, keeper, moves). No draft parts (Fit, Worth, bid guide, keeper outlook, tier).
-const TABS = [["summary", "Summary"], ["log", "Game log"], ["team", "Team"], ["history", "History"]];
+const TABS = [["summary", "Summary"], ["log", "Game Log"], ["team", "Team"], ["history", "History"]];
 export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose, onOpenGame }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
