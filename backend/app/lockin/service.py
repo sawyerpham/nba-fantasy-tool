@@ -339,7 +339,7 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
             played.append({"name": ath.get("displayName"), "player_id": ids.get(normalize_name(ath.get("displayName"))), "pos": (ath.get("position") or {}).get("abbreviation"),
                            "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
                            "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
-                           "fp": round(actual_fp(st_, session.league.scoring), 1), "lead": lead_stats(st_, session.league.scoring)})
+                           "fp": round(actual_fp(st_, session.league.scoring), 2), "lead": lead_stats(st_, session.league.scoring)})
         teams.append({"abbr": abbr, "name": c["team"].get("displayName"), "logo": ((c["team"].get("logos") or [{}])[0]).get("href"),
                       "score": c.get("score"), "home": c.get("homeAway") == "home",
                       "record": next((r.get("summary") for r in c.get("record") or [] if r.get("type") == "total"), None),
@@ -900,7 +900,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
         season_log.append(row)
     games_played = [r for r in season_log if "fp" in r]
     done = [r for r in games_played if r["status"] == "complete"]   # averages: finished games only (not a half-played one)
-    averages = {k: round(sum(r[k] for r in done) / len(done), 1) for k in ("min", "pts", "reb", "ast", "stl", "blk", "to", "fp")} \
+    averages = {k: round(sum(r[k] for r in done) / len(done), 2 if k == "fp" else 1) for k in ("min", "pts", "reb", "ast", "stl", "blk", "to", "fp")} \
         if done else None
     # his latest game (live or last final), with both teams' scores; this week's from ESPN (quarter + clock)
     last = games_played[-1] if games_played else None
@@ -967,7 +967,8 @@ def season_averages(rows: list[dict], sids: set[str], done: set[str], scoring) -
             s["fp"] += actual_fp(st, scoring)
             for k in AVG_STATS:
                 s[k] += float(st.get(k) or 0)
-    return {sid: {"gp": int(s["gp"]), **{k: round(s[k] / s["gp"], 1) for k in ("fp",) + AVG_STATS}} for sid, s in sums.items()}
+    return {sid: {"gp": int(s["gp"]), "fp": round(s["fp"] / s["gp"], 2), **{k: round(s[k] / s["gp"], 1) for k in AVG_STATS}}
+            for sid, s in sums.items()}
 
 
 def waivers(session, fetch: Fetch, view: dict) -> dict:

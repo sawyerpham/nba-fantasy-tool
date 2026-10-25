@@ -825,8 +825,8 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-who .small { font-size: 14px; }
 .mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room (only a locked ✓ shows here) */
 .chips-row { gap: 8px; }
-.game-chip { min-width: 84px; padding: 7px 10px; border-radius: 9px; }
-.gch-day { font-size: 11.5px; } .gch-fp { font-size: 19px; } .gch-fp .gch-exp { font-size: 10.9px; }
+.game-chip { min-width: 84px; padding: 7px 6px; border-radius: 9px; }
+.gch-day { font-size: 11.5px; } .gch-fp { font-size: 15.5px; } .gch-fp .gch-exp { font-size: 9.5px; }   /* sized for 2-decimal FP ("17.50 13.27") */
 .mu-slot .pos-tag, .mu-slot span { font-size: 15px; font-weight: 800; }
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -903,9 +903,9 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .gp-watch { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 8px; background: var(--primary-soft); color: var(--text); text-decoration: none; }
 .gp-section { margin-top: 14px; }
 .gp-section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.gp-box { width: 100%; font-size: 11.5px; border-collapse: collapse; }
+.gp-box { width: 100%; font-size: 11px; border-collapse: collapse; }
 .gp-box th { font-size: 10px; font-weight: 700; color: var(--muted); padding: 3px 2px; border-bottom: 1px solid var(--border); }
-.gp-box td { padding: 4px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space: nowrap; }
+.gp-box td { padding: 4px 1.5px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space: nowrap; }
 .gp-box .num { text-align: right; } .gp-box th:first-child { text-align: left; }
 .gp-name { font-weight: 600; } .gp-mine td { background: var(--primary-soft); }
 .gp-player { display: inline-flex; align-items: center; gap: 6px; }
