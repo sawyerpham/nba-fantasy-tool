@@ -121,8 +121,8 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
     players' projected FP/G, 1 = most), and the top teammates with photos. Not a win projection."""
     drafted = {p.player_id: p.manager_id for p in session.draft.picks}
     names = {m.manager_id: m.name for m in session.managers}
-    by_team, talent = team_rosters(session)
-    order = sorted(talent, key=lambda t: -talent[t])
+    rosters = team_rosters(session)
+    by_team = rosters[0]
     abbr = session.players[player_id].team_abbr
     roster = sorted(by_team.get(abbr, []), reverse=True)
     # Card order: Sleeper's starting five PG -> C, then 'next up' by depth (all the #2s PG -> C, then #3s ...).
@@ -138,7 +138,6 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
     if player_id not in shown:
         shown.append(player_id)
     fpg_of = {pid: f for f, pid in roster}
-    team_ref = next((t for t in state.stats.list_teams() if t.abbreviation == abbr), None) if hasattr(state.stats, "list_teams") else None
 
     def mate(fpg: float, pid: int) -> dict:
         rec = session.players[pid]
@@ -151,20 +150,31 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
                 "pos": (session.overrides.get(pid).eligibility if session.overrides.get(pid) else []),
                 "drafted_by": names.get(drafted.get(pid)), "is_self": pid == player_id}
 
-    from ... import config
-
-    rel = config.standings_rel(session.league.stats_season)
-    conference = ((state.store.read_json(rel)["teams"] if state.store.exists(rel) else {}).get(abbr) or {}).get("conference")
     return {
-        "abbr": abbr, "name": team_ref.full_name if team_ref else abbr, "conference": conference,
-        "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
-        "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
-        "talent_fpg": round(talent.get(abbr, 0.0), 1),
+        **team_header(state, session, abbr, rosters),
         "player_rank": next((i for i, (_, pid) in enumerate(roster, 1) if pid == player_id), None),
         "teammates": [mate(fpg_of[pid], pid) for pid in shown],
         "depth_grid": depth_grid(session, roster, player_id),
         "role": _team_role(session, roster, player_id),
     }
+
+
+def team_header(state: AppState, session, abbr: str, rosters=None) -> dict:
+    """An NBA team's card head: name, conference, logo, its projected-fantasy-talent rank (sum of the top 8 players'
+    projected FP/G, 1 = most; not a win projection) and Sleeper's depth chart. rosters: team_rosters(session), if
+    already made. Shared by the player profile's Team tab and the season Team card."""
+    from ... import config
+
+    by_team, talent = rosters or team_rosters(session)
+    order = sorted(talent, key=lambda t: -talent[t])
+    team_ref = next((t for t in state.stats.list_teams() if t.abbreviation == abbr), None) if hasattr(state.stats, "list_teams") else None
+    rel = config.standings_rel(session.league.stats_season)
+    conference = ((state.store.read_json(rel)["teams"] if state.store.exists(rel) else {}).get(abbr) or {}).get("conference")
+    return {"abbr": abbr, "name": team_ref.full_name if team_ref else abbr, "conference": conference,
+            "logo": f"https://sleepercdn.com/images/team_logos/nba/{abbr.lower()}.png",
+            "talent_rank": order.index(abbr) + 1 if abbr in talent else None, "teams": len(order),
+            "talent_fpg": round(talent.get(abbr, 0.0), 1),
+            "depth_grid": depth_grid(session, sorted(by_team.get(abbr, []), reverse=True))}
 
 
 def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = None) -> dict:

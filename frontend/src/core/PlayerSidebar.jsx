@@ -3,6 +3,7 @@ import { PosList, PosTag, posClass, tierHue } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
+import TeamLink from "./TeamLink.jsx";
 import { ordinal } from "../draft/SpendingGuide.jsx";
 import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile.jsx";
 
@@ -68,7 +69,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
-        {rec_.full_name} <span className="muted">{rec_.fantasy?.number != null && `#${rec_.fantasy.number} `}{rec_.team_abbr || "FA"}</span>
+        {rec_.full_name} <span className="muted">{rec_.fantasy?.number != null && `#${rec_.fantasy.number} `}{rec_.team_abbr ? <TeamLink abbr={rec_.team_abbr} /> : "FA"}</span>
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
           {season && data.team?.role && (
@@ -103,18 +104,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   // his NBA team: logo, his rank on the team, the team's fantasy-talent rank; the depth chart (season) or teammates
   const teamCard = data.team && (
     <div className="team-card" data-testid="team-card">
-      <div className="team-card-head">
-        <img src={data.team.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
-        <div>
-          <div className="team-name">{data.team.name}{data.team.conference && <span className={`conf conf-${data.team.conference}`}>{data.team.conference}</span>}</div>
-          <div className="small muted">
-            {data.team.player_rank && <><strong style={{ color: "var(--text)" }}>#{data.team.player_rank}</strong> on the team · </>}
-            <span title={`sum of the top 8 players' projected FP/G (${data.team.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
-              team <strong style={{ color: "var(--text)" }}>#{data.team.talent_rank}</strong> of {data.team.teams} in projected fantasy talent
-            </span>
-          </div>
-        </div>
-      </div>
+      <TeamHead t={data.team} />
       {season && sea?.team_ranks && <TeamRanks r={sea.team_ranks} />}
       {season && data.team.depth_grid ? <DepthGrid grid={data.team.depth_grid} onSelectPlayer={onSelectPlayer} /> : (
       <div className="teammates">
@@ -271,7 +261,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <thead><tr><th>season</th><th>team</th><th>age</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th></tr></thead>
             <tbody>
               {data.detail.season_totals.slice().reverse().map((t, i) => (
-                <tr key={i}><td>{t.season}</td><td>{t.team_abbr}</td><td>{t.age ?? ""}</td><td>{t.gp}</td><td>{t.gp ? (t.minutes / t.gp).toFixed(1) : ""}</td>
+                <tr key={i}><td>{t.season}</td><td><TeamLink abbr={t.team_abbr} /></td><td>{t.age ?? ""}</td><td>{t.gp}</td><td>{t.gp ? (t.minutes / t.gp).toFixed(1) : ""}</td>
                   <td>{t.gp ? (t.pts / t.gp).toFixed(1) : ""}</td><td>{t.gp ? (t.reb / t.gp).toFixed(1) : ""}</td><td>{t.gp ? (t.ast / t.gp).toFixed(1) : ""}</td>
                   <td>{t.gp ? (t.stl / t.gp).toFixed(1) : ""}</td><td>{t.gp ? (t.blk / t.gp).toFixed(1) : ""}</td><td>{t.gp ? (t.tov / t.gp).toFixed(1) : ""}</td></tr>
               ))}
@@ -284,12 +274,31 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   );
 }
 
+// An NBA team's card head: logo, name (opens its Team card), conference, the player's rank on it (a player's
+// profile only) and the team's projected-fantasy-talent rank. Shared by the profile's Team tab and the Team card.
+export function TeamHead({ t }) {
+  return (
+    <div className="team-card-head">
+      <img src={t.logo} alt="" width={40} height={40} className="team-logo" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+      <div>
+        <div className="team-name"><TeamLink abbr={t.abbr}>{t.name}</TeamLink>{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</div>
+        <div className="small muted">
+          {t.player_rank && <><strong style={{ color: "var(--text)" }}>#{t.player_rank}</strong> on the team · </>}
+          <span title={`sum of the top 8 players' projected FP/G (${t.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
+            team <strong style={{ color: "var(--text)" }}>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // His NBA team's ranks among the league's teams, per game (backend team_ranks): Offense and Defense side by side, each
 // headed by its overall rank (points scored / allowed), then each stat's rank (defense: what it allows). 1 = best;
 // coloured on a dark green -> yellow -> dark red scale.
 const RANK_STATS = [["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
   ["tpm", "3-pointers"], ["fga", "FG attempts"], ["to", "Turnovers"]];
-function TeamRanks({ r }) {
+export function TeamRanks({ r }) {
   // 7 steps best to worst: dark green, green, light green, yellow, light red, red, dark red (--rank-0 .. --rank-6)
   const step = (rank) => Math.min(6, Math.floor(((rank - 1) / r.teams) * 7));
   const rank = (x) => <strong style={{ color: `var(--rank-${step(x.rank)})` }}>{ordinal(x.rank)}</strong>;
