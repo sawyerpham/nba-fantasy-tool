@@ -284,25 +284,24 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   );
 }
 
-// His NBA team's ranks among the league's teams, per game (backend team_ranks): offense and defense overall (points
-// scored / allowed), then each stat. 1 = best; the top third green, the bottom third red.
-const RANK_STATS = [["pts", "Points"], ["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
+// His NBA team's ranks among the league's teams, per game (backend team_ranks): Offense and Defense side by side, each
+// headed by its overall rank (points scored / allowed), then each stat's rank (defense: what it allows). 1 = best;
+// the top third green, the bottom third red.
+const RANK_STATS = [["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
   ["tpm", "3-pointers"], ["fga", "FG attempts"], ["to", "Turnovers"]];
 function TeamRanks({ r }) {
   const tone = (rank) => rank <= r.teams / 3 ? "good" : rank > (r.teams * 2) / 3 ? "bad" : "";
-  const cell = (x) => <><strong className={`rank ${tone(x.rank)}`}>{ordinal(x.rank)}</strong> <span className="muted">{x.v}</span></>;
+  const rank = (x) => <strong className={`rank ${tone(x.rank)}`}>{ordinal(x.rank)}</strong>;
   return (
     <div className="team-ranks" data-testid="team-ranks">
-      <div className="team-ranks-head">
-        <span>Offense {cell(r.offense.pts)}</span><span>Defense {cell(r.defense.pts)}</span>
-        <span className="small muted">per game · {r.games} GP</span>
-      </div>
-      <table className="small">
-        <thead><tr><th></th><th>Offense</th><th>Allowed</th></tr></thead>
-        <tbody>{RANK_STATS.map(([k, label]) => (
-          <tr key={k}><td>{label}</td><td>{cell(r.offense[k])}</td><td>{cell(r.defense[k])}</td></tr>
-        ))}</tbody>
-      </table>
+      {[["offense", "Offense"], ["defense", "Defense"]].map(([side, title]) => (
+        <div key={side} className="team-ranks-side">
+          <div className="team-ranks-head"><span>{title}</span>{rank(r[side].pts)}</div>
+          {RANK_STATS.map(([k, label]) => (
+            <div key={k} className="team-ranks-row small"><span>{label}</span>{rank(r[side][k])}</div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
