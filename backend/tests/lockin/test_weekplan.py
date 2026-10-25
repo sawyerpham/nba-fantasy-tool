@@ -321,3 +321,14 @@ def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_f
     assert 3.0 < cold.value < 8.1 and cold.seat == "PF"
     assert benched.value == 0
     assert plan.expected == pytest.approx(tipped.value + cold.value, abs=0.1)
+
+
+def test_win_chance_counts_a_live_game_at_its_projected_finish():
+    from app.lockin.weekplan import slot_spread
+
+    today = "2026-10-24"
+    live = pp("sharpe", ["C"], "C", [Game(today, 10.4, fp=6.0, started=True, live=True, min=15, proj_min=26,
+                                         period=3, clock=600)])                  # no games after tonight
+    plan_week([live], {"C": 1})
+    mean, _ = slot_spread(live, lock=False)
+    assert live.slot_w is None and mean == pytest.approx(live.value) and mean > 6.0   # not 0 for a slot with nothing left

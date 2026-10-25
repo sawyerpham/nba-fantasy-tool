@@ -239,7 +239,8 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
     seats = seat_players(order, slot_counts, pinned)
 
     for p in players:   # a lockable starter: locking him closes his slot, so waiting is worth what the open slot gets
-        p.slot_w, p.slot_from = open_slot(p, players) if p.seat and p.x is not None and p.locked is None else (None, [])
+        # only a final game is lockable; a game in progress keeps his own value (w: its projected finish counted)
+        p.slot_w, p.slot_from = open_slot(p, players) if p.seat and p.x is not None and p.x_final and p.locked is None else (None, [])
     for p in players:
         if p.locked is not None:
             p.action, p.why = "LOCKED", f"locked {p.locked:.1f}"
