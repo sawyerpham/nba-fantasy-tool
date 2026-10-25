@@ -90,7 +90,7 @@ export function SeasonLog({ sea }) {
           {LOG_COLS.map(([h, f, k]) => {
             const tone = r.fp == null ? null : logTone(k, r[k], avg[k]);
             return <td key={h} className="num log-cell">
-              {r.fp == null ? "" : <span className={`log-box ${tone || ""}`}>{h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</span>}</td>;
+              {r.fp == null ? "" : <span className={`log-box ${tone || ""}`}>{f(r)}</span>}</td>;
           })}
         </tr>
       ))}</tbody>
