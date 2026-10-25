@@ -92,7 +92,7 @@ export function SeasonHistory({ sea }) {
   if (!sea.acquired?.length) return <div className="small muted">No transactions this season: he hasn't been drafted, kept or moved.</div>;
   return (
     <table className="sp-history" data-testid="season-history">
-      <tbody>{sea.acquired.map((a, i) => (
+      <tbody>{[...sea.acquired].reverse().map((a, i) => (   /* newest first (the backend sends them oldest first) */
         <tr key={i}><td><strong>{KIND[a.kind] || a.kind}</strong></td><td>{what(a)}</td><td className="muted">{a.when ? longDate(a.when) : ""}</td></tr>
       ))}</tbody>
     </table>
