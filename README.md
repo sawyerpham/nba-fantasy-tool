@@ -5,6 +5,46 @@ A local helper for Sleeper NBA fantasy leagues.
 - **Draft**: rankings, bid guide and live Sleeper sync for auction drafts
 - **Season**: best lineup, lock calls, week timeline, news and waivers for Lock-In leagues
 
+## Features
+
+### Draft
+
+- Rankings
+- Player profiles
+- Bid guide
+- Spending guide
+- Position market
+- Live Sleeper sync
+- Live lot
+- My team
+- Room board
+- Managers view
+- NBA teams view
+- Nomination order
+- Pick recording and editing
+- Keepers
+
+### Season
+
+- Matchup view
+- Best lineup
+- Swap arrows
+- Lock calls
+- Week timeline
+- Next check-in
+- Swap windows
+- Alarms
+- Win probability
+- Game cards
+- Top performers
+- Stream links
+- Player profiles
+- Team ranks
+- Depth charts
+- News
+- League standings
+- Waivers
+
 ## Layout
 
 ```
