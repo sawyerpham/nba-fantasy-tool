@@ -301,3 +301,31 @@ def test_sleeper_injuries_tag_every_hurt_player_red_or_yellow():
     assert (hurt["1"]["group"], hurt["2"]["group"], hurt["5"]["group"]) == ("out", "q", "out")
     assert hurt["1"]["body"] == "Ankle" and hurt["2"]["team"] == "MEM"
     assert sleeper_injuries(lambda url, ttl: (_ for _ in ()).throw(OSError("down"))) == {}   # Sleeper down: no colours, no crash
+
+
+def test_team_card_schedule_stats_and_injury_report(fixture_world):
+    from app.lockin.service import injury_report, team_player_stats, team_schedule
+
+    sched = [{"date": "2026-10-22", "status": "complete", "home": {"team": "MEM", "points": 110}, "away": {"team": "UTA", "points": 120}},
+             {"date": "2026-10-20", "status": "complete", "home": {"team": "BOS", "points": 99}, "away": {"team": "MEM", "points": 101}},
+             {"date": "2026-10-25", "status": "pre_game", "home": {"team": "SAC"}, "away": {"team": "MEM"}},
+             {"date": "2026-10-21", "status": "complete", "home": {"team": "LAL"}, "away": {"team": "DEN"}}]
+    s = team_schedule(sched, "MEM")
+    assert [(g["date"], g["home"], g["opp"], g["result"]) for g in s] == [
+        ("2026-10-20", False, "BOS", "W"), ("2026-10-22", True, "UTA", "L"), ("2026-10-25", False, "SAC", None)]
+    assert (s[0]["pts"], s[0]["opp_pts"]) == (101, 99)
+
+    sess = make_session(fixture_world)
+    sess.players[JOKIC] = sess.players[JOKIC].model_copy(update={"sleeper_id": "999", "team_abbr": "DEN"})
+    line = {"sp": 2100, "pts": 30, "reb": 12, "ast": 9, "fgm": 12, "fga": 20, "ftm": 4, "fta": 5, "tpm": 2, "tpa": 4}
+    rows = [{"player_id": "999", "team": "DEN", "game_id": "g1", "stats": line},
+            {"player_id": "999", "team": "DEN", "game_id": "g2", "stats": {**line, "pts": 20, "fgm": 8}},
+            {"player_id": "999", "team": "DEN", "game_id": "live", "stats": line},       # in progress: not counted
+            {"player_id": "TEAM_DEN", "team": "DEN", "game_id": "g1", "stats": line}]    # the team's own row: not a player
+    j = next(r for r in team_player_stats(sess, rows, {"g1", "g2"}, "DEN") if r["sleeper_id"] == "999")
+    assert j["gp"] == 2 and j["pts"] == 25.0 and j["min"] == 35.0 and j["fg_pct"] == 50.0 and j["ft_pct"] == 80.0
+
+    hurt = {"1": {"name": "A", "team": "MEM", "group": "out"}, "2": {"name": "B", "team": "MEM", "group": "q"},
+            "3": {"name": "C", "team": "BKN", "group": "out"}, "4": {"name": "D", "team": "LAL", "group": "q"}}
+    rep = injury_report(hurt)
+    assert [t["abbr"] for t in rep] == ["MEM", "BKN", "LAL"] and (rep[0]["out"], rep[0]["q"]) == (1, 1)   # most hurt, then most out

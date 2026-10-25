@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from ..core.services.app_state import AppState
-from .service import (_cache, game_detail, http_fetch, read_locks, season_news, season_player, team_plan, team_ranks,
-                      team_stat_rows, trending, waivers, week_view, write_lock)
+from .service import (_cache, game_detail, http_fetch, injury_report, read_locks, season_news, season_player, sleeper_injuries,
+                      team_news, team_plan, team_player_stats, team_ranks, team_schedule, team_stat_rows, trending, waivers,
+                      week_view, write_lock, SLEEPER, DAY_TTL)
 from ..core.api.deps import _session, get_state
 
 router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
@@ -60,8 +61,32 @@ def team(league_id: str, abbr: str = Query(..., pattern=r"^[A-Z]{2,4}$"), state:
     head = team_header(state, session, abbr)
     if head["talent_rank"] is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown team {abbr}")
-    rows, done = team_stat_rows(_fetch(state), session.league.roster_season.split("-")[0])
-    return {**head, "ranks": team_ranks(rows, abbr, done)}
+    fetch, year = _fetch(state), session.league.roster_season.split("-")[0]
+    rows, done = team_stat_rows(fetch, year)
+    by_sid = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
+    hurt = [{**h, "player_id": by_sid.get(sid)} for sid, h in sleeper_injuries(fetch).items() if h["team"] == abbr]
+    return {**head, "ranks": team_ranks(rows, abbr, done), "names": _team_names(state),
+            "schedule": team_schedule(fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or [], abbr),
+            "stats": team_player_stats(session, rows, done, abbr),
+            "injuries": sorted(hurt, key=lambda h: (h["group"] != "out", h["name"]))}
+
+
+def _team_names(state: AppState) -> dict[str, str]:
+    """Abbreviation -> full name, every NBA team (the schedule's opponents)."""
+    return {t.abbreviation: t.full_name for t in state.stats.list_teams()} if hasattr(state.stats, "list_teams") else {}
+
+
+@router.get("/team/news")
+def team_news_feed(league_id: str, abbr: str = Query(..., pattern=r"^[A-Z]{2,4}$"), state: AppState = Depends(get_state)) -> dict:
+    """The Team card's News tab: notes on every player of one NBA team, newest first."""
+    return {"news": team_news(_session(state, league_id), _fetch(state), abbr)}
+
+
+@router.get("/injuries")
+def injuries(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """The News tab's teams report: every NBA team with injured players, most first, with names."""
+    _session(state, league_id)
+    return {"teams": injury_report(sleeper_injuries(_fetch(state))), "names": _team_names(state)}
 
 
 @router.post("/sync")
