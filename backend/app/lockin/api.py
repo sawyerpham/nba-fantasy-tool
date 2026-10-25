@@ -96,6 +96,7 @@ def news(league_id: str, state: AppState = Depends(get_state)) -> dict:
 def waiver_claims(league_id: str, state: AppState = Depends(get_state)) -> dict:
     session = _session(state, league_id)
     try:
-        return waivers(session, week_view(session, _fetch(state)))
+        fetch = _fetch(state)
+        return waivers(session, fetch, week_view(session, fetch))
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

@@ -992,12 +992,18 @@ function WaiversView({ leagueId, onSelect }) {
   if (w.error) return <div className="panel waivers warn-text" data-testid="waivers-error">{w.error}</div>;
   const faab = w.type === "FAAB";
   const top = Math.max(...w.claims.map((c) => c.upgrade), 0.01);   // upgrade bars scale to the best one
+  // claims land at the next run (backend next_waiver_run): "Sun 2:00 AM · in 7h 20m"
+  const mins = Math.max(0, Math.round((Date.parse(w.next_run) - Date.now()) / 60000));
+  const until = mins >= 1440 ? `${Math.floor(mins / 1440)}d ${Math.floor((mins % 1440) / 60)}h` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  const runDay = fmt(w.next_run, { weekday: "short" });
+  const hour = `${w.run_hour % 12 || 12} ${w.run_hour < 12 ? "AM" : "PM"}`;
   return (
     <div className="panel waivers" data-testid="waivers">
       <div className="wv-head">
         <h3>Waiver claims</h3>
         <span className="wv-chip">{faab ? "Blind FAAB" : `${w.type} priority`}</span>
-        <span className="wv-chip">Process {w.process}</span>
+        <span className="wv-chip">Runs {w.runs.join(" & ")} · {hour}</span>
+        <span className="wv-next" data-testid="waiver-next">Next run <strong>{runDay} {timeOf(w.next_run)}</strong> <span className="muted">in {until}</span></span>
         {faab && (
           <span className="wv-faab" data-tip="FAAB left this season">
             <span className="wv-meter"><span style={{ width: `${(w.faab_left / w.budget) * 100}%` }} /></span>
@@ -1015,15 +1021,23 @@ function WaiversView({ leagueId, onSelect }) {
       {w.claims.length ? (
         <table className="wv-table">
           <thead><tr><th>Player</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
-            <th data-tip="Value over your drop candidate.">Upgrade</th><th className="num">Games this wk</th>
+            <th data-tip="Value over your drop candidate.">Upgrade</th>
+            <th className="num" data-tip={`A claim lands at the next run (${runDay} ${timeOf(w.next_run)}): his games from then, the rest of this week and next week.`}>Games once he lands</th>
             <th className="num" data-tip="A guide: share of your FAAB that grows with the upgrade. Other bids are hidden.">Bid</th></tr></thead>
           <tbody>{w.claims.map((c) => (
             <tr key={c.player_id} className="clickable" onClick={() => onSelect(c.player_id)}>
-              <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={36} />
-                <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted">{c.team} · <PosList list={c.pos} /></div></div></div></td>
+              <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={44} />
+                <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted">{c.team} · <PosList list={c.pos} /></div>
+                  {/* his season so far, per game (finished games, league scoring) */}
+                  <div className="wv-stats" data-testid="waiver-stats">{c.season ? <>
+                    <span className="wv-fp">{c.season.fp} FP/G</span>
+                    {[["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tpm", "3PM"]].map(([k, l]) => <span key={k}><strong>{c.season[k]}</strong> {l}</span>)}
+                    <span className="muted">{c.season.gp} GP</span>
+                  </> : <span className="muted">No games played yet</span>}</div>
+                </div></div></td>
               <td className="num">{c.value.toFixed(2)}</td>
               <td><div className="wv-up"><span className="wv-bar"><span style={{ width: `${(c.upgrade / top) * 100}%` }} /></span><span className="ok">+{c.upgrade.toFixed(2)}</span></div></td>
-              <td className="num">{c.games_this_week}</td>
+              <td className="num"><strong>{c.games_left}</strong> <span className="muted">this wk</span> · <strong>{c.games_next}</strong> <span className="muted">next</span></td>
               <td className="num">{c.bid != null ? <span className="wv-bid">${c.bid}</span> : <span className="muted">-</span>}</td></tr>))}</tbody>
         </table>
       ) : <div className="muted">No free agent is an upgrade over your weakest player.</div>}

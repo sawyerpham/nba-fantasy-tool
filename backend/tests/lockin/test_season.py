@@ -172,7 +172,7 @@ def test_acquisitions_draft_price_then_moves_in_order():
 def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
     from app.lockin.service import waivers
 
-    assert waivers(None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
+    assert waivers(None, None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
 
 
 def test_timeline_hands_the_slot_to_a_later_player_at_his_check_in():
@@ -234,3 +234,32 @@ def test_team_ranks_offense_from_its_box_scores_and_defense_from_its_opponents()
     assert r["defense"]["pts"] == {"v": 115.0, "rank": 3}                 # allows the most (BOS 107.5, DEN 112.5)
     assert team_ranks(rows, "BOS", done)["offense"]["reb"]["rank"] == 2 == team_ranks(rows, "DEN", done)["offense"]["reb"]["rank"]  # a tie
     assert team_ranks(rows, "LAL", done) is None
+
+
+def test_next_waiver_run_is_the_coming_saturday_or_sunday_at_2_am():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.lockin.service import next_waiver_run
+
+    ct = ZoneInfo("America/Chicago")
+    at = lambda *a: datetime(*a, tzinfo=ct)
+    assert next_waiver_run(at(2026, 10, 21, 15, 0)) == at(2026, 10, 24, 2, 0)    # Wed -> Sat 2 AM
+    assert next_waiver_run(at(2026, 10, 24, 1, 59)) == at(2026, 10, 24, 2, 0)    # Sat just before the run
+    assert next_waiver_run(at(2026, 10, 24, 18, 0)) == at(2026, 10, 25, 2, 0)    # Sat evening -> Sun 2 AM
+    assert next_waiver_run(at(2026, 10, 25, 2, 0)) == at(2026, 10, 31, 2, 0)     # Sun's run just went -> next Sat
+
+
+def test_season_averages_count_finished_games_in_league_scoring(fixture_world):
+    from app.lockin.service import season_averages
+
+    s = make_session(fixture_world)
+    box = {"pts": 20, "reb": 10, "ast": 4, "stl": 1, "blk": 1, "to": 2, "tpm": 2, "sp": 1800}
+    rows = [{"player_id": "7", "game_id": "g1", "stats": box},
+            {"player_id": "7", "game_id": "g2", "stats": {**box, "pts": 10, "reb": 6}},
+            {"player_id": "7", "game_id": "live", "stats": {**box, "pts": 2}},        # in progress: not counted
+            {"player_id": "7", "game_id": "g3", "stats": {"pts": 0}},                 # DNP (no minutes)
+            {"player_id": "8", "game_id": "g1", "stats": box}]                        # not asked for
+    a = season_averages(rows, {"7"}, {"g1", "g2", "g3"}, s.league.scoring)
+    assert set(a) == {"7"} and a["7"]["gp"] == 2 and a["7"]["pts"] == 15.0 and a["7"]["reb"] == 8.0
+    assert a["7"]["fp"] == round((actual_fp(box, s.league.scoring) + actual_fp({**box, "pts": 10, "reb": 6}, s.league.scoring)) / 2, 1)

@@ -817,12 +817,54 @@ WAIVER_SHOW = 12
 # no data on rivals' bids, so it is a guide, not a price.
 
 
-def waivers(session, view: dict) -> dict:
+WAIVER_RUNS = (5, 6)   # claims process Saturday and Sunday (Mon = 0)...
+WAIVER_HOUR = 2        # ...at 2 AM league time
+# ponytail: the run days are set here, from the league manager; Sleeper's daily_waivers_days bitmask is undocumented
+AVG_STATS = ("pts", "reb", "ast", "stl", "blk", "tpm", "to")
+
+
+def next_waiver_run(now: datetime) -> datetime:
+    """The next time claims process after `now` (aware, league time): a WAIVER_RUNS day at WAIVER_HOUR."""
+    for d in range(8):
+        t = (now + timedelta(days=d)).replace(hour=WAIVER_HOUR, minute=0, second=0, microsecond=0)
+        if t.weekday() in WAIVER_RUNS and t > now:
+            return t
+    raise AssertionError("no waiver run day set")
+
+
+def season_averages(rows: list[dict], sids: set[str], done: set[str], scoring) -> dict[str, dict]:
+    """Per-game averages over his finished games (done: the schedule's complete game ids; a game in progress would
+    count its first half as a whole game) from Sleeper's per-game rows: FP in the league's scoring and AVG_STATS."""
+    sums: dict[str, dict] = {}
+    for e in rows:
+        sid, st = str(e.get("player_id")), e.get("stats") or {}
+        if sid in sids and st.get("sp") and e.get("game_id") in done:
+            s = sums.setdefault(sid, dict.fromkeys(("gp", "fp") + AVG_STATS, 0.0))
+            s["gp"] += 1
+            s["fp"] += actual_fp(st, scoring)
+            for k in AVG_STATS:
+                s[k] += float(st.get(k) or 0)
+    return {sid: {"gp": int(s["gp"]), **{k: round(s[k] / s["gp"], 1) for k in ("fp",) + AVG_STATS}} for sid, s in sums.items()}
+
+
+def waivers(session, fetch: Fetch, view: dict) -> dict:
     """Free agents worth claiming: rest-of-season value (the draft value: projection, Lock-In ceiling, availability),
-    this week's games, the player of yours to drop and a suggested blind bid. Waivers run daily (league setting)."""
+    his season averages, the games he plays once he lands (claims process at the next waiver run, Saturday and Sunday
+    2 AM: this week's games after it and next week's), the player of yours to drop and a suggested blind bid."""
     waiver = view.get("waiver")
     if waiver is None:
         return {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
+    tz = ZoneInfo(view.get("tz") or "America/Chicago")
+    run = next_waiver_run(datetime.fromisoformat(view["now"]).astimezone(tz) if view.get("now") else datetime.now(tz))
+    lands = run.date().isoformat()
+    year, week = session.league.roster_season.split("-")[0], view["week"]
+    schedule = fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
+    after: dict[tuple[str, int], int] = {}   # (team, week) -> his games on or after the day he lands
+    for g in schedule:
+        if g["date"] >= lands and int(g["week"]) in (week, week + 1):
+            for side in ("home", "away"):
+                key = (g[side]["team"], int(g["week"]))
+                after[key] = after.get(key, 0) + 1
     me = next(t for t in view["teams"] if t["is_user"])
     rostered = {sid for t in view["teams"] for sid in t["players"]}
     by_sleeper = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
@@ -835,17 +877,23 @@ def waivers(session, view: dict) -> dict:
     budget = view.get("faab_budget", FAAB_TOTAL)
     faab = waiver["type"] == "FAAB"
     faab_left = budget - (me.get("faab_used") or 0)
-    out = []
     floor = drop.value if drop else 0.0   # only real upgrades over your weakest player
-    for pid in sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]:
+    shown = sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]
+    stat_rows = [e for w in range(1, week + 1)
+                 for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == week else DAY_TTL) or []]
+    done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
+    avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown}, done, session.league.scoring)
+    out = []
+    for pid in shown:
         r = rows[pid]
         up = r.value - (drop.value if drop else 0)
         bid = (max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1) if faab else None
         out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
-                    "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id),
-                    "games_this_week": view["team_games"].get(r.team_abbr, 0), "upgrade": round(up, 2), "bid": bid})
+                    "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id), "season": avg.get(r.sleeper_id),
+                    "games_left": after.get((r.team_abbr, week), 0), "games_next": after.get((r.team_abbr, week + 1), 0),
+                    "upgrade": round(up, 2), "bid": bid})
     return {"faab_left": faab_left, "drop": {"player_id": drop.player_id, "sleeper_id": drop.sleeper_id, "name": drop.full_name,
                                              "value": round(drop.value, 2)} if drop else None,
             "claims": out, "budget": budget if faab else None, "type": waiver["type"],
-            "process": "daily" if waiver["daily"] else "weekly"}
+            "next_run": run.isoformat(), "runs": [{5: "Sat", 6: "Sun"}.get(d, d) for d in WAIVER_RUNS], "run_hour": WAIVER_HOUR}
