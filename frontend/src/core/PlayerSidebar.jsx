@@ -3,6 +3,7 @@ import { PosList, PosTag, posClass, tierHue } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 import { CallBadge, Term, TERMS } from "./Terms.jsx";
 import Headshot from "./Headshot.jsx";
+import { ordinal } from "../draft/SpendingGuide.jsx";
 import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile.jsx";
 
 // season: the in-season profile (Season tab), like Sleeper's: four tabs under his name. Summary (his live / last game,
@@ -114,6 +115,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           </div>
         </div>
       </div>
+      {season && sea?.team_ranks && <TeamRanks r={sea.team_ranks} />}
       {season && data.team.depth_grid ? <DepthGrid grid={data.team.depth_grid} onSelectPlayer={onSelectPlayer} /> : (
       <div className="teammates">
         {[["Starters", data.team.teammates.filter((m) => m.starter)], ["Next up", data.team.teammates.filter((m) => !m.starter)]].map(([label, list]) => (
@@ -278,6 +280,29 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
           </details>
         </>
       )}
+    </div>
+  );
+}
+
+// His NBA team's ranks among the league's teams, per game (backend team_ranks): offense and defense overall (points
+// scored / allowed), then each stat. 1 = best; the top third green, the bottom third red.
+const RANK_STATS = [["pts", "Points"], ["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
+  ["tpm", "3-pointers"], ["fga", "FG attempts"], ["to", "Turnovers"]];
+function TeamRanks({ r }) {
+  const tone = (rank) => rank <= r.teams / 3 ? "good" : rank > (r.teams * 2) / 3 ? "bad" : "";
+  const cell = (x) => <><strong className={`rank ${tone(x.rank)}`}>{ordinal(x.rank)}</strong> <span className="muted">{x.v}</span></>;
+  return (
+    <div className="team-ranks" data-testid="team-ranks">
+      <div className="team-ranks-head">
+        <span>Offense {cell(r.offense.pts)}</span><span>Defense {cell(r.defense.pts)}</span>
+        <span className="small muted">per game · {r.games} GP</span>
+      </div>
+      <table className="small">
+        <thead><tr><th></th><th>Offense</th><th>Allowed</th></tr></thead>
+        <tbody>{RANK_STATS.map(([k, label]) => (
+          <tr key={k}><td>{label}</td><td>{cell(r.offense[k])}</td><td>{cell(r.defense[k])}</td></tr>
+        ))}</tbody>
+      </table>
     </div>
   );
 }

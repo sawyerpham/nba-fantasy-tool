@@ -685,6 +685,11 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .season-block table { width: 100%; }
 .news-item { padding: 4px 0; border-bottom: 1px solid var(--border); }
 .news-item .muted { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }   /* hover-free: 3 lines of each story */
+.team-ranks { margin: 4px 0 10px; }
+.team-ranks-head { display: flex; align-items: baseline; gap: 16px; font-weight: 700; margin-bottom: 4px; }
+.team-ranks-head .small { margin-left: auto; font-weight: 500; }
+.team-ranks td, .team-ranks th { padding: 3px 4px; }
+.rank.good { color: var(--good-t); } .rank.bad { color: var(--bad-t); }
 table.depth-grid { width: 100%; margin-top: 8px; }
 table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .dg-cell { white-space: nowrap; } .dg-cell.self { background: var(--primary-soft); border-radius: 6px; font-weight: 800; }

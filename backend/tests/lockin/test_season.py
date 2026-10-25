@@ -214,3 +214,23 @@ def test_lead_stats_points_first_then_what_is_worth_fantasy_points(fixture_world
     lead = lead_stats({"pts": 20, "reb": 10, "ast": 1, "stl": 0, "blk": 3, "tpm": 0}, s.league.scoring)
     assert lead[0] == ["PTS", 20] and ["BLK", 3] in lead and ["REB", 10] in lead
     assert not any(label in ("STL", "3PM", "AST") for label, _ in lead)   # zeros and a lone assist aren't worth showing
+
+
+def test_team_ranks_offense_from_its_box_scores_and_defense_from_its_opponents():
+    from app.lockin.service import team_ranks
+
+    def row(team, opp, game="g1", **st):
+        return {"player_id": f"TEAM_{team}", "team": team, "opponent": opp, "game_id": game, "stats": st}
+    rows = [row("MEM", "BOS", pts=120, reb=50, to=20), row("BOS", "MEM", pts=100, reb=40, to=10),
+            row("MEM", "DEN", pts=110, reb=50, to=18), row("DEN", "MEM", pts=130, reb=45, to=12),
+            row("DEN", "BOS", pts=105, reb=35, to=15), row("BOS", "DEN", pts=115, reb=40, to=14),
+            {"player_id": "123", "team": "MEM", "opponent": "BOS", "game_id": "g1", "stats": {"pts": 40}},   # a player row
+            row("MEM", "LAL", game="live", pts=30, reb=9, to=2)]   # in progress (not in done): ignored
+    done = {"g1"}
+    r = team_ranks(rows, "MEM", done)
+    assert r["games"] == 2 and r["teams"] == 3
+    assert r["offense"]["pts"] == {"v": 115.0, "rank": 2}                 # DEN 117.5 scores more
+    assert r["offense"]["reb"]["rank"] == 1 and r["offense"]["to"]["rank"] == 3   # most turnovers: last
+    assert r["defense"]["pts"] == {"v": 115.0, "rank": 3}                 # allows the most (BOS 107.5, DEN 112.5)
+    assert team_ranks(rows, "BOS", done)["offense"]["reb"]["rank"] == 2 == team_ranks(rows, "DEN", done)["offense"]["reb"]["rank"]  # a tie
+    assert team_ranks(rows, "LAL", done) is None
