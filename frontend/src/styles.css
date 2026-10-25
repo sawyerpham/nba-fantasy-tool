@@ -826,7 +826,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room (only a locked ✓ shows here) */
 .chips-row { gap: 8px; }
 .game-chip { min-width: 84px; padding: 7px 6px; border-radius: 9px; }
-.gch-day { font-size: 11.5px; } .gch-fp { font-size: 15.5px; } .gch-fp .gch-exp { font-size: 9.5px; }   /* sized for 2-decimal FP ("17.50 13.27") */
+.gch-day { font-size: 11.5px; } .gch-fp { font-size: 14px; } .gch-fp .gch-exp { font-size: 8.5px; margin-left: 3px; }   /* sized so 2-decimal FP fits the 86px chip ("17.50 13.27") */
 .mu-slot .pos-tag, .mu-slot span { font-size: 15px; font-weight: 800; }
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
