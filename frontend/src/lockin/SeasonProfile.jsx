@@ -89,8 +89,8 @@ export function SeasonLog({ sea }) {
           <td>{r.week}</td><td>{r.home ? "" : "@"}<TeamLink abbr={r.opp} /></td><td>{mmdd(r.date)}</td>
           {LOG_COLS.map(([h, f, k]) => {
             const tone = r.fp == null ? null : logTone(k, r[k], avg[k]);
-            return <td key={h} className={`num log-cell ${tone || ""}`}>
-              {r.fp == null ? "" : h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</td>;
+            return <td key={h} className="num log-cell">
+              {r.fp == null ? "" : <span className={`log-box ${tone || ""}`}>{h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</span>}</td>;
           })}
         </tr>
       ))}</tbody>
