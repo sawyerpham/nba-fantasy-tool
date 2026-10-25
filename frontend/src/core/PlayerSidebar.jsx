@@ -286,12 +286,13 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
 // His NBA team's ranks among the league's teams, per game (backend team_ranks): Offense and Defense side by side, each
 // headed by its overall rank (points scored / allowed), then each stat's rank (defense: what it allows). 1 = best;
-// the top third green, the bottom third red.
+// coloured on a dark green -> yellow -> dark red scale.
 const RANK_STATS = [["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
   ["tpm", "3-pointers"], ["fga", "FG attempts"], ["to", "Turnovers"]];
 function TeamRanks({ r }) {
-  const tone = (rank) => rank <= r.teams / 3 ? "good" : rank > (r.teams * 2) / 3 ? "bad" : "";
-  const rank = (x) => <strong className={`rank ${tone(x.rank)}`}>{ordinal(x.rank)}</strong>;
+  // 7 steps best to worst: dark green, green, light green, yellow, light red, red, dark red (--rank-0 .. --rank-6)
+  const step = (rank) => Math.min(6, Math.floor(((rank - 1) / r.teams) * 7));
+  const rank = (x) => <strong style={{ color: `var(--rank-${step(x.rank)})` }}>{ordinal(x.rank)}</strong>;
   return (
     <div className="team-ranks" data-testid="team-ranks">
       {[["offense", "Offense"], ["defense", "Defense"]].map(([side, title]) => (
