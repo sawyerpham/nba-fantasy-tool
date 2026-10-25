@@ -69,30 +69,27 @@ export function SeasonSummary({ sea, onOpenGame }) {
 const LOG_COLS = [["FPTS", (r) => f1(r.fp), "fp"], ["MIN", (r) => r.min, "min"], ["PTS", (r) => r.pts, "pts"], ["REB", (r) => r.reb, "reb"],
   ["AST", (r) => r.ast, "ast"], ["STL", (r) => r.stl, "stl"], ["BLK", (r) => r.blk, "blk"], ["TO", (r) => r.to, "to"], ["PF", (r) => r.pf, "pf"],
   ["+/-", (r) => (r.pm > 0 ? `+${r.pm}` : r.pm), "pm"]];
-// Each game's stat against his own season average, on the team ranks' 7 steps (--rank-0 dark green .. --rank-3 yellow,
-// about average .. --rank-6 dark red): how far above or below, as a share of the average; turnovers and fouls the
-// other way round; +/- by its own size (10 = a step past the darkest).
+// Each game's stat against his own season average: green above it, yellow about it (within 8 %), red below it
+// (the share of the average); turnovers and fouls the other way round; +/- by its sign (within 1 is yellow).
 const LESS_IS_BETTER = new Set(["to", "pf"]);
-const STEPS = [0.5, 0.25, 0.08, -0.08, -0.25, -0.5];   // rel at or above each: steps 0..5, below the last: 6
 function logTone(k, v, avg) {
   if (v == null) return null;
   let rel = k === "pm" ? v / 10 : (v - avg) / Math.max(avg, 1);
   if (LESS_IS_BETTER.has(k)) rel = -rel;
-  const i = STEPS.findIndex((t) => rel >= t);
-  return i < 0 ? 6 : i;
+  return rel >= 0.08 ? "up" : rel > -0.08 ? "even" : "down";
 }
 export function SeasonLog({ sea }) {
   const played = sea.season_log.filter((r) => r.fp != null);
   const avg = Object.fromEntries(LOG_COLS.map(([, , k]) => [k, played.reduce((t, r) => t + (r[k] || 0), 0) / (played.length || 1)]));
   return (
     <table className="sp-log" data-testid="season-log">
-      <thead><tr><th>WK</th><th>OPP</th><th>DATE</th>{LOG_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
+      <thead><tr><th>WK</th><th>OPP</th><th>DATE</th>{LOG_COLS.map(([h]) => <th key={h} className="log-cell">{h}</th>)}</tr></thead>
       <tbody>{sea.season_log.map((r) => (
         <tr key={r.date} className={`${r.week === sea.week ? "this-week" : ""} ${r.fp == null ? "muted" : ""}`}>
           <td>{r.week}</td><td>{r.home ? "" : "@"}<TeamLink abbr={r.opp} /></td><td>{mmdd(r.date)}</td>
           {LOG_COLS.map(([h, f, k]) => {
             const tone = r.fp == null ? null : logTone(k, r[k], avg[k]);
-            return <td key={h} className="num" style={tone == null ? undefined : { background: `color-mix(in srgb, var(--rank-${tone}) 30%, transparent)` }}>
+            return <td key={h} className={`num log-cell ${tone || ""}`}>
               {r.fp == null ? "" : h === "FPTS" ? <strong>{f(r)}</strong> : f(r)}</td>;
           })}
         </tr>
