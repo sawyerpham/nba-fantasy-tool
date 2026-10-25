@@ -694,6 +694,39 @@ def acquisitions(session, fetch: Fetch, view: dict, sid: str) -> list[dict]:
     return out
 
 
+TEAM_STATS = ("pts", "reb", "ast", "blk", "stl", "tpm", "fga", "to")   # the team ranks' stats (Sleeper's keys)
+
+
+def team_ranks(rows: list[dict], team: str, done: set[str]) -> dict | None:
+    """One NBA team's per-game offense (its own box scores) and defense (what its opponents put up against it), each
+    stat ranked among every team (1 = best: most made, fewest allowed; turnovers the other way round). From Sleeper's
+    per-game TEAM_ rows (stats/nba/{year}/{week}); the Sleeper app shows these ranks, its API sends only the totals.
+    done: the schedule's finished game ids; a game in progress would count its half box score as a whole game.
+    {games, teams, offense: {stat: {v, rank}}, defense: {...}} or None before his team has played."""
+    sums = {"offense": {}, "defense": {}}
+    games = {"offense": {}, "defense": {}}
+    for e in rows:
+        if not str(e.get("player_id", "")).startswith("TEAM_") or not e.get("opponent") or e.get("game_id") not in done:
+            continue
+        for side, t in (("offense", e["team"]), ("defense", e["opponent"])):   # his box score is what the opponent allowed
+            s = sums[side].setdefault(t, {})
+            for k in TEAM_STATS:
+                s[k] = s.get(k, 0.0) + float((e.get("stats") or {}).get(k) or 0)
+            games[side][t] = games[side].get(t, 0) + 1
+    if team not in sums["offense"]:
+        return None
+    out = {"games": games["offense"][team], "teams": len(sums["offense"])}
+    for side in ("offense", "defense"):
+        per = {t: {k: v / games[side][t] for k, v in s.items()} for t, s in sums[side].items()}
+        out[side] = {}
+        for k in TEAM_STATS:
+            more_is_better = (k == "to") == (side == "defense")   # offense: more, but fewer turnovers; defense: the reverse
+            mine = per[team][k]
+            better = sum(1 for t in per if (per[t][k] > mine if more_is_better else per[t][k] < mine))
+            out[side][k] = {"v": round(mine, 1), "rank": better + 1}   # ties share a rank
+    return out
+
+
 def season_player(session, fetch: Fetch, player_id: int, week: int | None = None) -> dict:
     """Owner, this week's games, recent game log, ranks and news for any player (rostered or not)."""
     rec = session.players.get(player_id)
@@ -721,13 +754,15 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
     # every game his team plays this season (Sleeper's schedule), his box score where he played (the weeks' logs above
     # only go back GAME_LOG games, so this reads every past week): the Game log tab, and the Summary's averages
     team_abbr = me.get("team") or rec.team_abbr
-    played = {}
+    played, season_rows = {}, []
     for w in range(1, view["week"] + 1):
-        for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == view["week"] else DAY_TTL) or []:
+        rows = fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == view["week"] else DAY_TTL) or []
+        season_rows += rows
+        for e in rows:
             if str(e.get("player_id")) == sid and (e.get("stats") or {}).get("sp"):
                 played[e["date"]] = e["stats"]
-    season_log = []
-    for g in sorted(fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or [], key=lambda g: g["date"]):
+    season_log, schedule = [], fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []
+    for g in sorted(schedule, key=lambda g: g["date"]):
         side = "home" if g["home"]["team"] == team_abbr else "away" if g["away"]["team"] == team_abbr else None
         if not side:
             continue
@@ -766,6 +801,8 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             "games": me.get("games", []), "injury": me.get("injury", "healthy"), "injury_tag": me.get("injury_tag"),
             "injury_note": me.get("injury_note", ""),
             "retired": me.get("retired", False), "game_log": log[:GAME_LOG], "overall_rank": overall, "pos_rank": pos_rank,
+            "team_ranks": team_ranks(season_rows, team_abbr, {g.get("game_id") for g in schedule if g.get("status") == "complete"})
+            if team_abbr else None,
             "acquired": acquisitions(session, fetch, view, sid),
             "season_log": season_log, "averages": averages, "games_played": len(done), "last_game": last,
             "owned": research.get("owned"), "started": research.get("started"),
