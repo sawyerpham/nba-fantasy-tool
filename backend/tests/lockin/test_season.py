@@ -212,8 +212,11 @@ def test_lead_stats_points_first_then_what_is_worth_fantasy_points(fixture_world
 
     s = make_session(fixture_world)
     lead = lead_stats({"pts": 20, "reb": 10, "ast": 1, "stl": 0, "blk": 3, "tpm": 0}, s.league.scoring)
-    assert lead[0] == ["PTS", 20] and ["BLK", 3] in lead and ["REB", 10] in lead
-    assert not any(label in ("STL", "3PM", "AST") for label, _ in lead)   # zeros and a lone assist aren't worth showing
+    assert lead[0] == ["PTS", 20] and lead[1:] == [["REB", 10], ["BLK", 3], ["AST", 1]]   # by FP worth; a lone assist still shows
+    assert not any(label in ("STL", "3PM") for label, _ in lead)                          # zeros don't
+    assert lead_stats({"pts": 7, "reb": 2}, s.league.scoring) == [["PTS", 7], ["REB", 2]]   # 2 REB (0.8 FP) shows
+    many = lead_stats({"pts": 30, "reb": 9, "ast": 8, "stl": 3, "blk": 2, "tpm": 4}, s.league.scoring)
+    assert len(many) == 5 and many[0][0] == "PTS"                                          # points + the 4 worth the most
 
 
 def test_team_ranks_offense_from_its_box_scores_and_defense_from_its_opponents():

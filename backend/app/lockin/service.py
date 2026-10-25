@@ -284,9 +284,9 @@ LEAD_STATS = (("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("STL", "stl"), ("
 
 def lead_stats(stats: dict, scoring) -> list[list]:
     """A player's headline stat line (the game card's top performers, like Sleeper's): points always, then up to 4
-    more by the fantasy points each is worth in the league's scoring, leaving out any worth under 1 FP (0 STL, 1 AST)."""
+    more, any he has (not 0), the ones worth the most fantasy points in the league's scoring first."""
     worth = {k: actual_fp({k: stats.get(k, 0)}, scoring) for _, k in LEAD_STATS[1:]}
-    rest = sorted((x for x in LEAD_STATS[1:] if worth[x[1]] >= 1), key=lambda x: -worth[x[1]])[:4]   # ponytail: 1 FP floor, tune here
+    rest = sorted((x for x in LEAD_STATS[1:] if stats.get(x[1])), key=lambda x: -worth[x[1]])[:4]
     return [[label, int(stats.get(k, 0))] for label, k in [LEAD_STATS[0], *rest]]
 
 
