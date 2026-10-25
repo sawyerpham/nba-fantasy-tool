@@ -9,33 +9,31 @@ A local helper for Sleeper NBA fantasy leagues.
 
 ### Draft
 
+- **Live Sleeper draft sync**
+- **Live bid calls on the nominee**
+- **Rival drafting habits from past leagues**
 - Auction value rankings
 - Worth and max bid per player
-- Live bid calls on the nominee
-- Live Sleeper draft sync
 - Budget plan for open roster spots
 - Position scarcity and tier cliffs
 - Rival manager money and needs
-- Rival drafting habits from past leagues
 - Fantasy team strength estimates
 - NBA team win totals and fantasy talent
 - Keeper keep-or-cut verdicts
-- Nomination rotation
-- Manual pick entry and fixes
 
 ### Season
 
-- Optimal lineup at any time of the week
+- **Optimal lineup at any time of the week**
+- **Live keep-or-swap calls**
+- **Swap and lock alarms**
+- **Next Sleeper check-in**
+- **Live NBA game cards**
+- **Injury watch**
 - Lineup swap instructions
 - Lock-or-wait calls
-- Live keep-or-swap calls
-- Swap and lock alarms
-- Next Sleeper check-in
 - Win probability by strategy
 - Lockable games
-- Injury watch
 - Opponent lineups
-- Live NBA game cards
 - Box scores and top performers
 - Game stream links
 - Player game logs and news
