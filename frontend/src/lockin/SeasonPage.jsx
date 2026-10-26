@@ -541,7 +541,8 @@ function RosterAlerts({ roster }) {
 }
 
 // One card per game he has this week (so 3-4 at most): day, tip time, then his FP (— before the game) with the
-// projection small beside it; live, the projection turns green / red as his pace (backend live_estimate) beats it or not.
+// projection small beside it; live, that number is where his game is headed instead (backend pace: live_estimate), green /
+// red as it beats his projection or not; once the game is final it goes back to the pregame projection.
 // A game that can't be locked (or count any more) is crossed out: every game but the locked one once he's locked;
 // a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it); a live
 // game while he sits on the bench (it won't count, and it's too late to start him).
@@ -586,7 +587,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
             {toggle && <button className="gch-lockbtn corner" onClick={lockClick} aria-label="Lock" data-testid="lock-game"><LockIcon open /></button>}
             {toggle === "" && <button className="gch-lockbtn corner unlock" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button>}
             {watch && <a className="gch-lockbtn corner watch" href={watch} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Watch" data-testid="watch-game"><svg className="gch-play" viewBox="0 0 9 10" aria-hidden="true"><path d="M0 0L9 5L0 10Z" fill="currentColor" /></svg></a>}
-            <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(g.proj)}</span></span>
+            <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(live && g.pace != null ? g.pace : g.proj)}</span></span>
           </span>
         );
       });
