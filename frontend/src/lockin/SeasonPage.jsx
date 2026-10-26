@@ -333,7 +333,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
                     <div key={r.name} className={`gp-leader ${r.player_id ? "clickable" : ""}`} onClick={r.player_id ? () => onOpenPid(r.player_id) : undefined}>
                       <GpHead src={r.head} size={34} />
                       <div>
-                        <div className={`gp-name ${own?.mine ? "gp-mine-name" : ""}`}>{r.name}</div>
+                        <div className={`gp-name ${own?.mine ? "gp-mine-name" : ""}`}>{r.name}{r.jersey && <span className="gp-jersey">#{r.jersey}</span>}</div>
                         <div className="gp-line"><span className="gp-fp">{fp(r.fp)} FP</span>
                           {r.lead.map(([k, v]) => <span key={k}><strong>{v}</strong> {k}</span>)}</div>
                       </div>
@@ -569,7 +569,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
           [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
-          !live && played && g.min != null && `${g.min} min`,
+          played && g.min != null && `${g.min} min${live ? " so far" : ""}`,
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
