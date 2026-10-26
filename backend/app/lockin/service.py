@@ -337,7 +337,7 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
                     m, att = str(v).split("-", 1)
                     st_[ESPN_PAIRS[k][0]], st_[ESPN_PAIRS[k][1]] = _num(m), _num(att)
             played.append({"name": ath.get("displayName"), "player_id": ids.get(normalize_name(ath.get("displayName"))), "pos": (ath.get("position") or {}).get("abbreviation"),
-                           "head": (ath.get("headshot") or {}).get("href"), "starter": bool(a.get("starter")),
+                           "head": (ath.get("headshot") or {}).get("href"), "jersey": ath.get("jersey"), "starter": bool(a.get("starter")),
                            "min": int(_num(raw.get("minutes"))), "stats": {k: int(v) for k, v in st_.items() if k != "sp"},
                            "fp": round(actual_fp(st_, session.league.scoring), 2), "lead": lead_stats(st_, session.league.scoring)})
         teams.append({"abbr": abbr, "name": c["team"].get("displayName"), "logo": ((c["team"].get("logos") or [{}])[0]).get("href"),
