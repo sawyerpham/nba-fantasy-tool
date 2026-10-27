@@ -127,11 +127,11 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   useEffect(() => {
     const m = mainRef.current, h = headerSlot?.closest("header");
     if (!m || !h) return;
-    const place = () => {   // centred only when it clears the tabs and the alarm button; else inline after the tabs
+    const place = () => {   // centred only when it clears the tabs and the search box; else inline after the tabs
       const a = m.getBoundingClientRect(), c = a.left + a.width / 2, wk = weekRef.current;
-      const nav = h.querySelector("nav").getBoundingClientRect().right, alarms = h.querySelector('[data-testid="arm-alarms"]')?.getBoundingClientRect().left;
+      const nav = h.querySelector("nav").getBoundingClientRect().right, right = h.querySelector(".season-search")?.getBoundingClientRect().left;
       const w = wk ? wk.children[2].getBoundingClientRect().right - wk.children[0].getBoundingClientRect().left : 0, after = wk?.lastElementChild?.offsetWidth || 0;
-      setWeekX(c - w / 2 >= nav + 24 && (alarms == null || c + w / 2 + 12 + after + 24 <= alarms) ? c - h.getBoundingClientRect().left : null);
+      setWeekX(c - w / 2 >= nav + 24 && (right == null || c + w / 2 + 12 + after + 24 <= right) ? c - h.getBoundingClientRect().left : null);
     };
     const ro = new ResizeObserver(place);
     ro.observe(m); ro.observe(h);
@@ -159,13 +159,13 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             </span>
           </span>
           {error && <span className="small warn-text">{error}</span>}
-          <button style={{ marginLeft: "auto" }} className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
-            data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
-            {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
+          <span className="season-search" style={{ marginLeft: "auto" }}><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
-          <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
+          <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
+            data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
+            {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
         </div>
   );
   return (
