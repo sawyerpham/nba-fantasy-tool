@@ -837,9 +837,9 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .swap-arrows.right { left: auto; right: 0; transform: scaleX(-1); }   /* the rival's arrows: the left lane mirrored */
 /* your game chips as a timeline (x from laneXs) and the time line through them; the line sits under the chips */
 .chips-lane { position: relative; flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; }
-.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 100px; height: 100%; justify-content: center; min-width: 0; box-sizing: border-box; transform-origin: left center; }
-.chips-lane > .chips-row { flex-wrap: nowrap; align-self: stretch; }
-.chips-lane > .chips-row > .game-chip { justify-content: center; }   /* too narrow for the timeline: one plain row, as before */
+.chips-lane > .game-chip { position: absolute; top: 50%; transform: translateY(-50%); width: 100px; height: calc(100% - 18px); justify-content: center; min-width: 0; box-sizing: border-box; }   /* 18px: the corner ▶ / padlock stays inside the row */
+.chips-lane > .chips-row { flex-wrap: nowrap; align-self: stretch; }   /* too narrow for the timeline: one plain row, as before */
+.chips-lane > .chips-row > .game-chip { justify-content: center; margin: 9px 0; }   /* 9px: room for the corner ▶ / padlock (top -9px) inside the row */
 .time-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary); opacity: 0.35; pointer-events: none; }
 /* fantasy teams: Sleeper avatar + team name (+ username); player nicknames on the cards */
 .team-name-tag { display: inline-flex; align-items: center; gap: 8px; min-width: 0; vertical-align: middle; }
