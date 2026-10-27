@@ -178,6 +178,32 @@ def test_faab_bid_paces_the_budget_over_the_season():
     assert faab_bid(0.1, 89, 23) == 1       # never below the league minimum
     assert faab_bid(6, 10, 1) == 2          # last week: spend, but still capped
     assert faab_bid(6, 0, 5) == 0           # nothing left
+    assert faab_bid(6.68, 89, 23, demand=0.3) == 4
+
+
+def test_waiver_demand_needs_him_to_outscore_your_drop():
+    from app.lockin.service import waiver_demand
+
+    assert waiver_demand(10.4, 5.0) == 1.0          # twice your drop: full bid
+    assert waiver_demand(6.0, 5.0) == 0.0           # 20 % better: not worth a drop and a bid, min bid
+    assert waiver_demand(4.0, 5.0) == 0.0
+    assert waiver_demand(7.5, 5.0) == 0.5
+    assert waiver_demand(3.0, 0.0) == 1.0           # drop has no games and no projection
+
+
+def test_long_out_reads_the_tag_and_the_latest_notes():
+    from app.lockin import service
+
+    notes = [{"headline": "Cason Wallace (labrum) out indefinitely", "story": ""}]
+    orig = service.player_news
+    service.player_news = lambda fetch, sid: notes
+    try:
+        assert service.long_out(None, "2586", "Out")
+        assert not service.long_out(None, "2586", "DTD")       # a day-to-day tag never hides him
+        notes[0] = {"headline": "Coby White - Out with calf strain", "story": "out Monday"}
+        assert not service.long_out(None, "1", "Out")
+    finally:
+        service.player_news = orig
 
 
 def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
