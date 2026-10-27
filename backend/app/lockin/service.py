@@ -952,8 +952,15 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
 FAAB_TOTAL = 100   # fallback only: the budget comes from the league's settings (waiver_budget)
 WAIVER_TYPES = {0: "rolling", 1: "reverse standings", 2: "FAAB"}   # Sleeper settings.waiver_type
 WAIVER_SHOW = 12
-# ponytail: bid = share of FAAB left that grows with the upgrade over your weakest player (8 value points = 60 %);
-# no data on rivals' bids, so it is a guide, not a price.
+BID_CAP = 0.25   # one claim never takes more than a quarter of what is left
+
+
+def faab_bid(up: float, faab_left: int, weeks_left: int, min_bid: int = 1) -> int:
+    """Suggested blind bid: FAAB left paced over the weeks left, so a typical upgrade (2 value points) costs about one
+    week's share, scaled by his upgrade over your weakest player and capped at BID_CAP of what is left."""
+    # ponytail: no data on rivals' bids, so it is a guide, not a price
+    pace = faab_left / max(1, weeks_left)
+    return min(faab_left, max(min_bid, min(round(faab_left * BID_CAP), round(pace * max(0.0, up) / 2))))
 
 
 # When claims process: the league's waiver_days / waiver_hour (League tab settings); Sleeper's daily_waivers_days bitmask
@@ -1026,11 +1033,12 @@ def waivers(session, fetch: Fetch, view: dict) -> dict:
                  for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == week else DAY_TTL) or []]
     done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
     avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown}, done, session.league.scoring)
+    weeks_left = max((int(g["week"]) for g in schedule), default=week) - week + 1
     out = []
     for pid in shown:
         r = rows[pid]
         up = r.value - (drop.value if drop else 0)
-        bid = (max(1, min(faab_left, round(faab_left * min(0.6, max(0.0, up) / 8 * 0.6)))) if up > 0 else 1) if faab else None
+        bid = faab_bid(up, faab_left, weeks_left, waiver.get("min_bid") or 1) if faab else None
         out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
                     "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id), "season": avg.get(r.sleeper_id),

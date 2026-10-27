@@ -169,6 +169,17 @@ def test_acquisitions_draft_price_then_moves_in_order():
         ("drafted", "me", 24), ("dropped", "me", None), ("claimed", "rival", 7)]   # failed claim skipped
 
 
+def test_faab_bid_paces_the_budget_over_the_season():
+    from app.lockin.service import faab_bid
+
+    assert faab_bid(6.68, 89, 23) == 13     # a big upgrade early: about 3 weeks' share, not half the budget
+    assert faab_bid(3.18, 89, 23) == 6
+    assert faab_bid(40, 89, 23) == 22       # capped at a quarter of what is left
+    assert faab_bid(0.1, 89, 23) == 1       # never below the league minimum
+    assert faab_bid(6, 10, 1) == 2          # last week: spend, but still capped
+    assert faab_bid(6, 0, 5) == 0           # nothing left
+
+
 def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
     from app.lockin.service import waivers
 
