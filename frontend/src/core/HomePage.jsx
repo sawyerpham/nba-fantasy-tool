@@ -1,16 +1,13 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
 
-// The site's front door: what it is, what it does (the README's feature lists, the automatic ones first) and a big
-// "import your Sleeper league" box. Import = a new league "sleeper-<id>" (or the existing one), Sleeper's name, scoring,
-// roster slots, team count and keepers applied, then its managers and keepers synced; then a check mark and the way in.
 const FEATURES = {
   Draft: {
     top: ["Live Sleeper draft sync", "Live bid calls on the nominee", "Rival drafting habits from past leagues"],
     rest: ["Auction value rankings", "Worth and max bid per player", "Budget plan for open roster spots", "Position scarcity and tier cliffs",
       "Rival manager money and needs", "Fantasy team strength estimates", "NBA team win totals and fantasy talent", "Keeper keep-or-cut verdicts"],
   },
-  Season: {
+  "Season Advisor": {
     top: ["Optimal lineup at any time of the week", "Live keep-or-swap calls", "Swap and lock alarms", "Next Sleeper check-in",
       "Live NBA game cards", "Injury watch"],
     rest: ["Lineup swap instructions", "Lock-or-wait calls", "Win probability by strategy", "Lockable games", "Opponent lineups",
@@ -55,14 +52,15 @@ export default function HomePage({ setLeagueId, setTab }) {
   const cards = [
     ["settings", "Settings", "Managers, keepers, rules and settings: pick which team is you."],
     ["draft", "Draft", "Rankings, bid calls and live sync for your auction."],
-    ["season", "Season", "Your best lineup, lock calls, alarms and live games each week."],
+    ["season", "Season Advisor", "Your best lineup, lock calls, alarms and live games each week."],
   ];
   return (
     <div className="home" data-testid="home-page">
       <section className="home-hero">
         <h1>NBA Fantasy Tool</h1>
-        <p className="home-pitch">A free tool for Sleeper NBA lock-in leagues. No sign-up, no account: paste your league and go.</p>
-        <div className="home-import">
+        <p className="home-pitch">Tool for Sleeper NBA lock-in leagues.
+          <br />No account, no data kept, and free forever.</p>
+            <div className="home-import">
           <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !busy && importLeague()}
             placeholder="Import Sleeper league: paste its ID or link" aria-label="Sleeper league ID or link" data-testid="home-import-input" />
           <button className="primary" onClick={importLeague} disabled={busy || !input.trim()} data-testid="home-import">{busy ? "Importing…" : "Import"}</button>
