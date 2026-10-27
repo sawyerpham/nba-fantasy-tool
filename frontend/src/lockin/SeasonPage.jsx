@@ -574,6 +574,8 @@ function RosterAlerts({ roster }) {
 // The stream (streamed.pk) of a game that's on or about to start: a ▶ in the same corner (a final game has none).
 function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen, onLock }) {
   const { list: matches } = useNBAMatches();
+  // each chip's stream: a scan of every listed stream, so once per list / games, not on every render (the slider re-renders)
+  const watches = React.useMemo(() => games.map((g) => (g.state !== "post" ? watchUrl(findMatch(matches, g, team)) : null)), [matches, games, team]);
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
   const chips = games.map((g, i) => {
         // live: ESPN says in progress, or his stats are coming in before ESPN's state catches up; final only once ESPN says so
@@ -583,7 +585,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
         const toggle = !onLock ? null : lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
         const lockClick = (e) => { e.stopPropagation(); onLock(toggle); };
-        const watch = g.state !== "post" ? watchUrl(findMatch(matches, g, team)) : null;   // any game not over
+        const watch = watches[i];   // any game not over
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
@@ -736,9 +738,11 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const [at, setAt] = useState(null);   // ms; null = follow the clock (so does the slider pushed into the past)
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
+  // the slider's dot follows atMs at once; the lineup grid renders at gridMs, which React lets lag a frame while you drag
+  const gridMs = React.useDeferredValue(atMs);
   const gap = data.sleeper_gap;
-  const gamesOf = Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games]));
-  const me = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
+  const gamesOf = React.useMemo(() => Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games])), [data.players]);
+  const me = bestLineup(shown, gridMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, gridMs, data.roster_positions, true, gamesOf);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -820,7 +824,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
         <SwapArrows pairs={me.pairs} side="left" names={(sid) => data.players[sid]?.name || sid} />
         <SwapArrows pairs={them.pairs} side="right" names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
-          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
+          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, gridMs,Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
