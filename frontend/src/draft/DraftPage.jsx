@@ -152,7 +152,7 @@ export default function DraftPage({ leagueId }) {
     });
   }, [rankings, filter, posFilter, sort]);
 
-  if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
+  if (!leagueId) return <p className="muted">Select or create a league on the Settings tab first.</p>;
   if (!view) return <p>{error || "Loading…"}</p>;
 
   const live = view.status === "live";
