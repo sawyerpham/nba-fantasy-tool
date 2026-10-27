@@ -688,7 +688,11 @@ function laneAt(xs, ms, start, end, width) {
 const EXP_TIP = "Expected final score: locked points plus what each slot is expected to add (each player's locked game, " +
   "else the better of locking his last game and waiting for his later ones).";
 
-function PlayerCard({ data, r, open, openGame, setLock, mine, side, day, lane }) {
+// Re-render a card only when what it shows changes: the slider re-renders the grid every step, and bestLineup hands
+// back fresh row objects each time (so r is compared field by field).
+const sameFields = (a, b) => a === b || (!!a && !!b && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]));
+const sameCard = (a, b) => Object.keys(a).every((k) => (k === "r" ? sameFields(a.r, b.r) : a[k] === b[k]));
+const PlayerCard = React.memo(function PlayerCard({ data, r, open, openGame, setLock, mine, side, day, lane }) {
   if (!r) return <div className={`mu-card empty ${side}`}><span className="muted small">empty</span></div>;
   const p = data.players[r.sid] || { games: [] };
   const starter = r.slot !== "BN" && r.slot !== "IR";
@@ -710,7 +714,7 @@ function PlayerCard({ data, r, open, openGame, setLock, mine, side, day, lane })
       </div>
     </div>
   );
-}
+}, sameCard);
 
 // Slot order down the middle (PG PG SG SG ... C C), then every bench spot and every IR spot (empty ones too);
 // each team's players fill their current slots.
@@ -738,11 +742,9 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const [at, setAt] = useState(null);   // ms; null = follow the clock (so does the slider pushed into the past)
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
-  // the slider's dot follows atMs at once; the lineup grid renders at gridMs, which React lets lag a frame while you drag
-  const gridMs = React.useDeferredValue(atMs);
   const gap = data.sleeper_gap;
   const gamesOf = React.useMemo(() => Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games])), [data.players]);
-  const me = bestLineup(shown, gridMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, gridMs, data.roster_positions, true, gamesOf);
+  const me = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -771,6 +773,10 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
     ro.observe(grid);
     return () => ro.disconnect();
   });
+  // the chips' x positions: the same object until the plan or the lane width changes, so the cards can skip re-rendering
+  const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
+  const xs = React.useMemo(() => laneXs([...games(shown?.players || []), ...games(shown?.opponent?.players || [])], lane?.w),
+    [shown, data.players, lane?.w]);   // eslint-disable-line react-hooks/exhaustive-deps
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
   const nav = (
@@ -783,10 +789,8 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const o = shown.opponent;
   const L = bySlot(me.rows, data.roster_positions, data.reserve_slots);
   const R = o ? bySlot(them.rows, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
-  const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
   const irRows = Math.max(L.ir.length, R.ir.length);
   const allRows = L.lines.length + Math.max(L.bench.length, R.bench.length) + irRows;
-  const xs = laneXs([...games(shown.players), ...games(o?.players || [])], lane?.w);
   // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
   const row = (l, r, key, slot, first) => (
     <React.Fragment key={key}>
@@ -824,7 +828,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
         <SwapArrows pairs={me.pairs} side="left" names={(sid) => data.players[sid]?.name || sid} />
         <SwapArrows pairs={them.pairs} side="right" names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
-          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, gridMs,Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
+          <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
         {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
         {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
