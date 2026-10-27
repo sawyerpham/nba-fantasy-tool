@@ -57,7 +57,7 @@ export default function SettingsPage({ leagueId }) {
   }, [leagueId, s]);
   useSaveShortcut(save, !!s);
 
-  if (!leagueId) return <p className="muted">Select or create a league on the League tab first.</p>;
+  if (!leagueId) return <p className="muted">Select or create a league on the Settings tab first.</p>;
   if (!s) return <p>{error || "Loading…"}</p>;
 
   const set = (patch) => setS({ ...s, ...patch });
@@ -136,7 +136,7 @@ export default function SettingsPage({ leagueId }) {
           <label>Budget per manager $<Num value={s.budget_per_manager} onChange={(v) => set({ budget_per_manager: v })} data-testid="budget" /></label>
           <label>Minimum bid $<Num value={s.min_bid} onChange={(v) => set({ min_bid: v })} /></label>
           <label>Bid increment $<Num value={s.bid_increment} onChange={(v) => set({ bid_increment: v })} /></label>
-          <label>Managers <span className="muted">{s.num_managers} (edit on the League tab)</span></label>
+          <label>Managers <span className="muted">{s.num_managers} (edit on the Settings tab)</span></label>
         </div>
       </div>
 

@@ -16,7 +16,6 @@ import { reseat, swapSteps } from "./swaps.js";
 // today's lineup moves, the league (matchups + standings) and waiver claims. Any player name opens his season
 // profile on the right. Data: backend services/season.py + engine/weekplan.py; refreshed every 2 minutes.
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
-const VIEWS = [["week", "This week"], ["news", "News"], ["league", "League"], ["waivers", "Waivers"]];
 
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 const md = (d) => d.slice(5).replace("-", "/");   // "2026-10-20" -> "10/20"
@@ -36,8 +35,7 @@ function TeamName({ t, cls = "", size = 24 }) {
 }
 
 
-export default function SeasonPage({ leagueId }) {
-  const [view, setView] = useState(() => { const v = localStorage.getItem("da.season.view"); return VIEWS.some(([id]) => id === v) ? v : "week"; });
+export default function SeasonPage({ leagueId, view }) {   // view: week | news | league | waivers (the app's top tabs)
   const [week, setWeek] = useState(null);
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
@@ -72,7 +70,6 @@ export default function SeasonPage({ leagueId }) {
     document.addEventListener("visibilitychange", back);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", back); };
   }, [load, tick]);
-  useEffect(() => { try { localStorage.setItem("da.season.view", view); } catch { /* ignore */ } }, [view]);
   const [syncing, setSyncing] = useState(false);
   const sync = () => {
     setSyncing(true);
@@ -115,7 +112,7 @@ export default function SeasonPage({ leagueId }) {
     return () => timers.forEach(clearTimeout);
   }, [armed, plan?.today?.watch?.map((w) => `${w.sid}${w.alarm}`).join(","), leagueId, week]);
 
-  if (!leagueId) return <div className="panel muted">Pick a league on the League tab first.</div>;
+  if (!leagueId) return <div className="panel muted" data-testid="no-league">No Sleeper league selected!</div>;
   if (error && !data) return <div className="panel error">{error}</div>;
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
@@ -134,9 +131,6 @@ export default function SeasonPage({ leagueId }) {
           <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
           <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
           {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
-          <nav className="season-tabs">
-            {VIEWS.map(([id, label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)} data-testid={`season-${id}`}>{label}</button>)}
-          </nav>
           <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
           <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
             data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">

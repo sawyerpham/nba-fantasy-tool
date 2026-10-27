@@ -617,8 +617,6 @@ main:has(.season-grid) { max-width: none; }   /* season tab: full width like the
 .season-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .season-side { position: sticky; top: 12px; max-height: calc(100vh - 90px); overflow: auto; }
 .season-bar { gap: 10px; flex-wrap: wrap; }
-.season-tabs { display: flex; gap: 4px; margin-left: 12px; }
-.season-tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .mc-name { font-weight: 800; font-size: 17px; } .mc-points { font-size: 40px; font-weight: 900; line-height: 1.05; }
 .inj { font-weight: 700; text-transform: uppercase; font-size: 11px; }
 .inj.ok { background: var(--good); color: var(--good-t); }
@@ -777,11 +775,15 @@ table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .mu-mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 
 /* page bars docked in the app header (Season tab's week bar) */
-.header-slot { flex: 1; min-width: 0; display: flex; align-items: center; margin: 0 16px; }
+header.top { flex-wrap: wrap; row-gap: 10px; }   /* too narrow for the season bar: it drops to a second row */
+.header-slot { flex: 1 0 auto; min-width: 0; display: flex; align-items: center; margin: 0 16px; }
 .header-slot:empty { display: none; }
 .header-slot .season-bar { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; flex-wrap: nowrap; }
 .season-week { font-size: 18px; white-space: nowrap; }
 .header-slot .season-bar > .muted { white-space: nowrap; }
+.header-slot .season-bar > button { white-space: nowrap; flex-shrink: 0; }
+.header-slot .season-search { min-width: 140px; flex: 1; }
+header.top .meta { white-space: nowrap; flex-shrink: 0; }
 
 /* compact matchup header: one line, arrows at the ends */
 .matchup { padding-top: 8px; padding-bottom: 10px; }

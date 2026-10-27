@@ -9,10 +9,14 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["league", "League"],   // the league's settings, data pull and wallpaper live here too
+  ["settings", "Settings"],   // the league's managers, keepers, settings, data pull and wallpaper
   ["draft", "Draft"],
-  ["season", "Season"],
+  ["season", "Season"],      // the rest are SeasonPage's views
+  ["news", "News"],
+  ["standings", "League"],
+  ["waivers", "Waivers"],
 ];
+const SEASON_VIEWS = { season: "week", news: "news", standings: "league", waivers: "waivers" };
 
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
 const WALLPAPERS = [
@@ -31,7 +35,7 @@ const WALLPAPERS = [
 export default function App() {
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem("da.tab");
-    return !t ? "home" : t === "data" || t === "settings" ? "league" : t;   // Data and Settings now live on the League tab
+    return !t ? "home" : t === "data" || t === "league" ? "settings" : t;   // Data and the old League tab now live on Settings
   });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
@@ -93,7 +97,7 @@ export default function App() {
       </header>
       <main>
         {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
-        {tab === "league" && <>
+        {tab === "settings" && <>
           <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />
           {leagueId && <SettingsPage leagueId={leagueId} />}
           <DataPage onPoolChanged={refreshHealth} />
@@ -104,7 +108,7 @@ export default function App() {
           </div>
         </>}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
-        {tab === "season" && <SeasonPage leagueId={leagueId} />}
+        {SEASON_VIEWS[tab] && <SeasonPage leagueId={leagueId} view={SEASON_VIEWS[tab]} />}
       </main>
       <TipLayer />
     </>

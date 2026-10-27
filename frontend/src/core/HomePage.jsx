@@ -53,7 +53,7 @@ export default function HomePage({ setLeagueId, setTab }) {
   };
 
   const cards = [
-    ["league", "League", "Managers, keepers, rules and settings: pick which team is you."],
+    ["settings", "Settings", "Managers, keepers, rules and settings: pick which team is you."],
     ["draft", "Draft", "Rankings, bid calls and live sync for your auction."],
     ["season", "Season", "Your best lineup, lock calls, alarms and live games each week."],
   ];
@@ -61,7 +61,7 @@ export default function HomePage({ setLeagueId, setTab }) {
     <div className="home" data-testid="home-page">
       <section className="home-hero">
         <h1>NBA Fantasy Tool</h1>
-        <p className="home-pitch">A free tool for Sleeper NBA leagues, forever. No sign-up, no account: paste your league and go.</p>
+        <p className="home-pitch">A free tool for Sleeper NBA lock-in leagues. No sign-up, no account: paste your league and go.</p>
         <div className="home-import">
           <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !busy && importLeague()}
             placeholder="Import Sleeper league: paste its ID or link" aria-label="Sleeper league ID or link" data-testid="home-import-input" />
@@ -71,7 +71,7 @@ export default function HomePage({ setLeagueId, setTab }) {
         {done && (
           <div className="home-done" data-testid="home-imported">
             <div className="home-check" aria-hidden="true">✓</div>
-            <div><strong>{done.name}</strong> imported<div className="small muted">Saved as league “{done.id}”. Pick which team is you on the League tab.</div></div>
+            <div><strong>{done.name}</strong> imported<div className="small muted">Saved as league “{done.id}”. Pick which team is you on the Settings tab.</div></div>
           </div>
         )}
         {done && (
