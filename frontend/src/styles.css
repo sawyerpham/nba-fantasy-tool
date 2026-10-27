@@ -684,9 +684,8 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 table.depth-grid { width: 100%; margin-top: 8px; }
 /* injury colours (Sleeper's tag right now): questionable / GTD / DTD yellow, out / IR red */
 .health-q { color: #facc15; } .health-out { color: #f87171; }
-/* the right side's Team card (TeamPanel): head, then Schedule / Roster / Stats / News / Injuries tabs */
+/* the right side's Team card (TeamPanel): head, then Schedule / Roster / Stats / News tabs */
 .team-panel { position: relative; }
-.team-panel .profile-tabs { grid-template-columns: repeat(5, 1fr); }   /* five tabs on one row */
 .tp-head { display: flex; align-items: center; gap: 12px; margin: 30px 0 10px; }
 .tp-name { margin: 0; font-size: 20px; }
 .tp-game { display: grid; grid-template-columns: 82px 22px 24px 1fr auto; align-items: center; gap: 8px; padding: 6px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
