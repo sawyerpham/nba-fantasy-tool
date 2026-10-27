@@ -9,7 +9,6 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["home", "Home"],
   ["league", "League"],   // the league's settings, data pull and wallpaper live here too
   ["draft", "Draft"],
   ["season", "Season"],
