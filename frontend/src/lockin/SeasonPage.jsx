@@ -205,19 +205,19 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
 }
 
 // The right side's Team card (a team's name clicked anywhere on the Season tab, or a team in the News tab's report):
-// logo and name, then tabs (backend /season/team):
-//   Schedule  every game: vs / @ the opponent, and W / L with the score once it's played;
+// logo and name, then tabs (backend /season/team), Roster first and open:
 //   Roster    offense / defense ranks and the depth chart (names coloured by injury), then the injuries
 //             (yellow: questionable / game-time / day-to-day; red: out / IR);
+//   Schedule  every game: vs / @ the opponent, and W / L with the score once it's played;
 //   Stats     every player's per-game line for this team;
 //   News      the News tab's notes, on this team's players only (loaded when the tab opens).
-const TEAM_TABS = [["schedule", "Schedule"], ["roster", "Roster"], ["stats", "Stats"], ["news", "News"]];
+const TEAM_TABS = [["roster", "Roster"], ["schedule", "Schedule"], ["stats", "Stats"], ["news", "News"]];
 const teamLogo = (abbr) => `https://sleepercdn.com/images/team_logos/nba/${abbr.toLowerCase()}.png`;
 const shortName = (n) => { const [first, ...rest] = (n || "").split(" "); return rest.length ? `${first[0]}. ${rest.join(" ")}` : n; };
 function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
   const [t, setT] = useState(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("schedule");
+  const [tab, setTab] = useState("roster");
   const [news, setNews] = useState(null);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/team` + qs({ abbr })).then(setT).catch((e) => setError(e.message)); }, [leagueId, abbr]);
   useEffect(() => {
