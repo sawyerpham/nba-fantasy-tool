@@ -712,14 +712,14 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const isMine = idx === mineIdx;
   const shown = isMine ? plan : other;
   // Your side shows your best lineup at the timeline's time (default: now); rivals show their real Sleeper lineup.
-  // Each side's arrows are the moves from its Sleeper lineup to its best one. In the Sleeper
-  // gap (data.sleeper_gap) the arrows hide and, at now, each side shows its Sleeper lineup as is.
+  // Each side's arrows are the moves from its Sleeper lineup to its best one. In the Sleeper gap (data.sleeper_gap: Sleeper
+  // still serves the day that just ended) that lineup is the one it carries into the next day, so the arrows start from it.
   const [at, setAt] = useState(null);   // ms; null = follow the clock (so does the slider pushed into the past)
   const tl = shown?.timeline, nowMs = data.now ? Date.parse(data.now) : Date.now();
   const atMs = Math.max(at ?? nowMs, nowMs);
-  const gap = data.sleeper_gap ? (atMs > nowMs ? "arrows" : "all") : null;
+  const gap = data.sleeper_gap;
   const gamesOf = Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games]));
-  const me = bestLineup(shown, atMs, data.roster_positions, gap, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, gap, true, gamesOf);
+  const me = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -775,7 +775,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   return (
     <div className="panel matchup" data-testid="my-week">
       {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} />}
-      {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: lineups set for the next day don't show until it rolls over, so the arrows are off till then.</div>}
+      {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: the arrows start from that lineup (the one Sleeper carries into the next day), so skip any move you've already made there.</div>}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
         {/* each side: name outside, score toward the centre, its expected final (small, grey) just outside the score */}
@@ -815,14 +815,13 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
 // A team's best lineup at `atMs` from its timeline (one lineup per check-in; locked players never move): rows with
 // everyone in the slot he should be in then, and the swaps from its Sleeper lineup as it is right now (so the arrows
 // are the moves you'd make in Sleeper from where you are, at any point of the timeline).
-// gap: "all" = Sleeper lineup as is, no arrows; "arrows" = best lineup, no arrows (they'd start from a stale lineup).
 // asIs (rivals): rows stay their real Sleeper lineup; the arrows still show the moves to the best one.
 const GAME_MS = 135 * 60000;   // a game counts as under way this long after its tip (as the backend's timeline does)
-function bestLineup(team, atMs, positions, gap, asIs, games = {}) {
+function bestLineup(team, atMs, positions, asIs, games = {}) {
   const tl = team?.timeline, players = team?.players || [];
   const seg = tl?.segments[Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to)))];
   const seats = seg ? seg.seats : team?.today?.seats;
-  if (!seats || gap === "all") return { seg, rows: players, pairs: [] };
+  if (!seats) return { seg, rows: players, pairs: [] };
   const best = {};
   for (const [slot, sids] of Object.entries(seats)) for (const sid of sids) best[sid] = slot;
   // the plan says who starts; reseat keeps everyone who already starts in his Sleeper slot, so the moves are fewest
@@ -838,7 +837,7 @@ function bestLineup(team, atMs, positions, gap, asIs, games = {}) {
     || (r.slot === "BN" && playing(r.sid))).map((r) => r.sid));
   const after = reseat(now, Object.fromEntries(players.map((r) => [r.sid, best[r.sid] || (r.slot === "IR" ? "IR" : "BN")])), pos, positions, fixed);
   const rows = players.map((r) => ({ ...r, slot: after[r.sid] }));
-  return { seg, rows: asIs ? players : rows, pairs: gap ? [] : swapSteps(now, after, pos, !asIs) };
+  return { seg, rows: asIs ? players : rows, pairs: swapSteps(now, after, pos, !asIs) };
 }
 
 // The arrows, in a lane beside a team's cards (left of the left team, right of the right team, mirrored by CSS): one
