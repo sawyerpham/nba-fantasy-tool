@@ -487,7 +487,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
           // the open slot: the best game it can still take each day, his or a spare bench player's (backend open_slot)
           const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${lastName(who)}`}`);
           return (
-            <div key={r.sid} className={`guide-lock ${e >= 0 ? "lock" : "pass"}`}>
+            <div key={r.sid} className={`guide-lock ${Math.abs(e) < 0.015 ? "even" : e > 0 ? "lock" : "pass"}`}>
               <Headshot sleeperId={r.sid} name={r.name} size={38} />
               <div className="guide-lock-main">
                 <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
