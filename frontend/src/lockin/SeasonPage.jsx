@@ -23,13 +23,20 @@ const fp = (x) => (x == null ? "" : x.toFixed(2));   // fantasy points: 2 decima
 // Player nicknames the managers set on Sleeper: shown unless switched off (Settings > General, this browser only).
 const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off"; } catch { return true; } };
 
-// A fantasy team: its Sleeper avatar, its team name, and the manager's username when that differs.
-function TeamName({ t, cls = "", size = 24 }) {
+// A fantasy team: its Sleeper avatar, its team name, and under it the manager's username (when that differs) and
+// W-L record, with a green up / red down arrow for the latest result.
+function TeamName({ t, cls = "", size = 24, record = true }) {
+  const rec = record && t.wins != null;
   return (
     <span className="team-name-tag">
       {t.avatar && <img className="team-avatar" src={t.avatar} width={size} height={size} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
-      <span className={cls}>{t.name}</span>
-      {t.user && t.user !== t.name && <span className="small muted">{t.user}</span>}
+      <span className="team-name-lines">
+        <span className={cls}>{t.name}</span>
+        {(rec || (t.user && t.user !== t.name)) && <span className="small muted">
+          {t.user && t.user !== t.name && t.user}{t.user && t.user !== t.name && rec && " · "}
+          {rec && <span data-testid="team-record">{t.wins}-{t.losses}{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
+        </span>}
+      </span>
     </span>
   );
 }
@@ -126,12 +133,11 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          <strong className="season-week">Week {data.week}</strong>
-          <span className="muted small">{data.dates.length ? `${dayName(data.dates[0])} ${md(data.dates[0])} – ${dayName(data.dates.at(-1))} ${md(data.dates.at(-1))}` : ""}</span>
           <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
+          <strong className="season-week">Week {data.week}</strong>
           <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
+          <span className="muted small">{data.league_name}</span>
           {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
-          <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
           <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
             data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
             {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
@@ -139,6 +145,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
           {error && <span className="small warn-text">{error}</span>}
+          <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
         </div>
   );
   return (
@@ -1098,7 +1105,7 @@ function LeagueView({ data, leagueId, open }) {
         <table className="small" data-testid="standings">
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
-            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}><TeamName t={t} size={22} /></td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
+            <tr key={t.roster_id} className={t.is_user ? "you-need" : ""}><td>{i + 1}</td><td className="clickable" onClick={() => show(t.roster_id)}><TeamName t={t} size={22} record={false} /></td><td className="num">{t.wins}</td><td className="num">{t.losses}</td>
               <td className="num">{fp(t.fpts)}</td><td className="num">{data.waiver ? `$${(data.faab_budget ?? 100) - (t.faab_used || 0)}` : "?"}</td></tr>))}</tbody>
         </table>
       </div>

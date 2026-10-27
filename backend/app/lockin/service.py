@@ -186,7 +186,9 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                       "user": u.get("display_name"),
                       "avatar": um.get("avatar") or (f"https://sleepercdn.com/avatars/thumbs/{u['avatar']}" if u.get("avatar") else None),
                       "is_user": bool(m and m.is_user), "wins": s.get("wins", 0), "losses": s.get("losses", 0),
-                      "ties": s.get("ties", 0), "fpts": round(s.get("fpts", 0) + s.get("fpts_decimal", 0) / 100, 2),
+                      "ties": s.get("ties", 0),
+                      "last": ((r.get("metadata") or {}).get("record") or "")[-1:] or None,   # Sleeper's "WLW..." record: latest result
+                      "fpts": round(s.get("fpts", 0) + s.get("fpts_decimal", 0) / 100, 2),
                       "faab_used": s.get("waiver_budget_used", 0),
                       "players": r.get("players") or [], "starters": r.get("starters") or [], "reserve": r.get("reserve") or []})
 
@@ -255,7 +257,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     sday = (datetime.now(ZoneInfo("America/New_York")) - timedelta(hours=SLEEPER_FLIP_HOUR)).date().isoformat()
     gap = not preview and bool(tips.get(sday)) and all(t["state"] == "post" for t in tips[sday].values())
     day = iso if preview else next((d for d in dates if d > iso or (d == iso and (not tips[d] or any(t["state"] != "post" for t in tips[d].values())))), None)
-    return {"week": week, "weeks": sorted(weeks), "dates": dates, "today": iso, "day": day,
+    return {"week": week, "weeks": sorted(weeks), "dates": dates, "league_name": league.get("name") or lg.name, "today": iso, "day": day,
             "now": None if preview else datetime.now(tz).isoformat(), "tz": tz.key, "roster_positions": positions,
             "sleeper_gap": gap,
             "reserve_slots": reserve_slots,
@@ -431,6 +433,10 @@ CHECK_LEAD_MIN = 15      # timeline check-ins sit this long before the tip they'
 GAME_MINUTES = 135       # ponytail: a game runs ~2 h 15 m; overtime runs longer, use ESPN's final status if that bites
 
 
+def _team_tag(team: dict) -> dict:   # what the frontend's TeamName shows
+    return {k: team.get(k) for k in ("roster_id", "name", "user", "avatar", "wins", "losses", "last")}
+
+
 def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict | None) -> dict:
     """The best lineup at every moment from now to the end of the week, for the timeline slider. The lineup changes
     only at check-ins, CHECK_LEAD_MIN before a tip where someone moves in, so you open Sleeper as few times as
@@ -521,7 +527,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         # this week's advice: the chance to win locking everything you can now (safe) vs waiting on later games (risky)
         outlook = {"safe": round(win_chance(scenario_total(players, True), theirs), 3),
                    "risky": round(win_chance(scenario_total(players, False), theirs), 3)}
-        opp = {"roster_id": oteam["roster_id"], "name": oteam["name"], "user": oteam.get("user"), "avatar": oteam.get("avatar"),
+        opp = {**_team_tag(oteam),
                "expected": oplan.expected,
                "points": locked_points(oplayers), "locked": sum(1 for v in olocks.values() if v[0] in ("locked", "guess")),
                "games_left": sum(1 for q in oplayers if q.slot != "IR" for g in q.games if not g.started),
@@ -569,7 +575,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     # a healthy player on IR counts as a 16th man: Sleeper freezes the lineup and locks until you drop
                     "illegal": healthy_ir if len(active) + len(healthy_ir) > len(view["roster_positions"]) else [],
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
-    return {"roster_id": team["roster_id"], "name": team["name"], "user": team.get("user"), "avatar": team.get("avatar"),
+    return {**_team_tag(team),
             "expected": plan.expected, "slots": counts,
             "points": locked_points(players), "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
             "outlook": outlook,

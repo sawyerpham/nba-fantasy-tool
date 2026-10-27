@@ -31,7 +31,7 @@ const summary = { league: LEAGUE, steps: [], picks: [] };
 
 try {
   await page.goto(BASE);
-  await page.getByTestId("health").waitFor();
+  await page.getByTestId("theme-toggle").waitFor();
 
   // ---------------------------------------------------------------- 1. data pull through the UI
   await page.getByTestId("tab-settings").click();   // settings and data pull live on the Settings tab

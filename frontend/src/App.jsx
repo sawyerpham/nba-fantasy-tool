@@ -85,11 +85,7 @@ export default function App() {
         </nav>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         <span className="meta">
-          <span data-testid="health">
-            {health && <span className={`dot ${health.ok ? "" : "down"}`} />}
-            {health ? (health.ok ? `${health.players} players` : "API unreachable") : "…"}
-            {leagueId ? ` · ${leagueId}` : " · no league selected"}
-          </span>
+          {health && !health.ok && <span className="small warn-text" data-testid="health">API unreachable</span>}
           <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="toggle theme" data-testid="theme-toggle">
             {theme === "dark" ? "☀ Light" : "☾ Dark"}
           </button>
