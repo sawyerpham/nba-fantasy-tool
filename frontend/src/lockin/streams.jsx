@@ -55,10 +55,12 @@ export function findMatch(list, game, team, tz) {
   return hits.sort((x, y) => near(x) - near(y))[0] || null;
 }
 
-// The watch page is /watch/{match id}/{source}/{stream number}. Stream 1 is the first one listed.
+// The watch page is /watch/{match id}/{source}/{stream number}. Stream 1 is the first one listed. No match (the list
+// didn't load: streamed.pk's API now redirects to its homepage, or the game isn't listed yet): the site's homepage,
+// so the Watch button is always there.
 export function watchUrl(m) {
   const src = m?.sources?.[0];
-  return src ? `${API}/watch/${m.id}/${src.source}/1` : null;
+  return src ? `${API}/watch/${m.id}/${src.source}/1` : `${API}/`;
 }
 
 // The frame instead, if you ever want the player on your own page. One small request for the stream number.

@@ -299,8 +299,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
     const n = data.players[sid]?.name;
     if (n) owner[normName(n)] = { sid, team: t.user || t.name, mine: t.is_user };
   }
-  const m = sel.game.state !== "post" ? findMatch(matches, sel.game, sel.team) : null;
-  const watch = m ? watchUrl(m) : null;
+  const watch = sel.game.state !== "post" ? watchUrl(findMatch(matches, sel.game, sel.team)) : null;   // any game not over
   const when = g?.tip ? fmt(g.tip, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
   const status = !g ? "" : g.state === "in" ? quarters(g.detail) : g.state === "post" ? "Final" : `Tips ${fmt(g.tip, { hour: "numeric", minute: "2-digit" })}`;
   return (
@@ -563,8 +562,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const upcoming = g.state === "pre" && !played && !dead;   // only a game still to come gets the purple border
         const toggle = !onLock ? null : lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
         const lockClick = (e) => { e.stopPropagation(); onLock(toggle); };
-        const m = g.state !== "post" ? findMatch(matches, g, team) : null;
-        const watch = m ? watchUrl(m) : null;
+        const watch = g.state !== "post" ? watchUrl(findMatch(matches, g, team)) : null;   // any game not over
         // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
         const tip = [
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
