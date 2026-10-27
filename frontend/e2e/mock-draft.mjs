@@ -34,7 +34,7 @@ try {
   await page.getByTestId("health").waitFor();
 
   // ---------------------------------------------------------------- 1. data pull through the UI
-  await page.getByTestId("tab-settings").click();
+  await page.getByTestId("tab-league").click();   // settings and data pull live on the League tab
   if (process.env.DA_SKIP_PULL !== "1") {
     await page.getByTestId("pull-button").click();
     await page.waitForFunction(() => {
@@ -55,6 +55,7 @@ try {
   await page.getByTestId("create-league-id").fill(LEAGUE);
   await page.getByTestId("create-league-name").fill("Mock Auction 2026-27");
   await page.getByTestId("create-league-submit").click();
+  await page.locator('[data-testid="managers-toggle"] > summary').click();   // the Managers section starts folded
   await page.getByTestId(`manager-row-m2`).waitFor();
   // bulk: paste 12 names, set everyone's pace, then one Save all
   const names = ["Sawyer", "Early Eddie", "Manager Three", "Four", "Late Lucy", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
@@ -80,7 +81,7 @@ try {
   summary.steps.push("league created, 12 managers named/paced in bulk and saved with one click, theme toggled");
 
   // ---------------------------------------------------------------- 3. settings (defaults, save round trip)
-  await page.getByTestId("tab-settings").click();
+  await page.getByTestId("tab-league").click();   // settings and data pull live on the League tab
   await page.getByTestId("budget").waitFor();
   assert((await page.getByTestId("budget").inputValue()) === "200", "budget default 200");
   assert((await page.getByTestId("slot-BN").inputValue()) === "8", "8 bench slots");

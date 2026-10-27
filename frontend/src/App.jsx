@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import DataPage from "./core/DataPage.jsx";
+import HomePage from "./core/HomePage.jsx";
 import LeaguePage from "./core/LeaguePage.jsx";
 import SettingsPage from "./core/SettingsPage.jsx";
 import DraftPage from "./draft/DraftPage.jsx";
@@ -8,8 +9,8 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["league", "League"],
-  ["settings", "Settings"],
+  ["home", "Home"],
+  ["league", "League"],   // the league's settings, data pull and wallpaper live here too
   ["draft", "Draft"],
   ["season", "Season"],
 ];
@@ -31,7 +32,7 @@ const WALLPAPERS = [
 export default function App() {
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem("da.tab");
-    return !t || t === "data" ? "settings" : t;   // the Data tab now lives at the top of Settings
+    return !t ? "home" : t === "data" || t === "settings" ? "league" : t;   // Data and Settings now live on the League tab
   });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
@@ -71,7 +72,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <span className="brand" onClick={() => setTab("season")} title="Home (Season)" data-testid="home"><span className="logo">🏀</span>NBA Fantasy Tool</span>
+        <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo">🏀</span>NBA Fantasy Tool</span>
         <nav>
           {TABS.map(([id, label]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`tab-${id}`}>
@@ -92,14 +93,16 @@ export default function App() {
         </span>
       </header>
       <main>
-        {tab === "league" && <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />}
-        {tab === "settings" && <>
+        {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
+        {tab === "league" && <>
+          <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />
+          {leagueId && <SettingsPage leagueId={leagueId} />}
+          <DataPage onPoolChanged={refreshHealth} />
           <div className="panel wall-pick"><h3>Wallpaper</h3>
             <select value={wall} onChange={(e) => setWall(e.target.value)} data-testid="wallpaper">
               {WALLPAPERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </div>
-          <DataPage onPoolChanged={refreshHealth} /><SettingsPage leagueId={leagueId} />
         </>}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
         {tab === "season" && <SeasonPage leagueId={leagueId} />}

@@ -300,7 +300,7 @@ def sleeper_sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
     if state.platform is None or not hasattr(state.platform, "get_json"):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sleeper provider not configured")
     if not sid:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "link a Sleeper league first (Settings → Sleeper league → linked league)")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "link a Sleeper league first (League tab → Sleeper league → linked league)")
     changes: list[str] = []
     log_before = {e["id"] for e in load_changelog(state.store, sid)}
     try:
