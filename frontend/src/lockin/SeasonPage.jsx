@@ -1022,8 +1022,8 @@ const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 
 // Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most starters
 // out first; red counts out / IR, yellow questionable / day-to-day, the names under it (starters bold, first). A team
-// opens its Team card on the right.
-function TeamsReport({ leagueId, refreshKey }) {
+// opens its Team card on the right, a name its player card.
+function TeamsReport({ leagueId, open, refreshKey }) {
   const [r, setR] = useState(null);
   const openTeam = useContext(TeamLinkContext);
   useEffect(() => { api.get(`/leagues/${leagueId}/season/injuries`).then(setR).catch(() => setR({ teams: [], names: {} })); }, [leagueId, refreshKey]);
@@ -1041,7 +1041,8 @@ function TeamsReport({ leagueId, refreshKey }) {
                 {t.starters_q > 0 && <span className="health-q">{t.starters_q} starter{t.starters_q > 1 ? "s" : ""} ?</span>}
               </span></div>
             <div className="small tr-names">{t.players.map((h, j) => (
-              <span key={h.sid} className={`health-${h.group} ${h.starter ? "tr-starter" : ""}`} title={h.starter ? "starter" : undefined}>{j ? ", " : ""}{h.name}</span>))}
+              <span key={h.sid}>{j ? ", " : ""}<span className={`health-${h.group} ${h.starter ? "tr-starter" : ""} ${h.player_id ? "clickable" : ""}`} title={h.starter ? "starter" : undefined}
+                onClick={h.player_id ? (e) => { e.stopPropagation(); open(h.player_id); } : undefined}>{h.name}</span></span>))}
               <span className="muted"> · {[t.out && `${t.out} out`, t.q && `${t.q} questionable`].filter(Boolean).join(", ")}</span></div>
           </div>
         </div>
@@ -1069,7 +1070,7 @@ function NewsView({ leagueId, open, refreshKey }) {
   const managers = [...new Set(news.league.map((n) => n.user))].sort((a, b) => a.localeCompare(b));
   return (
     <div className="news-wrap">
-    <TeamsReport leagueId={leagueId} refreshKey={refreshKey} />
+    <TeamsReport leagueId={leagueId} open={open} refreshKey={refreshKey} />
     <div className="news-col">
       <div className="panel news-filters" data-testid="news-filters">
         <input type="search" placeholder="Search player, team, manager or note…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="news-search" />
