@@ -791,14 +791,19 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const R = o ? bySlot(them.rows, data.roster_positions, data.reserve_slots) : { lines: [], bench: [], ir: [] };
   const irRows = Math.max(L.ir.length, R.ir.length);
   const allRows = L.lines.length + Math.max(L.bench.length, R.bench.length) + irRows;
-  // first: the first bench / IR row gets a gap above it (instead of a divider row, so every row can share the height)
-  const row = (l, r, key, slot, first) => (
+  // first: the first bench / IR row gets a gap above it: a 5px empty track (with the grid's gaps, 10px more than between rows),
+  // so every player row keeps the same height
+  const nBench = Math.max(L.bench.length, R.bench.length);
+  const tracks = [...Array(L.lines.length).fill("minmax(0, 1fr)"), ...(nBench ? ["5px", ...Array(nBench).fill("minmax(0, 1fr)")] : []),
+    ...(irRows ? ["5px", ...Array(irRows).fill("minmax(0, 1fr)")] : [])];
+  const row = (l, r, key, slot, first, gr) => (
     <React.Fragment key={key}>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
-      <div className={`mu-slot ${first ? "first" : ""}`}><PosTag text={slot} /></div>
-      <div className={`mu-cell ${first ? "first" : ""}`}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
+      <div className="mu-cell" style={{ gridRow: gr }}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
+      <div className={`mu-slot ${first ? "first" : ""}`} style={{ gridRow: gr }}><PosTag text={slot} /></div>
+      <div className="mu-cell" style={{ gridRow: gr }}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
     </React.Fragment>
   );
+  const benchAt = L.lines.length + 2, irAt = benchAt + nBench + (nBench ? 1 : 0);
   return (
     <div className="panel matchup" data-testid="my-week">
       {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} />}
@@ -824,15 +829,15 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
       </div>
       {/* starters + bench fill the window; IR rows sit below the fold (scroll down), at the same row height */}
       <div className="mu-scroll">
-      <div className="mu-grid with-arrows" ref={gridRef} style={irRows ? { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` } : undefined}>
+      <div className="mu-grid with-arrows" ref={gridRef} style={{ gridTemplateRows: tracks.join(" "), ...(irRows && { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` }) }}>
         <SwapArrows pairs={me.pairs} side="left" names={(sid) => data.players[sid]?.name || sid} />
         <SwapArrows pairs={them.pairs} side="right" names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
           <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
-        {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot))}
-        {Array.from({ length: Math.max(L.bench.length, R.bench.length) }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0))}
-        {Array.from({ length: irRows }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0))}
+        {L.lines.map((l, i) => row(l, R.lines[i], `s${i}`, l.slot, false, i + 1))}
+        {Array.from({ length: nBench }, (_, i) => row(L.bench[i], R.bench[i], `b${i}`, "BN", i === 0, benchAt + i))}
+        {Array.from({ length: irRows }, (_, i) => row(L.ir[i], R.ir[i], `i${i}`, "IR", i === 0, irAt + i))}
       </div>
       </div>
     </div>
