@@ -1186,7 +1186,7 @@ function WaiversView({ leagueId, onSelect }) {
           <thead><tr><th>Player</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
             <th data-tip="Value over your drop candidate.">Upgrade</th>
             <th className="num" data-tip={`A claim lands at the next run (${runDay} ${timeOf(w.next_run)}): his games from then, the rest of this week and next week.`}>Games once he lands</th>
-            <th className="num" data-tip="A guide: your FAAB left paced over the weeks left, scaled by the upgrade, never over a quarter of what's left. Other bids are hidden.">Bid</th></tr></thead>
+            <th className="num" data-tip="A guide: your FAAB left paced over the weeks left, scaled by the upgrade and by how much more he scores than your drop (under 25 % more: min bid), never over a quarter of what's left. Other bids are hidden.">Bid</th></tr></thead>
           <tbody>{w.claims.map((c) => (
             <tr key={c.player_id} className="clickable" onClick={() => onSelect(c.player_id)}>
               <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={44} />

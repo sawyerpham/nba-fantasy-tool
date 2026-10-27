@@ -955,12 +955,28 @@ WAIVER_SHOW = 12
 BID_CAP = 0.25   # one claim never takes more than a quarter of what is left
 
 
-def faab_bid(up: float, faab_left: int, weeks_left: int, min_bid: int = 1) -> int:
+def faab_bid(up: float, faab_left: int, weeks_left: int, min_bid: int = 1, demand: float = 1.0) -> int:
     """Suggested blind bid: FAAB left paced over the weeks left, so a typical upgrade (2 value points) costs about one
-    week's share, scaled by his upgrade over your weakest player and capped at BID_CAP of what is left."""
+    week's share, scaled by his upgrade over your weakest player and by `demand` (0-1, waiver_demand), capped at
+    BID_CAP of what is left."""
     # ponytail: no data on rivals' bids, so it is a guide, not a price
     pace = faab_left / max(1, weeks_left)
-    return min(faab_left, max(min_bid, min(round(faab_left * BID_CAP), round(pace * max(0.0, up) / 2))))
+    return min(faab_left, max(min_bid, min(round(faab_left * BID_CAP), round(pace * max(0.0, up) / 2 * demand))))
+
+
+def waiver_demand(fpg: float, drop_fpg: float) -> float:
+    """How hard rivals chase him (0-1): nobody drops a player and pays for one who barely outscores him, so 0 up to 25 %
+    over your drop candidate's FP/G, full at 75 % over."""
+    # ponytail: actual FP/G only, a 1-game sample counts in full; blend in the projection if hot starts mislead
+    return 1.0 if drop_fpg <= 0 else min(1.0, max(0.0, (fpg / drop_fpg - 1.25) / 0.5))
+
+
+# Out / IR and the latest notes say surgery, a tear or an open timeline: he won't help this season, so no claim
+LONG_OUT = re.compile(r"surger|indefinite|season-ending|for the season|torn|\btear\b|ruptur|\bACL\b|achilles", re.I)
+
+
+def long_out(fetch: Fetch, sid: str, tag: str | None) -> bool:
+    return tag in ("Out", "IR") and any(LONG_OUT.search(f"{n['headline']} {n['story']}") for n in player_news(fetch, sid)[:3])
 
 
 # When claims process: the league's waiver_days / waiver_hour (League tab settings); Sleeper's daily_waivers_days bitmask
@@ -1028,17 +1044,26 @@ def waivers(session, fetch: Fetch, view: dict) -> dict:
     faab = waiver["type"] == "FAAB"
     faab_left = budget - (me.get("faab_used") or 0)
     floor = drop.value if drop else 0.0   # only real upgrades over your weakest player
-    shown = sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value)[:WAIVER_SHOW]
+    tags = view.get("injury_tags", {})
+    shown = []
+    for pid in sorted((pid for pid in fa_ids if pid in rows and rows[pid].value > floor), key=lambda pid: -rows[pid].value):
+        if len(shown) == WAIVER_SHOW:
+            break
+        if not long_out(fetch, rows[pid].sleeper_id, tags.get(rows[pid].sleeper_id)):
+            shown.append(pid)
     stat_rows = [e for w in range(1, week + 1)
                  for e in fetch(f"{SLEEPER}/stats/nba/{year}/{w}?season_type=regular", LIVE_TTL if w == week else DAY_TTL) or []]
     done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
-    avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown}, done, session.league.scoring)
+    avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown} | ({drop.sleeper_id} if drop else set()),
+                          done, session.league.scoring)
+    fpg = lambda r: (avg.get(r.sleeper_id) or {}).get("fp", r.proj_fpts or 0.0)   # noqa: E731 - his actual FP/G, else projected
+    drop_fpg = fpg(drop) if drop else 0.0
     weeks_left = max((int(g["week"]) for g in schedule), default=week) - week + 1
     out = []
     for pid in shown:
         r = rows[pid]
         up = r.value - (drop.value if drop else 0)
-        bid = faab_bid(up, faab_left, weeks_left, waiver.get("min_bid") or 1) if faab else None
+        bid = faab_bid(up, faab_left, weeks_left, waiver.get("min_bid") or 1, waiver_demand(fpg(r), drop_fpg)) if faab else None
         out.append({"player_id": pid, "sleeper_id": r.sleeper_id, "name": r.full_name, "team": r.team_abbr,
                     "pos": r.eligibility, "value": round(r.value, 2), "proj_fpg": r.proj_fpts, "injury": r.injury_status,
                     "injury_tag": view.get("injury_tags", {}).get(r.sleeper_id), "season": avg.get(r.sleeper_id),
