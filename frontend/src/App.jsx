@@ -38,7 +38,6 @@ export default function App() {
     return !t ? "home" : t === "data" || t === "league" ? "settings" : t;   // Data and the old League tab now live on Settings
   });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
-  const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "dark");
   const [wall, setWall] = useState(() => localStorage.getItem("da.wall") || "");
   const [health, setHealth] = useState(null);
 
@@ -51,11 +50,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("da.tab", tab);
   }, [tab]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("da.theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--wall", wall ? `url(/wallpapers/${wall}.png)` : "none");
@@ -84,12 +78,7 @@ export default function App() {
           ))}
         </nav>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
-        <span className="meta">
-          {health && !health.ok && <span className="small warn-text" data-testid="health">API unreachable</span>}
-          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="toggle theme" data-testid="theme-toggle">
-            {theme === "dark" ? "☀ Light" : "☾ Dark"}
-          </button>
-        </span>
+        {health && !health.ok && <span className="meta"><span className="small warn-text" data-testid="health">API unreachable</span></span>}
       </header>
       <main>
         {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
