@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
-from statistics import mean, pstdev
 
 from ..core.engine import roster
 
@@ -101,9 +100,10 @@ class WeekPlan:
 
 def swing_of(per_game_fpts: list[float]) -> float:
     games = [f for f in per_game_fpts if f is not None]
-    if len(games) < MIN_GAMES_FOR_SWING or mean(games) <= 0:
+    m = sum(games) / len(games) if games else 0.0   # float math: statistics.mean/pstdev run exact fractions, ~400 calls a page
+    if len(games) < MIN_GAMES_FOR_SWING or m <= 0:
         return DEFAULT_SWING
-    return min(MAX_SWING, max(MIN_SWING, pstdev(games) / mean(games)))
+    return min(MAX_SWING, max(MIN_SWING, math.sqrt(sum((f - m) ** 2 for f in games) / len(games)) / m))
 
 
 def _phi(z: float) -> float:
