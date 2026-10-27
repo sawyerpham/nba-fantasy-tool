@@ -1,18 +1,20 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
 
+// top (bold): only this app; rest: Sleeper has it too, brought alongside
 const FEATURES = {
   Draft: {
-    top: ["Live Sleeper draft sync", "Live bid calls on the nominee", "Rival drafting habits from past leagues"],
-    rest: ["Auction value rankings", "Worth and max bid per player", "Budget plan for open roster spots", "Position scarcity and tier cliffs",
-      "Rival manager money and needs", "Fantasy team strength estimates", "NBA team win totals and fantasy talent", "Keeper keep-or-cut verdicts"],
+    top: ["Live bid calls on the nominee", "Rival drafting habits from past leagues", "Worth and max bid per player",
+      "Budget plan for open roster spots", "Position scarcity and tier cliffs", "Fantasy team strength estimates",
+      "NBA team win totals and fantasy talent", "Keeper keep-or-cut verdicts"],
+    rest: ["Live Sleeper draft sync", "Auction value rankings", "Rival manager money and needs"],
   },
   "Season Advisor": {
     top: ["Optimal lineup at any time of the week", "Live keep-or-swap calls", "Swap and lock alarms", "Next Sleeper check-in",
-      "Live NBA game cards", "Injury watch"],
-    rest: ["Lineup swap instructions", "Lock-or-wait calls", "Win probability by strategy", "Lockable games", "Opponent lineups",
-      "Box scores and top performers", "Game stream links", "Player game logs and news", "NBA team offense and defense ranks",
-      "NBA depth charts", "League standings and FAAB", "Waiver targets with FAAB bids"],
+      "Lineup swap instructions", "Lock-or-wait calls", "Win probability by strategy", "Game stream links",
+      "NBA team offense and defense ranks", "Waiver targets with FAAB bids"],
+    rest: ["Live NBA game cards", "Injury watch", "Lockable games", "Opponent lineups", "Box scores and top performers",
+      "Player game logs and news", "NBA depth charts", "League standings and FAAB"],
   },
 };
 const APPLY = ["name", "scoring", "roster_slots", "num_managers", "keepers"];
