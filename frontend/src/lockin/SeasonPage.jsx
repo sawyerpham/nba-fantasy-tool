@@ -619,7 +619,7 @@ const tipMs = (g) => Date.parse(g.tip) || Date.parse(`${g.date}T12:00:00`);
 // within a day the tips spread by the hour (4-12 px an hour, as much as fits); room left over spaces the days in
 // proportion to time. Too narrow even at 4 px an hour: the chips shrink (scale) down to 65%; narrower than that, xs is
 // null and the chips sit in a plain row (no time line).
-const CHIP_W = 86, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
+const CHIP_W = 100, CHIP_GAP = 6, HOUR_MIN = 4, HOUR_MAX = 12;
 function laneXs(games, width) {   // games: [tip ms, game date] for every chip in the matchup
   const day = new Map(games);
   const tips = [...day.keys()].sort((a, b) => a - b);
@@ -676,7 +676,7 @@ function PlayerCard({ data, r, open, openGame, setLock, mine, side, day, lane })
     <div className={`mu-card ${side} ${starter ? "" : "bench"} ${locked ? "done" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
-        <Headshot sleeperId={r.sid} name={r.name} size={42} />
+        <Headshot sleeperId={r.sid} name={r.name} size={34} />
         <div className="mu-who">
           <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
