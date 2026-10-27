@@ -207,11 +207,11 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
 // The right side's Team card (a team's name clicked anywhere on the Season tab, or a team in the News tab's report):
 // logo and name, then tabs (backend /season/team):
 //   Schedule  every game: vs / @ the opponent, and W / L with the score once it's played;
-//   Roster    offense / defense ranks and the depth chart (names coloured by injury);
+//   Roster    offense / defense ranks and the depth chart (names coloured by injury), then the injuries
+//             (yellow: questionable / game-time / day-to-day; red: out / IR);
 //   Stats     every player's per-game line for this team;
-//   News      the News tab's notes, on this team's players only (loaded when the tab opens);
-//   Injuries  yellow: questionable / game-time / day-to-day; red: out / IR.
-const TEAM_TABS = [["schedule", "Schedule"], ["roster", "Roster"], ["stats", "Stats"], ["news", "News"], ["injuries", "Injuries"]];
+//   News      the News tab's notes, on this team's players only (loaded when the tab opens).
+const TEAM_TABS = [["schedule", "Schedule"], ["roster", "Roster"], ["stats", "Stats"], ["news", "News"]];
 const teamLogo = (abbr) => `https://sleepercdn.com/images/team_logos/nba/${abbr.toLowerCase()}.png`;
 const shortName = (n) => { const [first, ...rest] = (n || "").split(" "); return rest.length ? `${first[0]}. ${rest.join(" ")}` : n; };
 function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
@@ -268,7 +268,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
         )}
         {tab === "news" && (news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
           : <div className="muted">Loading news…</div>)}
-        {tab === "injuries" && (
+        {tab === "roster" && (
           <div data-testid="team-injuries">{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
             const list = t.injuries.filter((h) => h.group === g);
             return (
