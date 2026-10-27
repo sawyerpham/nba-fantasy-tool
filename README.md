@@ -42,14 +42,6 @@ A local helper for Sleeper NBA fantasy leagues.
 - League standings and FAAB
 - Waiver targets with FAAB bids
 
-## Layout
-
-```
-backend/app/    core/ (leagues, players, data pull, Sleeper)   draft/ (auction)   lockin/ (season)
-frontend/src/   core/                                          draft/             lockin/
-shared/         models, data providers, scoring
-```
-
 ## Run
 
 Needs Python 3.13 and Node 20+.
@@ -69,10 +61,3 @@ npm run dev
 ```
 
 Open http://localhost:5173, create a league, add your Sleeper league id in Settings and pick which manager you are.
-
-## Test
-
-```powershell
-cd backend
-.\venv\Scripts\python.exe -m pytest -q
-```
