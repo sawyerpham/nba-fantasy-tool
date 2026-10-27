@@ -82,9 +82,9 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   };
 
   return (
-    <div className="panel">
+    <details className="panel panel-toggle" data-testid="managers-toggle">
+      <summary><h3>Managers ({rows.length})</h3></summary>
       <div className="row sticky-bar">
-        <h3 style={{ margin: 0 }}>Managers ({rows.length})</h3>
         <button className="primary" onClick={saveAll} disabled={!dirty || busy} data-testid="managers-save-all">Save all (Ctrl+S)</button>
         {dirty && <span className="badge dirty">unsaved changes</span>}
         {msg && <span className="small">{msg}</span>}
@@ -131,7 +131,7 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </details>
   );
 }
 
@@ -157,8 +157,8 @@ function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
   };
   const managerName = (id) => managers.find((m) => m.manager_id === id)?.name || id;
   return (
-    <div className="panel">
-      <h3>Keeper history (prior seasons) <span className="muted small">— what each keeper cost in that season; this year's keepers and their prices are entered when you start the draft</span></h3>
+    <details className="panel panel-toggle" data-testid="keepers-toggle">
+      <summary><h3>Keeper history (prior seasons) <span className="muted small">— what each keeper cost in that season; this year's keepers and their prices are entered when you start the draft</span></h3></summary>
       <div className="row small" style={{ marginBottom: 6 }}>
         season <input type="text" value={season} onChange={(e) => setSeason(e.target.value)} style={{ width: 80, minWidth: 0 }} />
         <button onClick={addAllManagers} data-testid="history-add-all">Add a row for every manager</button>
@@ -197,7 +197,7 @@ function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
         </tbody>
       </table>
       <div className="row"><button onClick={add}>Add row</button><button className="primary" onClick={save} disabled={!dirty}>Save history</button>{dirty && <span className="badge dirty">unsaved</span>}{msg && <span className="small">{msg}</span>}</div>
-    </div>
+    </details>
   );
 }
 

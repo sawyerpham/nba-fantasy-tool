@@ -32,7 +32,7 @@ export default function SleeperSync({ leagueId, sleeperLeagueId, onSynced }) {
   };
 
   if (!sleeperLeagueId) {
-    return <div className="panel muted small">Link a Sleeper league (Settings → Sleeper league → linked league) to sync managers, keepers and rules, and to see league activity here.</div>;
+    return <div className="panel muted small">Link a Sleeper league (League settings below → Sleeper league → linked league, or import one on the Home tab) to sync managers, keepers and rules, and to see league activity here.</div>;
   }
   const shown = showAll ? log : log.slice(0, 15);
   return (

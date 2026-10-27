@@ -940,7 +940,7 @@ WAIVER_SHOW = 12
 # no data on rivals' bids, so it is a guide, not a price.
 
 
-# When claims process: the league's waiver_days / waiver_hour (Settings tab); Sleeper's daily_waivers_days bitmask
+# When claims process: the league's waiver_days / waiver_hour (League tab settings); Sleeper's daily_waivers_days bitmask
 # is undocumented, so the days are set by hand
 DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 AVG_STATS = ("pts", "reb", "ast", "stl", "blk", "tpm", "to")
