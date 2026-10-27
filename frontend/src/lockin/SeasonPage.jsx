@@ -483,14 +483,15 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
       {lockable.length > 0 && <>
         <h4>Lockable games</h4>
         {lockable.map((r) => {
-          const e = edge(r), tip = nextTip(r.sid);
+          const e = edge(r), tip = nextTip(r.sid), nba = data.players[r.sid]?.team;
           // the open slot: the best game it can still take each day, his or a spare bench player's (backend open_slot)
           const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${lastName(who)}`}`);
           return (
             <div key={r.sid} className={`guide-lock ${Math.abs(e) < 0.015 ? "even" : e > 0 ? "lock" : "pass"}`}>
               <Headshot sleeperId={r.sid} name={r.name} size={38} />
               <div className="guide-lock-main">
-                <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
+                <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span>
+                  {nba && <span className="small muted"> · <TeamLink abbr={nba}><img src={teamLogo(nba)} alt="" width={16} height={16} style={{ verticalAlign: "-3px" }} /> {nba}</TeamLink></span>}</div>
                 <div className="small muted">Open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
                 {r.win_lock != null && (() => {
                   // locked where he sits now, when that isn't the best slot: what skipping the move costs
