@@ -85,8 +85,10 @@ def team_news_feed(league_id: str, abbr: str = Query(..., pattern=r"^[A-Z]{2,4}$
 @router.get("/injuries")
 def injuries(league_id: str, state: AppState = Depends(get_state)) -> dict:
     """The News tab's teams report: every NBA team with injured players, most first, with names."""
-    _session(state, league_id)
-    return {"teams": injury_report(sleeper_injuries(_fetch(state))), "names": _team_names(state)}
+    session = _session(state, league_id)
+    by_sid = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
+    hurt = {sid: {**h, "player_id": by_sid.get(sid)} for sid, h in sleeper_injuries(_fetch(state)).items()}
+    return {"teams": injury_report(hurt), "names": _team_names(state)}
 
 
 @router.post("/sync")
