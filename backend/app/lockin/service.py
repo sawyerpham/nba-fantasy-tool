@@ -145,7 +145,18 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         if int(g["week"]) == week:
             plays[(g["date"], g["home"]["team"])] = g["away"]["team"]
             plays[(g["date"], g["away"]["team"])] = g["home"]["team"]
-    tips = {d: espn_day(fetch, d, today) for d in dates}
+    lid = lg.sleeper_league_id
+    # every request below is independent: warm the cache in parallel, the reads after it then hit it (a failed
+    # prefetch is retried, and raises, at its read)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(16) as pool:
+        days = {d: pool.submit(espn_day, fetch, d, today) for d in dates}
+        for url, ttl in ((f"{SLEEPER}/projections/nba/{year}/{week}?season_type=regular", WEEK_TTL),
+                         (f"{SLEEPER}/stats/nba/{year}/{week}?season_type=regular", LIVE_TTL),
+                         (f"{SLEEPER}/v1/league/{lid}", WEEK_TTL), (f"{SLEEPER}/v1/league/{lid}/rosters", LIVE_TTL),
+                         (f"{SLEEPER}/v1/league/{lid}/users", WEEK_TTL), (f"{SLEEPER}/v1/league/{lid}/matchups/{week}", LIVE_TTL)):
+            pool.submit(fetch, url, ttl)
+    tips = {d: f.result() if not f.exception() else espn_day(fetch, d, today) for d, f in days.items()}
 
     proj, stats, injury, injury_tags = {}, {}, {}, {}
     for e in fetch(f"{SLEEPER}/projections/nba/{year}/{week}?season_type=regular", WEEK_TTL) or []:
@@ -158,8 +169,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
     for e in fetch(f"{SLEEPER}/stats/nba/{year}/{week}?season_type=regular", LIVE_TTL) or []:
         stats[(str(e["player_id"]), e["date"])] = e.get("stats") or {}
 
-    lid = lg.sleeper_league_id
-    league = fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
+    league =fetch(f"{SLEEPER}/v1/league/{lid}", WEEK_TTL) or {}
     positions = league.get("roster_positions") or []
     reserve_slots = (league.get("settings") or {}).get("reserve_slots", 0)
     ls = league.get("settings") or {}
