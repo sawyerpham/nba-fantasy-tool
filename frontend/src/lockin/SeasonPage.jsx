@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useNBAMatches, findMatch, watchUrl } from "./streams.jsx";
 import { createPortal } from "react-dom";
 import { api, qs } from "../api.js";
@@ -32,9 +32,9 @@ function TeamName({ t, cls = "", size = 24, record = true }) {
       {t.avatar && <img className="team-avatar" src={t.avatar} width={size} height={size} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
       <span className="team-name-lines">
         <span className={cls}>{t.name}</span>
-        {(rec || (t.user && t.user !== t.name)) && <span className="small muted">
-          {t.user && t.user !== t.name && t.user}{t.user && t.user !== t.name && rec && " · "}
-          {rec && <span data-testid="team-record">{t.wins}-{t.losses}{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
+        {(rec || (t.user && t.user !== t.name)) && <span className="small muted team-sub">
+          {t.user && t.user !== t.name && <span className="team-user">{t.user}</span>}
+          {rec && <span className="team-rec" data-testid="team-record">{t.wins}-{t.losses}{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
         </span>}
       </span>
     </span>
@@ -61,6 +61,9 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
+  // the header's ◀ Week ▶ sits over the middle of the matchup column: its x within the header, kept on resize
+  const mainRef = useRef(null), weekRef = useRef(null);
+  const [weekX, setWeekX] = useState(null);
 
   // The plan is "what to do now": the backend re-runs the rules against the clock on every load (today until its
   // games are over, then the next game day), so reload every minute and whenever the tab comes back into view.
@@ -121,6 +124,19 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
 
   if (!leagueId) return <div className="panel muted" data-testid="no-league">No Sleeper league selected!</div>;
   if (error && !data) return <div className="panel error">{error}</div>;
+  useEffect(() => {
+    const m = mainRef.current, h = headerSlot?.closest("header");
+    if (!m || !h) return;
+    const place = () => {   // centred only when it clears the tabs and the alarm button; else inline after the tabs
+      const a = m.getBoundingClientRect(), c = a.left + a.width / 2, wk = weekRef.current;
+      const nav = h.querySelector("nav").getBoundingClientRect().right, alarms = h.querySelector('[data-testid="arm-alarms"]')?.getBoundingClientRect().left;
+      const w = wk ? wk.children[2].getBoundingClientRect().right - wk.children[0].getBoundingClientRect().left : 0, after = wk?.lastElementChild?.offsetWidth || 0;
+      setWeekX(c - w / 2 >= nav + 24 && (alarms == null || c + w / 2 + 12 + after + 24 <= alarms) ? c - h.getBoundingClientRect().left : null);
+    };
+    const ro = new ResizeObserver(place);
+    ro.observe(m); ro.observe(h);
+    return () => ro.disconnect();
+  }, [headerSlot, !!(data && plan)]);
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
   const pidOf = (sid) => data.players[sid]?.player_id;
@@ -133,25 +149,29 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
-          <strong className="season-week">Week {data.week}</strong>
-          <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
-          <span className="muted small">{data.league_name}</span>
-          {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
-          <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
+          <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
+            <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
+            <strong className="season-week">Week {data.week}</strong>
+            <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
+            <span className="season-weeknav-after">
+              <span className="muted small">{data.league_name}</span>
+              {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
+            </span>
+          </span>
+          {error && <span className="small warn-text">{error}</span>}
+          <button style={{ marginLeft: "auto" }} className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
             data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
             {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
-          {error && <span className="small warn-text">{error}</span>}
           <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
         </div>
   );
   return (
     <TeamLinkContext.Provider value={openTeam}>
     <div className="season-grid">
-      <section className="season-main">
+      <section className="season-main" ref={mainRef}>
         {headerSlot ? createPortal(bar, headerSlot) : bar}
         {alerts.map((a) => (
           <div key={a.key} className={`panel roster-alert ${["gtd", "out"].includes(a.kind) || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">

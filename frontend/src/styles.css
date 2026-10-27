@@ -1,4 +1,4 @@
-/* Calm, card-based look. Dark by default, light via data-theme="light". Class names are shared by every page. */
+/* Calm, card-based look. Dark. Class names are shared by every page. */
 :root {
   --bg: #0d1117; --panel: #161b22; --panel-2: #1c232d; --text: #e6edf3; --muted: #8b949e; --border: #262d37;
   --th: transparent; --selected: rgba(99, 102, 241, 0.14); --hover: rgba(255, 255, 255, 0.04); --input-bg: #0d1117; --input-border: #30363d;
@@ -11,18 +11,6 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.18);
   --radius: 14px;
   color-scheme: dark;
-}
-[data-theme="light"] {
-  --bg: #f6f7fb; --panel: #ffffff; --panel-2: #f3f4f8; --text: #1f2330; --muted: #6b7280; --border: #e8eaf0;
-  --selected: rgba(99, 102, 241, 0.09); --hover: rgba(15, 23, 42, 0.03); --input-bg: #ffffff; --input-border: #dcdfe6;
-  --primary: #4f46e5; --primary-border: #4f46e5; --primary-soft: rgba(79, 70, 229, 0.1); --danger: #dc2626; --ok: #059669; --error: #dc2626;
-  --badge: #eef0f4; --badge-text: #374151; --header: rgba(255, 255, 255, 0.85);
-  --sleeper: #e0f2fe; --sleeper-t: #0369a1; --manual: #fef3c7; --manual-t: #92400e;
-  --warn: #fee2e2; --warn-t: #b91c1c; --info: #e0e7ff; --info-t: #4338ca;
-  --good: #d1fae5; --good-t: #047857; --even: #fef3c7; --even-t: #92400e; --bad: #fee2e2; --bad-t: #b91c1c;
-  --user-card: #f0fdf7; --user-b: #a7f3d0; --progress: #e8eaf0;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.05);
-  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -280,7 +268,6 @@ th.sorted { color: var(--primary); }
 .tier-cell { font-size: 13px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
 /* --h is set per tier (red = best, green = worst); "last" = tier nearly gone, ringed. */
 .tier-cell, .tier-tag { color: hsl(var(--h, 230) 85% 72%); background: hsl(var(--h, 230) 70% 50% / 0.2); }
-[data-theme="light"] .tier-cell, [data-theme="light"] .tier-tag { color: hsl(var(--h, 230) 80% 30%); background: hsl(var(--h, 230) 75% 50% / 0.16); }
 .tier-cell.last, .tier-tag.last { box-shadow: 0 0 0 1.5px currentColor; }
 .headshot { flex: none; display: inline-grid; place-items: center; border-radius: 50%; object-fit: cover; object-position: top; background: var(--panel-2); border: 1px solid var(--border); font-weight: 700; color: var(--muted); }
 .player-cell { display: flex; align-items: center; gap: 10px; }
@@ -407,7 +394,6 @@ th.sorted { color: var(--primary); }
 
 /* position colours, used everywhere a position is shown (components/Pos.jsx) */
 :root { --pos-PG: #ff2c6d; --pos-SG: #ff7a00; --pos-SF: #00ffc6; --pos-PF: #00d7ff; --pos-C: #c96cff; }   /* Sleeper's position colours */
-[data-theme="light"] { --pos-PG: #d6134f; --pos-SG: #c25e00; --pos-SF: #00a383; --pos-PF: #0089ad; --pos-C: #8f35d6; }   /* the same hues, darker for white backgrounds */
 .pos-c { font-weight: 600; }
 .pos-PG { color: var(--pos-PG) !important; } .pos-SG { color: var(--pos-SG) !important; } .pos-SF { color: var(--pos-SF) !important; }
 .pos-PF { color: var(--pos-PF) !important; } .pos-C { color: var(--pos-C) !important; }
@@ -415,7 +401,6 @@ th.sorted { color: var(--primary); }
 .team-logo-sm { width: 30px; height: 30px; object-fit: contain; }
 .conf { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; vertical-align: 2px; }
 .conf-East { background: rgba(59, 130, 246, 0.18); color: #93c5fd; } .conf-West { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
-[data-theme="light"] .conf-East { color: #1d4ed8; } [data-theme="light"] .conf-West { color: #b91c1c; }
 
 /* live Sleeper auction state in the record bar */
 .live-bid { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--good); color: var(--good-t); font-size: 14px; white-space: nowrap; }
@@ -462,8 +447,6 @@ th.sorted { color: var(--primary); }
 .live-card-title .term { color: inherit; }
 .live-card.win { --card-c: #34d399; } .live-card.pass { --card-c: #60a5fa; } .live-card.bids { --card-c: #fb923c; }
 .live-card.lockin { --card-c: #c084fc; } .live-card.keeper { --card-c: #facc15; }
-[data-theme="light"] .live-card.win { --card-c: #059669; } [data-theme="light"] .live-card.pass { --card-c: #2563eb; }
-[data-theme="light"] .live-card.bids { --card-c: #ea580c; } [data-theme="light"] .live-card.lockin { --card-c: #9333ea; } [data-theme="light"] .live-card.keeper { --card-c: #b45309; }
 
 /* pick notifications */
 .toasts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(820px, 60vw); }
@@ -559,28 +542,22 @@ header.top .brand { cursor: pointer; }
   --header: rgba(10, 12, 16, 0.45); --input-bg: rgba(10, 12, 16, 0.65); --panel-solid: rgba(16, 20, 26, 0.94);
   --glass: none;
 }
-[data-theme="light"] {
-  --panel: rgba(255, 255, 255, 0.4); --panel-2: rgba(255, 255, 255, 0.35); --border: rgba(255, 255, 255, 0.6);
-  --header: rgba(255, 255, 255, 0.6); --input-bg: rgba(255, 255, 255, 0.78); --panel-solid: rgba(255, 255, 255, 0.96);
-}
 body { background: #000; }
 .panel, .room-card, .block-bar, .sticky-bar, .sticky-block, header.top { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 th, .modal, .dropdown, .toast, .tip { background: var(--panel-solid); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 table.small th, .plan-table th, .money-table th, .market-table th { background: transparent; backdrop-filter: none; }
-[data-theme="light"] body { background: #f6f7fb; }
 /* the wallpaper (Settings tab): a pixelated photo fixed behind everything, an 80px border from the window's edges, dimmed so the
    panels over it stay readable; its own layer so image-rendering doesn't pixelate the headshots too */
 body::before { content: ""; position: fixed; inset: 80px; z-index: -1; pointer-events: none;
   background: var(--wall, none) center bottom / auto 100% no-repeat; image-rendering: pixelated; opacity: 0.3; }
-[data-theme="light"] body::before { opacity: 0.25; }
 .wall-pick { display: flex; align-items: center; gap: 14px; } .wall-pick h3 { margin: 0; }
 /* small pills and inputs: a darker backing so their colours stay legible */
-:root:not([data-theme="light"]) :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: inset 0 0 0 999px rgba(10, 12, 16, 0.45); }
+:root :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: inset 0 0 0 999px rgba(10, 12, 16, 0.45); }
 .tip, .dropdown, .modal, .toast, input, select, textarea { text-shadow: none; }
 /* the white high-bid card: dark text needs no outline */
 :root .live-lot-bid, :root .live-lot-bid * { text-shadow: none !important; }
 /* small coloured text (positions, ranks, sub-lines) gets a tighter outline so it holds up on the white sketch */
-:root:not([data-theme="light"]) :is(.pos-c, .pos-rank, .teammate-rank, .room-slot-pos, .player-sub, .trend, .fit-num, .bid-label, .muted) {
+:root :is(.pos-c, .pos-rank, .teammate-rank, .room-slot-pos, .player-sub, .trend, .fit-num, .bid-label, .muted) {
   text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .bid-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -704,7 +681,6 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .team-ranks-row { padding: 3px 0; }
 /* team ranks, best to worst: dark green, green, light green, yellow, light red, red, dark red (deeper on light) */
 :root { --rank-0: #16a34a; --rank-1: #4ade80; --rank-2: #bef264; --rank-3: #facc15; --rank-4: #fca5a5; --rank-5: #f87171; --rank-6: #dc2626; }
-[data-theme="light"] { --rank-0: #14532d; --rank-1: #15803d; --rank-2: #65a30d; --rank-3: #ca8a04; --rank-4: #ef4444; --rank-5: #b91c1c; --rank-6: #7f1d1d; }
 table.depth-grid { width: 100%; margin-top: 8px; }
 /* injury colours (Sleeper's tag right now): questionable / GTD / DTD yellow, out / IR red */
 .health-q { color: #facc15; } .health-out { color: #f87171; }
@@ -725,7 +701,6 @@ table.depth-grid { width: 100%; margin-top: 8px; }
 .tp-inj { margin-bottom: 14px; } .tp-inj h4 { margin: 4px 0 6px; font-size: 14px; }
 .tp-inj-row { display: grid; grid-template-columns: 28px auto 1fr; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
 .tp-inj-tag { color: var(--muted); text-align: right; }
-[data-theme="light"] .health-q { color: #a16207; } [data-theme="light"] .health-out { color: #dc2626; }
 table.depth-grid td, table.depth-grid th { padding: 3px 4px; }
 .dg-cell { white-space: nowrap; } .dg-cell.self { background: var(--primary-soft); border-radius: 6px; font-weight: 800; }
 .dg-cell img { vertical-align: middle; }
@@ -783,7 +758,12 @@ header.top { flex-wrap: wrap; row-gap: 10px; }   /* too narrow for the season ba
 .season-week { font-size: 18px; white-space: nowrap; }
 .header-slot .season-bar > .muted { white-space: nowrap; }
 .header-slot .season-bar > button { white-space: nowrap; flex-shrink: 0; }
-.header-slot .season-search { min-width: 140px; flex: 1; }
+.header-slot .season-search { width: 240px; flex-shrink: 0; margin-left: 0; }
+/* ◀ Week ▶ centred on the matchup column (left set from SeasonPage); league name / "this week" hang off its right */
+.season-weeknav { position: relative; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.header-slot .season-weeknav[style] { position: absolute; transform: translateX(-50%); }
+.season-weeknav-after { display: flex; align-items: center; gap: 10px; }
+.season-weeknav[style] .season-weeknav-after { position: absolute; left: 100%; margin-left: 12px; }
 header.top .meta { white-space: nowrap; flex-shrink: 0; }
 
 /* compact matchup header: one line, arrows at the ends */
@@ -865,6 +845,9 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .team-name-tag { display: inline-flex; align-items: center; gap: 8px; min-width: 0; vertical-align: middle; }
 .team-name-lines { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .team-name-lines > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-sub { display: flex; gap: 6px; min-width: 0; }
+.team-user { overflow: hidden; text-overflow: ellipsis; }
+.team-rec { flex-shrink: 0; }   /* the record stays whole; a long username gives way */
 .team-avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--panel-2); }
 .mu-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* the in-season player profile: Sleeper-style tabs (Summary, Game log, Team, History) */

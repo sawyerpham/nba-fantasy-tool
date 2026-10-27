@@ -31,7 +31,7 @@ const summary = { league: LEAGUE, steps: [], picks: [] };
 
 try {
   await page.goto(BASE);
-  await page.getByTestId("theme-toggle").waitFor();
+  await page.getByTestId("home").waitFor();
 
   // ---------------------------------------------------------------- 1. data pull through the UI
   await page.getByTestId("tab-settings").click();   // settings and data pull live on the Settings tab
@@ -72,13 +72,8 @@ try {
   const savedManagers = await apiGet(`/leagues/${LEAGUE}/managers`);
   assert(savedManagers.map((m) => m.name).join(",") === names.join(","), "bulk names saved in one go");
   assert(savedManagers[1].behavior.spend_pace === "early" && savedManagers[4].behavior.spend_pace === "late", "paces saved");
-  // theme toggle (dark is the default)
-  assert((await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "dark", "dark theme by default");
-  await page.getByTestId("theme-toggle").click();
-  assert((await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "light", "theme toggles to light");
-  await page.getByTestId("theme-toggle").click();
   await shot("02-league");
-  summary.steps.push("league created, 12 managers named/paced in bulk and saved with one click, theme toggled");
+  summary.steps.push("league created, 12 managers named/paced in bulk and saved with one click");
 
   // ---------------------------------------------------------------- 3. settings (defaults, save round trip)
   await page.getByTestId("tab-settings").click();   // settings and data pull live on the Settings tab
