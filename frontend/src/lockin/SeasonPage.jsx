@@ -159,7 +159,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             </span>
           </span>
           {error && <span className="small warn-text">{error}</span>}
-          <span className="season-search" style={{ marginLeft: "auto" }}><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} placeholder="Any player…" testId="season-search" /></span>
+          <span className="season-search" style={{ marginLeft: "auto" }}><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} onSelectTeam={openTeam} placeholder="Any player or team…" testId="season-search" /></span>
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
@@ -179,7 +179,6 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
           </div>
         ))}
-        <RosterAlerts roster={plan.roster} />
         {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
@@ -460,6 +459,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
   return (
     <div className="panel scroll guide" data-testid="lockin-guide">
       {head}
+      {mine && <RosterAlerts roster={plan.roster} />}
       {o && (
         <section className="guide-card">
           <div className="hub-win"><span className="bid-label">Win probability</span><strong>{pct(p.win_chance)}</strong></div>
