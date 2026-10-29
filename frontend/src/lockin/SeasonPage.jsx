@@ -96,6 +96,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
   const [alerts, setAlerts] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);   // the badge's floating panel
+  const [focusRid, setFocusRid] = useState(null);   // the matchup on the Week tab: Week stats follows it
   const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
   const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
   const arm = () => {
@@ -198,7 +199,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             ))}
             <RosterAlerts roster={plan.roster} />
           </div>, document.body)}
-        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} />}
+        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} onShow={setFocusRid} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
@@ -215,7 +216,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId}
             onOpenPid={setSelected} onClose={close} />
           : team ? <TeamPanel key={team} abbr={team} leagueId={leagueId} onOpenPid={setSelected} onClose={close} />
-          : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} />}
+          : <LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={setLock} open={open} focus={focusRid} />}
       </aside>
     </div>
     </TeamLinkContext.Provider>
@@ -373,6 +374,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
                       <div>
                         <div className={`gp-name ${own?.mine ? "gp-mine-name" : ""}`}>{r.name}{r.jersey && <span className="gp-jersey">#{r.jersey}</span>}</div>
                         <div className="gp-line"><span className="gp-fp">{fp(r.fp)} FP</span>
+                          {r.min != null && <span><strong>{r.min}</strong> MIN</span>}
                           {r.lead.map(([k, v]) => <span key={k}><strong>{v}</strong> {k}</span>)}</div>
                       </div>
                     </div>
@@ -427,8 +429,9 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 const lastName = (n) => n.split(" ").slice(1).join(" ") || n;
 // open(sid): a player's name opens his profile.
-function LockinGuide({ data, plan, leagueId, setLock, open }) {
-  const [rid, setRid] = useState(plan.roster_id);
+function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
+  const [rid, setRid] = useState(focus ?? plan.roster_id);
+  useEffect(() => { if (focus != null) setRid(focus); }, [focus]);   // the matchup shown on the Week tab
   const [other, setOther] = useState(null);
   const mine = rid === plan.roster_id;
   useEffect(() => {
@@ -467,9 +470,9 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
         <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked">✕</button>
       </>}</span>
   );
-  const side = (t, label) => (
+  const side = (t) => (
     <div className="hub-side">
-      <div className="hub-team">{label}</div>
+      <div className="hub-team"><TeamName t={t} cls="hub-name" size={26} /></div>
       <div className="hub-stat"><span>Projected</span><strong>{fp(t.expected)}</strong></div>
       <div className="hub-stat"><span>Banked</span><strong>{fp(t.points)}</strong></div>
       <div className="hub-stat"><span>Games left</span><strong>{t.games_left}</strong></div>
@@ -480,8 +483,9 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
       {head}
       {o && (
         <section className="guide-card">
-          <div className="hub-win"><span className="bid-label">Win probability</span><strong>{pct(p.win_chance)}</strong></div>
-          <div className="hub-sides">{side(p, p.user || p.name)}{side(o, o.user || o.name)}</div>
+          <div className="bid-label">Win probability</div>
+          <div className="hub-win"><strong>{pct(p.win_chance)}</strong><strong>{pct(1 - (p.win_chance ?? 0))}</strong></div>
+          <div className="hub-sides">{side(p)}{side(o)}</div>
         </section>
       )}
       {out && (
@@ -757,9 +761,10 @@ function bySlot(rows, positions, irSlots) {
 
 // One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on
 // yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
-function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
+function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
+  useEffect(() => { onShow?.(idx === mineIdx ? plan.roster_id : data.matchups[idx]?.[0]?.roster_id); }, [idx]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [other, setOther] = useState(null);
   const isMine = idx === mineIdx;
   const shown = isMine ? plan : other;
@@ -771,10 +776,11 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const atMs = Math.max(at ?? nowMs, nowMs);
   const gap = data.sleeper_gap;
   const gamesOf = React.useMemo(() => Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games])), [data.players]);
-  const best = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
-  // Your side can show the best lineup (default) or the one you have in Sleeper now; the toggle is live only when they differ.
+  const best = bestLineup(shown, atMs, data.roster_positions, false, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
+  // The left team (yours, or whichever matchup you've stepped to) can show its best lineup (default) or the one it has in Sleeper
+  // now; the toggle is live only when they differ.
   const [view, setView] = useState("best");
-  const differs = isMine && best.rows.some((r, i) => r.slot !== shown.players[i].slot);
+  const differs = !!shown && best.rows.some((r, i) => r.slot !== shown.players[i].slot);
   const me = differs && view === "sleeper" ? bestLineup(shown, atMs, data.roster_positions, true, gamesOf) : best;   // as-is rows, arrows still to the best
   const seg = me.seg;
   const gridRef = React.useRef(null);
@@ -987,7 +993,7 @@ function Timeline({ tl, nowMs, atMs, setAt, view, setView, differs }) {
   return (
     <div className="timeline" data-testid="timeline">
       <button className="tl-next" onClick={() => setView(view === "best" ? "sleeper" : "best")} disabled={!differs} data-testid="lineup-toggle"
-        data-tip={differs ? "Switch between the best lineup and the lineup you have in Sleeper now." : "Your Sleeper lineup is already the best one."}>
+        data-tip={differs ? "Switch between the best lineup and the lineup in Sleeper now." : "The Sleeper lineup is already the best one."}>
         <span className="tl-next-head"><span className="tl-next-label">Current lineup</span></span>
         <strong>{view === "best" ? "Best" : "In Sleeper"}</strong>
       </button>
