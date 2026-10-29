@@ -19,12 +19,12 @@ const TABS = [
 const SEASON_VIEWS = { season: "week", news: "news", standings: "league", waivers: "waivers" };
 
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
+const THEMES = [["", "Indigo (default)"], ["ocean", "Ocean"], ["sunset", "Sunset"]];   // accent colour presets, see styles.css
+
 const WALLPAPERS = [
   ["", "No wallpaper"],
   ["kawhi-dagger", "Kawhi dagger"],
   ["wemby-block", "Wemby block"],
-  ["wemby-spurs", "Wemby"],
-  ["lebron-ft", "Masked LeBron"],
   ["lin-calderon", "Lin over Calderón"],
   ["haliburton-msg", "Haliburton at MSG"],
   ["curry-okc", "Curry from deep"],
@@ -38,7 +38,8 @@ export default function App() {
     return !t ? "home" : t === "data" || t === "league" ? "settings" : t;   // Data and the old League tab now live on Settings
   });
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
-  const [wall, setWall] = useState(() => localStorage.getItem("da.wall") || "");
+  const [wall, setWall] = useState(() => { const w = localStorage.getItem("da.wall") || ""; return WALLPAPERS.some(([id]) => id === w) ? w : ""; });
+  const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "");
   const [health, setHealth] = useState(null);
 
   const setLeagueId = useCallback((id) => {
@@ -55,6 +56,11 @@ export default function App() {
     document.documentElement.style.setProperty("--wall", wall ? `url(/wallpapers/${wall}.png)` : "none");
     localStorage.setItem("da.wall", wall);
   }, [wall]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("da.theme", theme);
+  }, [theme]);
 
   const refreshHealth = useCallback(() => {
     api.get("/health").then(setHealth).catch(() => setHealth({ ok: false }));
@@ -83,13 +89,22 @@ export default function App() {
       <main>
         {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
         {tab === "settings" && <>
-          <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />
-          {leagueId && <SettingsPage leagueId={leagueId} />}
-          <DataPage onPoolChanged={refreshHealth} />
+          <div className="panel section-card" data-testid="section-appearance"><h2>Appearance</h2>
+          <div className="panel wall-pick"><h3>Theme</h3>
+            <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
+              {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </div>
           <div className="panel wall-pick"><h3>Wallpaper</h3>
             <select value={wall} onChange={(e) => setWall(e.target.value)} data-testid="wallpaper">
               {WALLPAPERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
+          </div>
+          </div>
+          <div className="panel section-card" data-testid="section-league"><h2>League</h2>
+            <LeaguePage leagueId={leagueId} setLeagueId={setLeagueId} />
+            {leagueId && <SettingsPage leagueId={leagueId} />}
+            <DataPage onPoolChanged={refreshHealth} />
           </div>
         </>}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}

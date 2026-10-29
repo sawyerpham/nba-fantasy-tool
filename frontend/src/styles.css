@@ -1,17 +1,21 @@
 /* Calm, card-based look. Dark. Class names are shared by every page. */
 :root {
   --bg: #0d1117; --panel: #161b22; --panel-2: #1c232d; --text: #e6edf3; --muted: #8b949e; --border: #262d37;
-  --th: transparent; --selected: rgba(99, 102, 241, 0.14); --hover: rgba(255, 255, 255, 0.04); --input-bg: #0d1117; --input-border: #30363d;
-  --primary: #6366f1; --primary-border: #6366f1; --primary-soft: rgba(99, 102, 241, 0.16); --danger: #f87171; --ok: #34d399; --error: #f87171;
+  --th: transparent; --selected: color-mix(in srgb, var(--primary) 14%, transparent); --hover: rgba(255, 255, 255, 0.04); --input-bg: #0d1117; --input-border: #30363d;
+  --primary: #6366f1; --primary-border: var(--primary); --primary-soft: color-mix(in srgb, var(--primary) 16%, transparent); --accent2: #ec4899; --danger: #f87171; --ok: #34d399; --error: #f87171;
   --badge: rgba(255, 255, 255, 0.06); --badge-text: #c9d1d9; --header: rgba(13, 17, 23, 0.85);
   --sleeper: rgba(56, 189, 248, 0.14); --sleeper-t: #7dd3fc; --manual: rgba(251, 191, 36, 0.14); --manual-t: #fcd34d;
-  --warn: rgba(248, 113, 113, 0.14); --warn-t: #fca5a5; --info: rgba(99, 102, 241, 0.16); --info-t: #a5b4fc;
+  --warn: rgba(248, 113, 113, 0.14); --warn-t: #fca5a5; --info: var(--primary-soft); --info-t: #a5b4fc;
   --good: rgba(52, 211, 153, 0.14); --good-t: #6ee7b7; --even: rgba(251, 191, 36, 0.14); --even-t: #fcd34d; --bad: rgba(248, 113, 113, 0.14); --bad-t: #fca5a5;
   --user-card: rgba(52, 211, 153, 0.06); --user-b: rgba(52, 211, 153, 0.35); --progress: #262d37;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.18);
   --radius: 14px;
   color-scheme: dark;
 }
+
+/* Settings > Theme: only the accent (buttons, links, selection, focus, sync/alarm toggles) changes; good/bad/even stay red/green/yellow */
+:root[data-theme="ocean"] { --primary: #0284c7; --accent2: #14b8a6; --info-t: #7dd3fc; }
+:root[data-theme="sunset"] { --primary: #ea580c; --accent2: #db2777; --info-t: #fdba74; }
 
 * { box-sizing: border-box; }
 body {
@@ -30,7 +34,7 @@ header.top {
   padding: 12px 28px; background: var(--header); border-bottom: 1px solid var(--border);
 }
 header.top .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
-header.top .brand .logo { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #6366f1, #ec4899); color: #fff; font-size: 18.5px; }
+header.top .brand .logo { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), var(--accent2)); color: #fff; font-size: 18.5px; }
 header.top nav { display: flex; gap: 4px; padding: 4px; background: var(--panel-2); border-radius: 12px; }
 header.top nav button { background: transparent; border: 0; color: var(--muted); padding: 6px 16px; border-radius: 9px; font-weight: 500; }
 header.top nav button:hover { color: var(--text); filter: none; }
@@ -118,6 +122,10 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .dg-rank > .block-bar { margin: 0 0 12px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
 .dg-rank > .panel.scroll { flex: 1; min-height: 0; max-height: none; margin-bottom: 0; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+/* Settings tab: a big card per area, holding the cards inside it */
+.section-card > h2 { font-size: 26px; margin: 0 0 14px; }
+.section-card .panel { background: var(--panel-2); box-shadow: none; }
+.section-card > :last-child, .section-card > div > .panel:last-child { margin-bottom: 0; }
 .panel.scroll { max-height: 72vh; overflow: auto; scrollbar-width: thin; }
 .dg-pane .panel.scroll { max-height: none; overflow: visible; }
 .panel.flush { padding: 0; overflow: hidden; }
@@ -153,7 +161,7 @@ pre { font-size: 12.5px; background: var(--panel-2); padding: 10px; border-radiu
 .inj.out { background: var(--bad); color: var(--bad-t); }
 
 .progress { height: 6px; background: var(--progress); border-radius: 999px; width: 320px; overflow: hidden; }
-.progress > div { height: 100%; background: linear-gradient(90deg, var(--primary), #ec4899); border-radius: 999px; transition: width 0.3s; }
+.progress > div { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent2)); border-radius: 999px; transition: width 0.3s; }
 
 /* ---------- draft header ---------- */
 .draft-top { padding: 10px 16px; margin-bottom: 12px; }
