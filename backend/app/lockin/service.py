@@ -911,7 +911,7 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
                "team_pts": g[side].get("points"), "opp_pts": other.get("points")}
         if st:
             row.update({"fp": round(actual_fp(st, session.league.scoring), 2), "min": round(float(st.get("sp") or 0) / 60, 1),
-                        **{k: int(st.get(k) or 0) for k in ("pts", "reb", "ast", "stl", "blk", "to", "pf")},
+                        **{k: int(st.get(k) or 0) for k in ("pts", "reb", "ast", "stl", "blk", "to", "pf", "fgm", "fga", "ftm", "fta")},
                         "pm": int(st.get("plus_minus") or 0)})
         season_log.append(row)
     games_played = [r for r in season_log if "fp" in r]
