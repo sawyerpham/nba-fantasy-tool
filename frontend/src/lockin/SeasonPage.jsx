@@ -1053,7 +1053,7 @@ const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 function TeamsReport({ leagueId, open, refreshKey }) {
   const [r, setR] = useState(null);
   const openTeam = useContext(TeamLinkContext);
-  const order = (ps) => [...ps].sort((a, b) => (a.role?.rank ?? 99) - (b.role?.rank ?? 99));   // by "#N option"; stable, so ties keep starter order
+  const order = (ps) => [...ps].sort((a, b) => !!b.starter - !!a.starter || (a.role?.rank ?? 99) - (b.role?.rank ?? 99));   // starters (bold) first, then by "#N option"; stable
   useEffect(() => { api.get(`/leagues/${leagueId}/season/injuries`).then(setR).catch(() => setR({ teams: [], names: {} })); }, [leagueId, refreshKey]);
   return (
     <div className="panel news-teams" data-testid="teams-report">
@@ -1111,6 +1111,7 @@ function NewsView({ leagueId, open, refreshKey }) {
         <label className="inline"><input type="checkbox" checked={inj} onChange={(e) => setInj(e.target.checked)} data-testid="news-injuries" /> Injuries only</label>
         {(q || nba || mgr || inj) && <button className="small ghost" onClick={() => { setQ(""); setNba(""); setMgr(""); setInj(false); }}>clear</button>}
       </div>
+      <div className="news-list">
       {!mgr && (
         <details className="panel news" open data-testid="news-mine">
           <summary><h3>My team <span className="small muted">({mine.length})</span></h3></summary>
@@ -1128,6 +1129,7 @@ function NewsView({ leagueId, open, refreshKey }) {
         <h3>League-wide <span className="small muted">({mgr || "other teams' players"}{league.length > LEAGUE_NEWS ? `, newest ${LEAGUE_NEWS} of ${league.length}` : ""})</span></h3>
         {league.length ? league.slice(0, LEAGUE_NEWS).map((n, i) => <NewsNote key={i} n={n} open={open} owner />)
           : <div className="muted">No notes match.</div>}
+      </div>
       </div>
     </div>
     </div>
