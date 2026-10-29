@@ -82,4 +82,5 @@ frontend/e2e/*.log
 screenshots/
 
 # wallpaper photos: Getty images, kept local (backgroundimages/pixelate.py makes them)
-frontend/public/wallpapers/
+frontend/public/wallpapers/*
+!frontend/public/wallpapers/lebron-chalk.png
