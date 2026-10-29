@@ -24,10 +24,9 @@ from .ranking import RankedPlayer, pool_values, rank_players, scarcity_bonus, sc
 from .spending import SpendingGuide, spending_guide
 
 
-
-
 @dataclass
 class ManagerSummary:
+    """One manager's row for the room view: money, open slots, roster, strength estimates and drafting habits."""
     manager_id: str
     name: str
     is_user: bool
@@ -42,6 +41,7 @@ class ManagerSummary:
 
 @dataclass
 class DraftSession:
+    """One league's settings, managers, draft state and player data wired to the engine, with cached rankings and valuations. The API serves from it and `to_export()` produces the league file."""
     league: LeagueSettings
     managers: list[Manager]
     draft: DraftState
@@ -59,9 +59,9 @@ class DraftSession:
     _opening_rate: float | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Create the draft engine over the session's state."""
         self.engine = DraftEngine(self.league, self.managers, self.draft, self.players, self.overrides, now=self.now)
 
-    # ------------------------------------------------------------------ invalidation
 
     def invalidate(self) -> None:
         """Call after any override, valuation, or league-settings change."""
@@ -72,20 +72,23 @@ class DraftSession:
         self.engine.managers = self.managers
 
     def set_league(self, league: LeagueSettings) -> None:
+        """Replace the league settings and invalidate cached rankings."""
         self.league = league
         self.invalidate()
 
     def set_override(self, override: PlayerOverrides) -> None:
+        """Set one player's override and invalidate cached rankings."""
         self.overrides[override.player_id] = override
         self.invalidate()
 
     def set_valuations(self, valuations: Mapping[int, PlayerValuation]) -> None:
+        """Replace the valuations and invalidate cached rankings."""
         self.valuations = dict(valuations)
         self.invalidate()
 
-    # ------------------------------------------------------------------ queries
 
     def user_manager_id(self) -> str:
+        """The id of the manager marked as you (DraftError when none)."""
         user = self.engine.user_manager()
         if user is None:
             raise DraftError("no manager is marked is_user")
@@ -111,15 +114,18 @@ class DraftSession:
         return self._pool_values
 
     def rank(self, my_picks, available_ids) -> list[RankedPlayer]:
+        """Rank the available players for the given picks (computes the position-scarcity bonuses first)."""
         self.pool_values()   # fills the scarcity bonuses
         return rank_players(self.league, self.players, self.overrides, self.valuations, my_picks, available_ids,
                             self.schedule(), self._scarcity)
 
     def available_ids(self) -> list[int]:
+        """Ids of every player not yet drafted."""
         drafted = self.engine.drafted_ids()
         return [pid for pid in self.players if pid not in drafted]
 
     def rankings(self, manager_id: str | None = None, limit: int | None = None) -> list[RankedPlayer]:
+        """Rankings for a manager (default: you), optionally limited to rosterable players and a row count."""
         manager_id = manager_id or self.user_manager_id()
         rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
@@ -128,6 +134,7 @@ class DraftSession:
         return rows[:limit] if limit else rows
 
     def recommend(self, player_id: int, manager_id: str | None = None) -> BidRecommendation:
+        """The bid recommendation for an available player and a manager (default: you)."""
         manager_id = manager_id or self.user_manager_id()
         if not self.engine.is_available(player_id):
             raise DraftError(f"player {player_id} is not available")
@@ -169,6 +176,7 @@ class DraftSession:
         return round(min(self.league.min_bid + max(0.0, value - rate.replacement) * rate.dollars_per_var, rate.market_cap))
 
     def spending_guide(self, manager_id: str | None = None, player_id: int | None = None, call_ids=()) -> SpendingGuide:
+        """The spending guide for a manager (default: you), with a go / pass call for `player_id` and calls for `call_ids`."""
         manager_id = manager_id or self.user_manager_id()
         rows = self.rank(self.engine.picks_for(manager_id), self.available_ids(),
         )
@@ -178,6 +186,7 @@ class DraftSession:
         )
 
     def manager_summaries(self) -> list[ManagerSummary]:
+        """Summaries of every manager for the room view, with Sleeper drafting habits and strength estimates."""
         from ..services.sleeper_league import draft_habits, tendencies
 
         nominator = self.engine.next_nominator()
@@ -186,6 +195,7 @@ class DraftSession:
         by_sleeper = {r.sleeper_id: pid for pid, r in self.players.items() if r.sleeper_id}
 
         def tendency(m) -> dict | None:
+            """A manager's drafting habits (style, top buys) from Sleeper history, or None without any."""
             if not habits and not drafts:
                 return None
             t = dict(habits.get(m.sleeper_user_id) or {"style": "new", "top_buys": []})
@@ -219,9 +229,9 @@ class DraftSession:
             )
         return out
 
-    # ------------------------------------------------------------------ commands (delegated)
 
     def start(self, keepers: list[KeeperAssignment]) -> None:
+        """Start the draft with its keepers and record them in the keeper history."""
         self.engine.start(keepers)
         self.sync_keeper_history()
 
@@ -233,20 +243,22 @@ class DraftSession:
         ] + self.engine.keeper_records(season)
 
     def edit_pick(self, pick_number: int, manager_id: str | None = None, price: int | None = None, slot: str | None = None):
+        """Edit a pick; a keeper's change is mirrored into the keeper history."""
         pick = self.engine.edit_pick(pick_number, manager_id, price, slot)
         if pick.is_keeper:
             self.sync_keeper_history()
         return pick
 
     def remove_pick(self, pick_number: int):
+        """Remove a pick; a keeper's removal is mirrored into the keeper history."""
         pick = self.engine.remove_pick(pick_number)
         if pick.is_keeper:
             self.sync_keeper_history()
         return pick
 
-    # ------------------------------------------------------------------ export / import
 
     def to_export(self) -> DraftExport:
+        """Build the versioned export document (the on-disk league file) from the session."""
         drafted = self.engine.drafted_ids()
         players = {
             str(pid): ExportedPlayer(
@@ -276,6 +288,7 @@ class DraftSession:
         valuations: Mapping[int, PlayerValuation],
         now: Callable[[], datetime] = utcnow,
     ) -> "DraftSession":
+        """Rebuild a session from a league document; drafted players saved in the document win over missing pool entries."""
         merged_players = dict(players)
         merged_overrides = dict(overrides)
         merged_valuations = dict(valuations)

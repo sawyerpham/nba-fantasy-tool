@@ -16,16 +16,19 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
 class LeagueNotFound(KeyError):
+    """Raised when a league document doesn't exist."""
     pass
 
 
 def validate_league_id(league_id: str) -> str:
+    """Validate a league id (letters, digits, '_', '-', '.', at most 64 chars) so it is safe as a file name."""
     if not _SAFE_ID.match(league_id):
         raise ValueError("league_id may only contain letters, digits, '_', '-' and '.' (max 64 chars)")
     return league_id
 
 
 def default_managers(count: int, budget: int) -> list[Manager]:
+    """Default managers m1..m{count} with the same budget; m1 is you."""
     return [
         Manager(manager_id=f"m{i}", name=f"Manager {i}", is_user=(i == 1), budget_total=budget)
         for i in range(1, count + 1)
@@ -33,6 +36,7 @@ def default_managers(count: int, budget: int) -> list[Manager]:
 
 
 def new_document(league: LeagueSettings, managers: list[Manager] | None = None) -> DraftExport:
+    """A fresh league document: no picks, nomination order following the managers."""
     managers = managers or default_managers(league.num_managers, league.budget_per_manager)
     return DraftExport(
         generated_at=datetime.now(timezone.utc),
@@ -45,40 +49,49 @@ def new_document(league: LeagueSettings, managers: list[Manager] | None = None) 
 
 
 class LeagueRepository:
+    """Reads and writes league documents (leagues/{id}.json) through the JSON store."""
     def __init__(self, store: JsonStore) -> None:
+        """Use the given store."""
         self.store = store
 
     def list_ids(self) -> list[str]:
+        """Ids of every league on disk, sorted."""
         folder = self.store.path("leagues")
         if not folder.is_dir():
             return []
         return sorted(p.stem for p in folder.glob("*.json"))
 
     def exists(self, league_id: str) -> bool:
+        """Whether the league's document exists."""
         return self.store.exists(config.league_rel(league_id))
 
     def load(self, league_id: str) -> DraftExport:
+        """Load a league document (LeagueNotFound when missing)."""
         rel = config.league_rel(league_id)
         if not self.store.exists(rel):
             raise LeagueNotFound(league_id)
         return self.store.read_model(rel, DraftExport)
 
     def save(self, doc: DraftExport) -> None:
+        """Save a document, stamping its generation time."""
         doc.generated_at = datetime.now(timezone.utc)
         self.store.write_model(config.league_rel(doc.league.league_id), doc)
 
     def delete(self, league_id: str) -> None:
+        """Delete a league's document if it exists."""
         path = self.store.path(config.league_rel(league_id))
         if path.is_file():
             path.unlink()
 
     def export_copy(self, doc: DraftExport) -> str:
+        """Write a timestamped copy under exports/ and return its relative path."""
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         rel = f"exports/{doc.league.league_id}_{stamp}.json"
         self.store.write_model(rel, doc)
         return rel
 
     def summaries(self) -> list[dict]:
+        """One summary per league (id, name, status); a corrupt file is listed as unreadable instead of hiding the others."""
         out = []
         for league_id in self.list_ids():
             try:

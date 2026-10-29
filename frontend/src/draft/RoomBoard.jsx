@@ -4,8 +4,10 @@ import { api } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 import { Term, TERMS, priceTone } from "../core/Terms.jsx";
 
-// Page 2 of the draft: one card per manager with money, roster by spot, needs and habits.
-// Click a player for his profile; ✎ edits the pick; drag it onto another card to move it.
+/**
+ * Page 2 of the draft: one card per manager with money, roster by spot, needs and habits.
+ * Click a player for his profile, ✎ to edit the pick, or drag a pick onto another card to move it.
+ */
 export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPick, onMovePick, onSelectPlayer }) {
   const [room, setRoom] = useState(null);
   const [dragging, setDragging] = useState(null);

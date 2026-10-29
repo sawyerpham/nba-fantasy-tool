@@ -28,6 +28,7 @@ GOOD_WORTH = 10   # the sold tracker counts available players still worth at lea
 
 
 def _fair(rate, value: float, min_bid: int) -> float:
+    """A player's fair price under the market rate: min bid plus his value above replacement times dollars per point, capped at the market cap."""
     return min(min_bid + max(0.0, value - rate.replacement) * rate.dollars_per_var, float(rate.market_cap))
 
 
@@ -45,6 +46,7 @@ def sale_worths(session) -> dict[int, int]:
 
 
 def market_board(session, manager_id: str) -> dict:
+    """The position market under the spending guide: per position demand vs supply, the tier cliff and who is chasing it, the room trend, and the sold tracker."""
     lg = session.league
     pool = session.pool_values()
     rows = session.rank(session.engine.picks_for(manager_id), session.available_ids())

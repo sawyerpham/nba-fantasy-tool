@@ -31,6 +31,7 @@ def build_service(
     stats_season: str | None = None,
     delay_s: float = 0.6,
 ) -> PullService:
+    """Build a PullService over a JSON store, with fixture providers when `fixtures` is given and the live nba_api / Sleeper providers otherwise."""
     store = JsonStore(data_dir)
     if fixtures is not None:
         stats = FixtureStatsProvider(fixtures)
@@ -43,6 +44,7 @@ def build_service(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: run the data pull for the chosen sources and print its status and the reconcile summary. Returns 0 when the pull finished, 1 otherwise."""
     parser = argparse.ArgumentParser(description="Pull nba_api + Sleeper data into the JSON store")
     parser.add_argument("--data-dir", type=Path, default=config.DEFAULT_DATA_DIR)
     parser.add_argument("--roster-season", default=None, help="e.g. 2026-27 (default: from Sleeper state)")

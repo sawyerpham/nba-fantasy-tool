@@ -9,7 +9,7 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["season", "Season"],      // these are SeasonPage's views (Settings is the cogwheel at the top right)
+  ["season", "Season"],
   ["standings", "League"],
   ["news", "News"],
   ["waivers", "Waivers"],
@@ -32,6 +32,10 @@ const WALLPAPERS = [
   ["lebron-chalk", "LeBron chalk toss"],
 ];
 
+/**
+ * Root component: the header (tabs, settings cog) and the page for the open tab (Home, Settings, Draft or a Season view).
+ * Persists the tab, league, theme and wallpaper in localStorage and polls /health every 15 s.
+ */
 export default function App() {
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem("da.tab");
@@ -42,6 +46,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "");
   const [health, setHealth] = useState(null);
 
+  /** Select a league (a falsy id clears it) and remember the choice in localStorage. */
   const setLeagueId = useCallback((id) => {
     setLeagueIdState(id || "");
     if (id) localStorage.setItem("da.league", id);
@@ -62,6 +67,7 @@ export default function App() {
     localStorage.setItem("da.theme", theme);
   }, [theme]);
 
+  /** Fetch /health into state; an unreachable API is recorded as { ok: false }. */
   const refreshHealth = useCallback(() => {
     api.get("/health").then(setHealth).catch(() => setHealth({ ok: false }));
   }, []);
@@ -85,7 +91,6 @@ export default function App() {
         </nav>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         {health && !health.ok && <span className="meta"><span className="small warn-text" data-testid="health">API unreachable</span></span>}
-        {/* the league's managers, keepers, settings, data pull and wallpaper */}
         <button className={`cog ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")} data-testid="tab-settings" aria-label="Settings" title="Settings">⚙&#xFE0E;</button>
       </header>
       <main>

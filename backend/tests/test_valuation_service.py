@@ -12,6 +12,7 @@ JOKIC, WALKER = 203999, 1629022
 
 @pytest.fixture
 def store(tmp_path, fixtures_dir):
+    """A store filled by a fixture pull."""
     store = JsonStore(tmp_path)
     status = PullService(store, FixtureStatsProvider(fixtures_dir), FixturePlatformProvider(fixtures_dir)).run()
     assert status.state == "done"
@@ -19,6 +20,7 @@ def store(tmp_path, fixtures_dir):
 
 
 def test_compute_caches_by_scoring_hash_and_recomputes_on_scoring_change(store):
+    """Compute caches by scoring hash and recomputes on scoring change."""
     service = ValuationService(store, "2025-26")
     default = ScoringSettings()
     assert service.load_cached(default) is None
@@ -40,6 +42,7 @@ def test_compute_caches_by_scoring_hash_and_recomputes_on_scoring_change(store):
 
 
 def test_force_recompute_rewrites_cache(store):
+    """Force recompute rewrites cache."""
     service = ValuationService(store, "2025-26")
     default = ScoringSettings()
     service.compute(default)

@@ -1,5 +1,3 @@
-"""League settings, managers, ranking knobs, and the Sleeper platform objects."""
-
 from __future__ import annotations
 
 from datetime import date
@@ -17,11 +15,13 @@ ScoringFormat = Literal["h2h_points"]
 
 
 class RosterSlotSpec(BaseModel):
+    """How many of one roster slot a team has (PG ... UTIL, bench, IR)."""
     slot: SlotType
     count: int = Field(ge=0)
 
 
 def default_roster_slots() -> list[RosterSlotSpec]:
+    """The default roster: 5 position slots, 2 UTIL, 8 bench and 2 IR."""
     # Decision 3: 7 starters (PG SG SF PF C UTIL UTIL), 8 bench, 2 IR.
     return [
         RosterSlotSpec(slot="PG", count=1),
@@ -46,6 +46,7 @@ class KeeperEscalation(BaseModel):
     increase_per_step: int = Field(default=1, ge=0)
 
     def price(self, last_price: int) -> int:
+        """Next year's keeper price for `last_price` under this escalation rule (never below $1)."""
         if not self.enabled:
             return max(1, int(last_price))
         last = max(0, int(last_price))
@@ -53,6 +54,7 @@ class KeeperEscalation(BaseModel):
 
 
 class KeeperSettings(BaseModel):
+    """Keeper rules: whether keepers are on, how many per manager, the deadline and the price escalation."""
     enabled: bool = True
     max_per_manager: int = 1
     deadline: date | None = None
@@ -60,6 +62,7 @@ class KeeperSettings(BaseModel):
 
 
 def default_injury_multipliers() -> dict[str, float]:
+    """Default ranking multiplier per injury status (how much of a season an injured player is expected to give)."""
     return {
         "healthy": 1.0,
         "day_to_day": 0.95,
@@ -70,6 +73,7 @@ def default_injury_multipliers() -> dict[str, float]:
 
 
 def default_sleeper_injury_map() -> dict[str, InjuryStatus]:
+    """Default mapping from Sleeper's injury tags to this app's injury statuses."""
     # Decision 9: Sleeper carries no duration, "Out" seeds as short term.
     return {"DTD": "day_to_day", "Out": "out_short_term", "IR": "out_long_term"}
 
@@ -111,11 +115,13 @@ class RankingSettings(BaseModel):
 
 
 class ManagerBehavior(BaseModel):
+    """How a manager is expected to bid: spend pace and aggression."""
     spend_pace: Literal["early", "even", "late"] = "even"
     aggression: float = 1.0
 
 
 class Manager(BaseModel):
+    """A fantasy manager: id, name, whether it is you, budget, bidding behaviour and Sleeper ids."""
     manager_id: str
     name: str
     is_user: bool = False
@@ -126,6 +132,7 @@ class Manager(BaseModel):
 
 
 class LeagueSettings(BaseModel):
+    """A league's editable settings: roster slots, scoring, keepers, ranking knobs, budget and nomination rules, plus the in-season time zone and waiver schedule. Validated on assignment."""
     league_id: str
     name: str
     platform: Literal["sleeper"] = "sleeper"
@@ -154,6 +161,7 @@ class LeagueSettings(BaseModel):
     @field_validator("timezone")
     @classmethod
     def _known_zone(cls, v: str) -> str:
+        """Validate an IANA time zone name."""
         from zoneinfo import ZoneInfo
 
         try:
@@ -165,6 +173,7 @@ class LeagueSettings(BaseModel):
     @field_validator("waiver_days")
     @classmethod
     def _waiver_days(cls, v: list[int]) -> list[int]:
+        """Validate the waiver days (0 = Mon to 6 = Sun) and return them sorted and unique."""
         if not v or any(d not in range(7) for d in v):
             raise ValueError("waiver_days: pick at least one day, 0 (Mon) to 6 (Sun)")
         return sorted(set(v))
@@ -172,12 +181,14 @@ class LeagueSettings(BaseModel):
     @field_validator("waiver_hour")
     @classmethod
     def _waiver_hour(cls, v: int) -> int:
+        """Validate the waiver hour (0 to 23)."""
         if v not in range(24):
             raise ValueError("waiver_hour must be 0 to 23")
         return v
 
     @model_validator(mode="after")
     def _check_budget(self) -> "LeagueSettings":
+        """Cross-field check: min_bid is at least $1 and the budget can fill every mandatory slot at min_bid."""
         if self.min_bid < 1:
             raise ValueError("min_bid must be at least 1")
         if self.budget_per_manager < self.min_bid * self.mandatory_slot_count():
@@ -189,6 +200,7 @@ class LeagueSettings(BaseModel):
         return sum(s.count for s in self.roster_slots if s.slot != "IR")
 
     def total_slot_count(self) -> int:
+        """All roster slots, IR included."""
         return sum(s.count for s in self.roster_slots)
 
 

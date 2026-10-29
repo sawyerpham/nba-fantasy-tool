@@ -26,12 +26,14 @@ class DraftError(ValueError):
 
 @dataclass(frozen=True)
 class KeeperAssignment:
+    """A keeper to place when the draft starts: manager, player and cost."""
     manager_id: str
     player_id: int
     cost: int
 
 
 class DraftEngine:
+    """The auction draft state machine over one league's draft: lookups, nomination order, commands (start, nominate, pick, undo, edit, remove, complete, reset) and their validation."""
     def __init__(
         self,
         league: LeagueSettings,
@@ -41,6 +43,7 @@ class DraftEngine:
         overrides: Mapping[int, PlayerOverrides],
         now: Callable[[], datetime] = utcnow,
     ) -> None:
+        """Bind the engine to the league, managers, draft state, player pool and overrides; `now` is injectable for tests."""
         self.league = league
         self.managers = managers
         self.draft = draft
@@ -50,47 +53,58 @@ class DraftEngine:
         if len({m.manager_id for m in managers}) != len(managers):
             raise DraftError("manager ids must be unique")
 
-    # ------------------------------------------------------------------ lookups
 
     def manager(self, manager_id: str) -> Manager:
+        """A manager by id (DraftError when unknown)."""
         for m in self.managers:
             if m.manager_id == manager_id:
                 return m
         raise DraftError(f"unknown manager {manager_id}")
 
     def user_manager(self) -> Manager | None:
+        """The manager marked as you, if any."""
         return next((m for m in self.managers if m.is_user), None)
 
     def picks_for(self, manager_id: str) -> list[Pick]:
+        """A manager's picks, in order."""
         return [p for p in self.draft.picks if p.manager_id == manager_id]
 
     def drafted_ids(self) -> set[int]:
+        """Ids of every drafted player."""
         return {p.player_id for p in self.draft.picks}
 
     def is_available(self, player_id: int) -> bool:
+        """Whether the player is in the pool and not yet drafted."""
         return player_id in self.players and player_id not in self.drafted_ids()
 
     def eligibility(self, player_id: int) -> list[str]:
+        """A player's eligible positions from his overrides."""
         override = self.overrides.get(player_id)
         return list(override.eligibility) if override else []
 
     def budget(self, manager_id: str) -> ManagerBudget:
+        """A manager's budget position."""
         return manager_budget(self.league, self.manager(manager_id), self.draft.picks)
 
     def open_slots(self, manager_id: str) -> dict[str, int]:
+        """A manager's open roster slots by type."""
         return roster.open_slots(self.league, self.picks_for(manager_id))
 
     def can_draft(self, manager_id: str) -> bool:
+        """Whether a manager can still draft (an open mandatory slot and enough money for the minimum bid)."""
         b = self.budget(manager_id)
         return b.open_mandatory > 0 and b.max_bid >= self.league.min_bid
 
     def stack(self, manager_id: str) -> dict[str, int]:
+        """A manager's count of players per NBA team."""
         return dict(roster.team_stack(self.players, self.picks_for(manager_id)))
 
     def non_keeper_picks(self) -> list[Pick]:
+        """Every pick that isn't a keeper."""
         return [p for p in self.draft.picks if not p.is_keeper]
 
     def total_draftable_slots(self) -> int:
+        """The number of mandatory slots across the whole league."""
         return self.league.mandatory_slot_count() * len(self.managers)
 
     def progress(self) -> float:
@@ -101,7 +115,6 @@ class DraftEngine:
             return 1.0
         return min(1.0, len(self.non_keeper_picks()) / remaining_total)
 
-    # ------------------------------------------------------------------ nomination order
 
     def set_nomination_order(self, order: list[str], keep_next: bool = True) -> None:
         """Replace the rotation. While live, the manager whose turn it is stays next (keep_next)."""
@@ -129,6 +142,7 @@ class DraftEngine:
         raise DraftError(f"{manager_id} is not in the nomination order")
 
     def _nominator_at(self, index: int) -> str:
+        """The manager who nominates at a position in the rotation (reversed on odd rounds of a snake order)."""
         order = self.draft.nomination_order
         n = len(order)
         rnd, pos = divmod(index, n)
@@ -149,9 +163,9 @@ class DraftEngine:
                 return candidate
         return None
 
-    # ------------------------------------------------------------------ commands
 
     def start(self, keepers: Iterable[KeeperAssignment] = ()) -> list[Pick]:
+        """Start the draft: place the keepers as picks and go live. DraftError when it isn't in setup."""
         if self.draft.status != "setup":
             raise DraftError(f"draft already {self.draft.status}")
         if not self.draft.nomination_order:
@@ -182,6 +196,7 @@ class DraftEngine:
         return list(self.draft.picks)
 
     def nominate(self, player_id: int, manager_id: str | None = None, force: bool = False) -> CurrentNomination:
+        """Put a player on the block for the next nominator (or a manager with `force`)."""
         self._require_live()
         if not self.is_available(player_id):
             raise DraftError(f"player {player_id} is not available")
@@ -196,6 +211,7 @@ class DraftEngine:
         return self.draft.current_nomination
 
     def pick(self, player_id: int, manager_id: str, price: int, slot: str | None = None) -> Pick:
+        """Record a pick: validates the manager, price and slot, closes the nomination and advances the nominator."""
         self._require_live()
         current = self.draft.current_nomination
         nominated_by = current.nominated_by if current and current.player_id == player_id else self.next_nominator()
@@ -205,6 +221,7 @@ class DraftEngine:
         return pick
 
     def undo(self) -> Pick:
+        """Undo the last pick (keepers included) and put its player back."""
         self._require_live()
         if not self.draft.picks:
             raise DraftError("nothing to undo")
@@ -217,6 +234,7 @@ class DraftEngine:
         return last
 
     def reassign_slot(self, pick_number: int, slot: str) -> Pick:
+        """Move a pick to another slot."""
         return self.edit_pick(pick_number, slot=slot)
 
     def edit_pick(
@@ -264,17 +282,20 @@ class DraftEngine:
         return pick
 
     def _pick(self, pick_number: int) -> Pick:
+        """A pick by number (DraftError when missing)."""
         pick = next((p for p in self.draft.picks if p.pick_number == pick_number), None)
         if pick is None:
             raise DraftError(f"no pick #{pick_number}")
         return pick
 
     def complete(self) -> None:
+        """Mark the draft complete and close any nomination."""
         self._require_live()
         self.draft.current_nomination = None
         self.draft.status = "complete"
 
     def reset(self) -> None:
+        """Clear every pick and return the draft to setup."""
         self.draft.picks = []
         self.draft.nomination_pointer = 0
         self.draft.current_nomination = None
@@ -291,15 +312,16 @@ class DraftEngine:
                                         cost=KeeperCost(type="auction", amount=p.price)))
         return out
 
-    # ------------------------------------------------------------------ internals
 
     def _require_live(self) -> None:
+        """DraftError unless the draft is live."""
         if self.draft.status != "live":
             raise DraftError(f"draft is {self.draft.status}, not live")
 
     def _record_pick(
         self, player_id: int, manager_id: str, price: int, slot: str | None, is_keeper: bool, nominated_by: str | None
     ) -> Pick:
+        """Validate and record a pick (or keeper): the player must exist and be available, the price within the manager's max bid, and a slot must be free."""
         manager = self.manager(manager_id)
         if player_id not in self.players:
             raise DraftError(f"unknown player {player_id}")

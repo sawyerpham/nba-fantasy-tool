@@ -30,9 +30,6 @@ PLAYERS_CACHE_MAX_AGE = timedelta(hours=24)
 ROSTERED_STATUSES = {"ACT", "TWO-WAY", "SUS", "NWT"}
 
 
-# ----------------------------------------------------------------------------- entry predicates
-
-
 def is_placeholder(entry: dict[str, Any]) -> bool:
     """DEF team-defense rows, DUP rows and 'duplicate player' stubs carry no real player."""
     if entry.get("position") == "DEF" or entry.get("status") == "DUP":
@@ -45,13 +42,12 @@ def is_placeholder(entry: dict[str, Any]) -> bool:
 
 
 def is_rostered(entry: dict[str, Any]) -> bool:
+    """Whether a Sleeper entry is an active player on a team (and not a placeholder)."""
     return bool(entry.get("active")) and bool(entry.get("team")) and not is_placeholder(entry)
 
 
-# ----------------------------------------------------------------------------- normalizers
-
-
 def _ms_epoch_to_datetime(value: Any) -> datetime | None:
+    """A Sleeper millisecond epoch as a UTC datetime; None for empty or unparseable values."""
     if value in (None, "", 0):
         return None
     try:
@@ -61,6 +57,7 @@ def _ms_epoch_to_datetime(value: Any) -> datetime | None:
 
 
 def _iso_date(value: Any) -> date | None:
+    """The date part of an ISO string; None for empty or unparseable values."""
     if not value:
         return None
     try:
@@ -70,6 +67,7 @@ def _iso_date(value: Any) -> date | None:
 
 
 def _positions(values: Any) -> list[str]:
+    """Keep only the real positions (PG SG SF PF C) from a list or comma-separated string."""
     if not values:
         return []
     if isinstance(values, str):
@@ -78,6 +76,7 @@ def _positions(values: Any) -> list[str]:
 
 
 def bio_from_sleeper_entry(entry: dict[str, Any], fetched_at: datetime | None = None) -> PlayerBio:
+    """Normalise a /players/nba entry into a PlayerBio (names, team, status, size, birthdate, age, experience)."""
     first = entry.get("first_name") or ""
     last = entry.get("last_name") or ""
     full = entry.get("full_name") or f"{first} {last}".strip()
@@ -104,6 +103,7 @@ def bio_from_sleeper_entry(entry: dict[str, Any], fetched_at: datetime | None = 
 
 
 def fantasy_attributes_from_entry(entry: dict[str, Any]) -> FantasyAttributes:
+    """Normalise a /players/nba entry into FantasyAttributes: positions, injury fields, search rank, news / team-change times, depth chart and jersey number."""
     metadata = entry.get("metadata") or {}
     alt = _positions(metadata.get("fantasy_positions")) if isinstance(metadata, dict) else []
     return FantasyAttributes(
@@ -125,6 +125,7 @@ def fantasy_attributes_from_entry(entry: dict[str, Any]) -> FantasyAttributes:
 
 
 def platform_state_from_json(data: dict[str, Any]) -> PlatformState:
+    """Normalise Sleeper's /state/nba response into a PlatformState."""
     return PlatformState(
         season=str(data["season"]),
         season_type=str(data.get("season_type") or ""),
@@ -136,6 +137,7 @@ def platform_state_from_json(data: dict[str, Any]) -> PlatformState:
 
 
 def platform_league_from_json(data: dict[str, Any]) -> PlatformLeague:
+    """Normalise a Sleeper league document into a PlatformLeague."""
     scoring = {k: float(v) for k, v in (data.get("scoring_settings") or {}).items() if v is not None}
     return PlatformLeague(
         league_id=str(data["league_id"]),
@@ -158,10 +160,8 @@ def sleeper_season_to_roster_season(season: str) -> str:
     return f"{year}-{str(year + 1)[2:]}"
 
 
-# ----------------------------------------------------------------------------- live provider
-
-
 class SleeperProvider:
+    """Live Sleeper provider. The big /players/nba payload is read through a disk cache that is never refreshed inside 24 hours unless forced; everything else is small read-only endpoints."""
     source = "sleeper"
 
     def __init__(
@@ -173,6 +173,7 @@ class SleeperProvider:
         cache_max_age: timedelta = PLAYERS_CACHE_MAX_AGE,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
+        """Create the provider (no network calls). `store` holds the caches; `session`, `base_url`, `cache_max_age` and `now` are injectable for tests."""
         self.store = store
         self.runner = runner or CallRunner()
         self.session = session or requests.Session()
@@ -182,12 +183,13 @@ class SleeperProvider:
         self._payload: dict[str, Any] | None = None
         self._payload_pulled_at: datetime | None = None
 
-    # ---- HTTP -----------------------------------------------------------------------------
 
     def _get_json(self, path: str, label: str) -> Any:
+        """GET a Sleeper path (or absolute URL) with retries; None on 404."""
         url = path if path.startswith("http") else f"{self.base_url}/{path.lstrip('/')}"
 
         def do() -> Any:
+            """One GET attempt: None on 404, raises on other errors."""
             resp = self.session.get(url, timeout=self.runner.policy.timeout_s)
             if resp.status_code == 404:
                 return None
@@ -196,7 +198,6 @@ class SleeperProvider:
 
         return self.runner.call(label, do)
 
-    # ---- players payload with the 24 h cache guard -----------------------------------------
 
     def load_players_payload(self, force: bool = False) -> tuple[dict[str, Any], bool, datetime | None]:
         """Returns (payload, served_from_cache, pulled_at)."""
@@ -225,6 +226,7 @@ class SleeperProvider:
         return payload, False, pulled_at
 
     def _read_cache(self) -> tuple[dict[str, Any], datetime] | None:
+        """The cached players payload and when it was pulled (memory first, then disk); None when missing or unreadable."""
         if self._payload is not None and self._payload_pulled_at is not None:
             return self._payload, self._payload_pulled_at
         if not self.store.exists(PLAYERS_CACHE_REL):
@@ -240,12 +242,12 @@ class SleeperProvider:
             return None
 
     def cache_age(self) -> timedelta | None:
+        """How old the players cache is, or None when there is none."""
         cached = self._read_cache()
         if cached is None:
             return None
         return self._now() - cached[1]
 
-    # ---- protocol methods ------------------------------------------------------------------
 
     def fetch_player_pool(
         self,
@@ -254,6 +256,7 @@ class SleeperProvider:
         include_unrostered: bool = False,
         force: bool = False,
     ) -> tuple[list[PlayerBio], FetchReport]:
+        """The Sleeper player pool as PlayerBios (rostered players only unless `include_unrostered`), read through the 24 h cache guard."""
         started = utcnow()
         calls_before = self.runner.calls
         emit(on_progress, 0, 1, "Sleeper /players/nba")
@@ -271,6 +274,7 @@ class SleeperProvider:
         return bios, report
 
     def fetch_fantasy_attributes(self, force: bool = False) -> tuple[dict[str, FantasyAttributes], FetchReport]:
+        """Fantasy attributes (positions, injuries, ranks) for every non-placeholder player, from the cached payload."""
         started = utcnow()
         calls_before = self.runner.calls
         payload, from_cache, _ = self.load_players_payload(force=force)
@@ -286,6 +290,7 @@ class SleeperProvider:
         return attrs, report
 
     def fetch_platform_state(self) -> PlatformState:
+        """Fetch Sleeper's NBA state (season, week) and cache it on disk."""
         data = self._get_json("state/nba", "Sleeper GET /state/nba")
         if not isinstance(data, dict):
             raise ValueError("Sleeper /state/nba returned no object")
@@ -322,6 +327,7 @@ class SleeperProvider:
         return out
 
     def fetch_league(self, sleeper_league_id: str) -> PlatformLeague | None:
+        """Fetch a league document, cache it on disk, and normalise it; None when the league doesn't exist."""
         data = self._get_json(f"league/{sleeper_league_id}", f"Sleeper GET /league/{sleeper_league_id}")
         if not data:
             return None
@@ -330,6 +336,7 @@ class SleeperProvider:
         return league
 
     def search_players(self, query: str, limit: int = 20) -> list[PlayerRef]:
+        """Search the cached Sleeper pool by name (negative ids; empty when nothing is cached)."""
         cached = self._read_cache()
         if cached is None:
             return []

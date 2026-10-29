@@ -35,6 +35,7 @@ PRESSURE_SCALE = 0.15
 
 @dataclass
 class Competitor:
+    """A rival who could bid on the player: his max bid and how much his behaviour weighs."""
     manager_id: str
     name: str
     max_bid: int
@@ -43,6 +44,7 @@ class Competitor:
 
 @dataclass
 class BidRecommendation:
+    """The bid recommendation for one player: whether you can bid, his Worth (fair value), the recommended max, walk-away, the competition and a reason."""
     player_id: int
     can_bid: bool
     fair_value: float
@@ -61,6 +63,7 @@ class BidRecommendation:
 
 
 def competitor_weight(behavior: ManagerBehavior, progress: float) -> float:
+    """How hard a manager bids at this point of the draft: spend pace (early / even / late) against how far along the draft is."""
     early = progress < EARLY_PHASE_END
     if behavior.spend_pace == "early":
         base = 1.3 if early else 0.8
@@ -72,6 +75,7 @@ def competitor_weight(behavior: ManagerBehavior, progress: float) -> float:
 
 
 def replacement_value(pool_values: Iterable[float], rosterable_n: int) -> float:
+    """Value of the n-th best player in the pool (the replacement level); the last when the pool is shorter, 0 when empty."""
     ordered = sorted(pool_values, reverse=True)
     if not ordered or rosterable_n <= 0:
         return 0.0
@@ -101,6 +105,7 @@ def market_rate(
     available_values: Iterable[float],
     pool_values: Mapping[int, float],
 ) -> MarketRate:
+    """The auction's market rate: dollars per point of value above replacement, from everyone's discretionary money and the available players, plus each manager's budget."""
     min_bid = league.min_bid
     budgets = {m.manager_id: manager_budget(league, m, picks) for m in managers}
     mandatory = league.mandatory_slot_count()
@@ -133,6 +138,7 @@ def recommend_bid(
     progress: float,
     rate: MarketRate | None = None,
 ) -> BidRecommendation:
+    """Recommend a bid for `target`: fair value from the market rate, pushed up by how many rivals can pay and fit him (weighted by their behaviour), and capped by the largest legal bid in the room."""
     min_bid = league.min_bid
     if rate is None:
         rate = market_rate(league, managers, picks, (p.value for p in available), pool_values)

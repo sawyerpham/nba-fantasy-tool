@@ -1,4 +1,3 @@
-"""Live draft: state, nomination, picks, undo, rankings, bid recommendation, spending guide."""
 
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ router = APIRouter(prefix="/leagues/{league_id}", tags=["draft"])
 
 
 def _draft_view(session) -> dict:
+    """The draft as the UI sees it: status, nomination order and pointer, next nominator, current nomination, picks, progress and manager summaries."""
     engine = session.engine
     return {
         "status": session.draft.status,
@@ -31,10 +31,12 @@ def _draft_view(session) -> dict:
 
 @router.get("/draft")
 def get_draft(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """The current draft view."""
     return _draft_view(_session(state, league_id))
 
 
 def _mutate(state: AppState, league_id: str, action) -> dict:
+    """Run a draft action on the league's session (draft errors become 400), save the session and return the new view."""
     session = _session(state, league_id)
     try:
         action(session)
@@ -72,27 +74,32 @@ def sync_from_sleeper(league_id: str, state: AppState = Depends(get_state)) -> d
 
 @router.post("/draft/start")
 def start_draft(league_id: str, body: StartDraft, state: AppState = Depends(get_state)) -> dict:
+    """Start the draft with its keepers."""
     keepers = [KeeperAssignment(k.manager_id, k.player_id, k.cost) for k in body.keepers]
     return _mutate(state, league_id, lambda s: s.start(keepers))
 
 
 @router.post("/draft/nominate")
 def nominate(league_id: str, body: NominateIn, state: AppState = Depends(get_state)) -> dict:
+    """Nominate a player (for the next nominator, or a given manager)."""
     return _mutate(state, league_id, lambda s: s.engine.nominate(body.player_id, body.manager_id, body.force))
 
 
 @router.post("/draft/pick")
 def pick(league_id: str, body: PickIn, state: AppState = Depends(get_state)) -> dict:
+    """Record a pick: player, winning manager and price (slot assigned automatically when omitted)."""
     return _mutate(state, league_id, lambda s: s.engine.pick(body.player_id, body.manager_id, body.price, body.slot))
 
 
 @router.post("/draft/undo")
 def undo(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Undo the last pick."""
     return _mutate(state, league_id, lambda s: s.engine.undo())
 
 
 @router.post("/draft/reassign")
 def reassign(league_id: str, body: ReassignIn, state: AppState = Depends(get_state)) -> dict:
+    """Move a recorded pick to another roster slot."""
     return _mutate(state, league_id, lambda s: s.engine.reassign_slot(body.pick_number, body.slot))
 
 
@@ -110,21 +117,25 @@ def remove_pick(league_id: str, pick_number: int, state: AppState = Depends(get_
 
 @router.post("/draft/complete")
 def complete(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Mark the draft complete."""
     return _mutate(state, league_id, lambda s: s.engine.complete())
 
 
 @router.post("/draft/reset")
 def reset(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Reset the draft to setup."""
     return _mutate(state, league_id, lambda s: s.engine.reset())
 
 
 @router.put("/draft/nomination-order")
 def set_nomination_order(league_id: str, body: NominationOrderIn, state: AppState = Depends(get_state)) -> dict:
+    """Set the nomination order."""
     return _mutate(state, league_id, lambda s: s.engine.set_nomination_order(body.order))
 
 
 @router.put("/draft/next-nominator")
 def set_next_nominator(league_id: str, body: NextNominatorIn, state: AppState = Depends(get_state)) -> dict:
+    """Make a manager the next nominator."""
     return _mutate(state, league_id, lambda s: s.engine.set_next_nominator(body.manager_id))
 
 
@@ -136,6 +147,7 @@ def rankings(
     include_unrosterable: bool = Query(False),
     state: AppState = Depends(get_state),
 ) -> list[dict]:
+    """The player rankings for a manager (default: you) with tier, Worth, Max, call, Fit, positional ranks and the reason FP/G moved. Worth, Max and the call match the spending guide; before the draft only Worth is filled in."""
     session = _session(state, league_id)
     try:
         if include_unrosterable:
@@ -207,6 +219,7 @@ def spending(
     player_id: int | None = Query(None, description="player to give a go/pass call on (the one on the block or selected)"),
     state: AppState = Depends(get_state),
 ) -> dict:
+    """The spending guide: your money against the room, the plan for your open spots and, for `player_id`, a go / pass call."""
     session = _session(state, league_id)
     try:
         guide = session.spending_guide(manager_id, player_id)
@@ -217,6 +230,7 @@ def spending(
 
 @router.get("/recommend/{player_id}")
 def recommend(league_id: str, player_id: int, manager_id: str | None = Query(None), state: AppState = Depends(get_state)) -> dict:
+    """The bid recommendation for a player (Worth, Max, walk-away and why) for a manager (default: you)."""
     session = _session(state, league_id)
     try:
         rec = session.recommend(player_id, manager_id)

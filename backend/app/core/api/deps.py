@@ -7,6 +7,7 @@ from ..services.league_repository import LeagueNotFound
 
 
 def get_state(request: Request) -> AppState:
+    """FastAPI dependency: the application state (raises if it hasn't been initialised)."""
     state = getattr(request.app.state, "app_state", None)
     if state is None:
         raise RuntimeError("AppState not initialised")
@@ -14,6 +15,7 @@ def get_state(request: Request) -> AppState:
 
 
 def _session(state: AppState, league_id: str):
+    """The draft session for a league; an unknown league becomes a 404."""
     try:
         return state.get_session(league_id)
     except LeagueNotFound as exc:

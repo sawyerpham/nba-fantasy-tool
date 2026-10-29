@@ -18,15 +18,20 @@ const FEATURES = {
   },
 };
 const APPLY = ["name", "scoring", "roster_slots", "num_managers", "keepers"];
-// a Sleeper league id, alone or inside a pasted link (sleeper.com/leagues/1234567890123456789/...)
+/** Pull a Sleeper league id (a run of 12+ digits) out of pasted text, alone or inside a league link. Returns null when there is none. */
 const sleeperId = (text) => (String(text).match(/\d{12,}/) || [])[0] || null;
 
+/** Landing page: import a Sleeper league by id or link, then jump into the app. Also lists what the Draft and Season Advisor tabs offer. */
 export default function HomePage({ setLeagueId, setTab }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(null);   // { id, name } once imported
 
+  /**
+   * Create (or refresh) the league from the pasted Sleeper id, apply its name, scoring, roster slots and keepers, and sync managers.
+   * A league imported before is refreshed without touching its manager count.
+   */
   const importLeague = async () => {
     const sid = sleeperId(input);
     if (!sid) return setError("Paste your Sleeper league ID or its link (the long number in sleeper.com/leagues/…).");

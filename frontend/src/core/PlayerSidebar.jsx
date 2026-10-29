@@ -7,10 +7,12 @@ import TeamLink from "./TeamLink.jsx";
 import { ordinal } from "../draft/SpendingGuide.jsx";
 import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile.jsx";
 
-// season: the in-season profile (Season tab), like Sleeper's: four tabs under his name. Summary (his live / last game,
-// season averages, ranks, ownership, owner, status, news), Game log (every game this season), Team (his team card and
-// depth chart) and History (draft, keeper, moves). No draft parts (Fit, Worth, bid guide, keeper outlook, tier).
 const TABS = [["summary", "Summary"], ["log", "Game Log"], ["team", "Team"], ["history", "History"]];
+/**
+ * A player's profile card beside the rankings (Draft) or the lineup (Season).
+ * Draft: Fit for your team, Worth, Max, bid guide, keeper outlook, tier, and editable overrides (eligibility, injury, notes). With `live`, the recommendation and spending call for him.
+ * Season (`season`): the in-season profile like Sleeper's, four tabs under his name: Summary, Game log, Team (his team card and depth chart) and History; no draft parts.
+ */
 export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose, onOpenGame }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
@@ -21,12 +23,12 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const [sea, setSea] = useState(null);
   const [tab, setTab] = useState("summary");   // season profile tab; stays put from player to player
 
-  // All four requests are fetched together and applied in one update, so the card never rebuilds piece by piece;
-  // the previous player stays on screen until the new one is ready, and late answers for an older click are dropped.
   const latest = useRef(0);
+  /** Load the player's data. All requests are fetched together and applied in one update, so the card never rebuilds piece by piece; the previous player stays on screen until the new one is ready, and late answers for an older click are dropped. */
   const load = useCallback(() => {
     if (!playerId) return;
     const ticket = ++latest.current;
+    /** Make an optional request resolve to null instead of rejecting. */
     const opt = (p) => p.catch(() => null);   // drafted players have no fit / bid guide
     Promise.all([
       api.get(`/players/${playerId}` + qs({ league_id: leagueId })),
@@ -53,6 +55,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const val = data.valuation;
   const fantasy = rec_.fantasy;
 
+  /** Save an override (eligibility, injury, notes) for the shown player, then reload him and tell the parent. */
   const patch = async (body) => {
     setError("");
     try {
@@ -102,7 +105,6 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     </>
   );
 
-  // his NBA team: logo, his rank on the team, the team's fantasy-talent rank; the depth chart (season) or teammates
   const teamCard = data.team && (
     <div className="team-card" data-testid="team-card">
       <TeamHead t={data.team} />
@@ -275,8 +277,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   );
 }
 
-// An NBA team's card head: logo, name (opens its Team card), conference, the player's rank on it (a player's
-// profile only) and the team's projected-fantasy-talent rank. Shared by the profile's Team tab and the Team card.
+/** An NBA team's card head: logo, name (opens its Team card), conference, the player's rank on it (a player's profile only) and the team's projected-fantasy-talent rank. Shared by the profile's Team tab and the Team card. */
 export function TeamHead({ t }) {
   return (
     <div className="team-card-head">
@@ -294,14 +295,14 @@ export function TeamHead({ t }) {
   );
 }
 
-// His NBA team's ranks among the league's teams, per game (backend team_ranks): Offense and Defense side by side, each
-// headed by its overall rank (points scored / allowed), then each stat's rank (defense: what it allows). 1 = best;
-// coloured on a dark green -> yellow -> dark red scale.
 const RANK_STATS = [["reb", "Rebounds"], ["ast", "Assists"], ["blk", "Blocks"], ["stl", "Steals"],
   ["tpm", "3-pointers"], ["fga", "FG attempts"], ["to", "Turnovers"]];
+/** His NBA team's ranks among the league's teams per game (backend team_ranks): Offense and Defense side by side, each headed by its overall rank (points scored / allowed), then each stat's rank (defense: what it allows). 1 = best, coloured on a dark green to dark red scale. */
 export function TeamRanks({ r }) {
   // 7 steps best to worst: dark green, green, light green, yellow, light red, red, dark red (--rank-0 .. --rank-6)
+  /** Colour step (0 best to 6 worst) for a rank among `r.teams` teams. */
   const step = (rank) => Math.min(6, Math.floor(((rank - 1) / r.teams) * 7));
+  /** A rank as its ordinal, coloured by its step. */
   const rank = (x) => <strong style={{ color: `var(--rank-${step(x.rank)})` }}>{ordinal(x.rank)}</strong>;
   return (
     <div className="team-ranks" data-testid="team-ranks">
@@ -319,8 +320,7 @@ export function TeamRanks({ r }) {
   );
 }
 
-// His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top; names coloured by
-// injury (backend depth_grid: health "q" yellow, "out" red; the tag and body part on hover). Also the season game card's.
+/** His NBA team's depth chart (Sleeper): PG to C down the side, 1st / 2nd / 3rd option across the top, names coloured by injury (backend depth_grid: health "q" yellow, "out" red; the tag and body part on hover). Also the season game card's. */
 export function DepthGrid({ grid, onSelectPlayer }) {
   return (
     <table className="depth-grid small" data-testid="depth-grid">
@@ -331,7 +331,6 @@ export function DepthGrid({ grid, onSelectPlayer }) {
             const m = grid[pos]?.[i];
             return <td key={i} className={m ? `dg-cell ${m.is_self ? "self" : "clickable"}` : "muted"} onClick={() => m && !m.is_self && onSelectPlayer?.(m.player_id)}
               data-tip={m ? [m.injury && `${m.injury}${m.injury_body ? ` (${m.injury_body})` : ""}`, `${m.fpg} FP/G`, m.drafted_by && `drafted by ${m.drafted_by}`].filter(Boolean).join(" · ") : ""}>
-              {/* the name coloured by his injury tag right now: yellow questionable / day-to-day, red out */}
               {m ? <><Headshot sleeperId={m.sleeper_id} name={m.name} size={22} /> <span className={`dg-name ${m.health ? `health-${m.health}` : ""}`}>{m.name.split(" ")[0][0]}. {m.name.split(" ").slice(1).join(" ")}</span></> : "—"}
             </td>;
           })}

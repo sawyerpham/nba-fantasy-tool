@@ -1,4 +1,3 @@
-"""Lock-In schedule factor and position scarcity."""
 
 from nba_fantasy_shared.models.league import LeagueSettings, RosterSlotSpec
 from nba_fantasy_shared.providers.nba_api_provider import games_per_week
@@ -8,6 +7,7 @@ from app.core.services.sleeper_league import fantasy_weeks
 
 
 def test_games_per_week_counts_regular_season_games_with_known_teams():
+    """Games per week counts regular season games with known teams."""
     game = lambda gid, week, home, away: {"gameId": gid, "weekNumber": week, "homeTeam": {"teamTricode": home}, "awayTeam": {"teamTricode": away}}
     sched = {"leagueSchedule": {"gameDates": [{"games": [
         game("0012600001", 0, "NYK", "BOS"),     # preseason
@@ -19,6 +19,7 @@ def test_games_per_week_counts_regular_season_games_with_known_teams():
 
 
 def test_more_games_and_playoff_weeks_lift_the_schedule_factor():
+    """More games and playoff weeks lift the schedule factor."""
     games = {"A": {"1": 4, "2": 4}, "B": {"1": 2, "2": 2}, "C": {"1": 3, "2": 3, "3": 0}}
     f = schedule_factors(games, weeks=[1, 2, 3])
     assert f["A"] > f["C"] > f["B"]
@@ -29,6 +30,7 @@ def test_more_games_and_playoff_weeks_lift_the_schedule_factor():
 
 
 def test_fantasy_weeks_follow_the_sleeper_playoff_settings():
+    """Fantasy weeks follow the sleeper playoff settings."""
     games = {"A": {str(w): 3 for w in range(1, 26)}}
     details = {"seasons": [{"league": {"settings": {"start_week": 1, "playoff_week_start": 19, "playoff_teams": 6}}}]}
     weeks, playoffs = fantasy_weeks(details, games)
@@ -37,6 +39,7 @@ def test_fantasy_weeks_follow_the_sleeper_playoff_settings():
 
 
 def test_scarce_position_gets_a_bonus_and_deep_position_a_penalty():
+    """Scarce position gets a bonus and deep position a penalty."""
     league = LeagueSettings(league_id="t", name="t", num_managers=1,
                             roster_slots=[RosterSlotSpec(slot="PG", count=1), RosterSlotSpec(slot="C", count=1), RosterSlotSpec(slot="BN", count=1)])
     # One starter per position; the best PG left over (9) is far better than the best C left over (2).

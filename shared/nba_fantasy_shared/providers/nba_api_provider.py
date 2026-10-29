@@ -30,18 +30,18 @@ log = logging.getLogger(__name__)
 REGULAR_SEASON = "Regular Season"
 
 
-# ----------------------------------------------------------------------------- seasons
-
-
 def season_start_year(season: str) -> int:
+    """The starting year of a season label ("2025-26" -> 2025)."""
     return int(season[:4])
 
 
 def season_label(start_year: int) -> str:
+    """The season label for a starting year (2025 -> "2025-26")."""
     return f"{start_year}-{str(start_year + 1)[2:]}"
 
 
 def previous_season(season: str) -> str:
+    """The season label before `season`."""
     return season_label(season_start_year(season) - 1)
 
 
@@ -50,8 +50,6 @@ def season_from_season_id(season_id: str) -> str:
     text = str(season_id)
     return season_label(int(text[-4:]))
 
-
-# ----------------------------------------------------------------------------- field parsers
 
 _HEIGHT_FT_IN = re.compile(r"^\s*(\d+)\s*-\s*(\d+)\s*$")
 
@@ -88,12 +86,10 @@ def parse_game_date(value: str) -> date:
 
 
 def parse_iso_datetime_date(value: Any) -> date | None:
+    """The date part of an ISO datetime string; None when empty."""
     if not value:
         return None
     return date.fromisoformat(str(value)[:10])
-
-
-# ----------------------------------------------------------------------------- row normalizers
 
 
 def game_line_from_row(row: dict[str, Any]) -> GameLine:
@@ -141,10 +137,12 @@ def game_line_from_row(row: dict[str, Any]) -> GameLine:
 
 
 def sort_game_lines(lines: Iterable[GameLine]) -> list[GameLine]:
+    """Game lines in date order (game id breaks ties)."""
     return sorted(lines, key=lambda g: (g.game_date, g.game_id))
 
 
 def bio_from_playerindex_row(row: dict[str, Any], fetched_at: datetime | None = None) -> PlayerBio:
+    """Normalise a PlayerIndex row into a PlayerBio."""
     first = row.get("PLAYER_FIRST_NAME") or ""
     last = row.get("PLAYER_LAST_NAME") or ""
     full = f"{first} {last}".strip()
@@ -177,6 +175,7 @@ def bio_from_playerindex_row(row: dict[str, Any], fetched_at: datetime | None = 
 
 
 def season_totals_from_row(row: dict[str, Any]) -> SeasonTotals:
+    """Normalise a career-stats season row into SeasonTotals."""
     return SeasonTotals(
         season=str(row["SEASON_ID"]),
         team_id=as_int(row.get("TEAM_ID")) or 0,
@@ -206,6 +205,7 @@ def detail_from_responses(
     career_stats: dict[str, list[dict[str, Any]]],
     fetched_at: datetime | None = None,
 ) -> PlayerDetail:
+    """Combine the CommonPlayerInfo and career-stats responses into a PlayerDetail."""
     info_rows = common_player_info.get("CommonPlayerInfo") or []
     info = info_rows[0] if info_rows else {}
     totals = [season_totals_from_row(r) for r in career_stats.get("SeasonTotalsRegularSeason") or []]
@@ -227,6 +227,7 @@ def detail_from_responses(
 
 
 def player_ref_from_static(row: dict[str, Any]) -> PlayerRef:
+    """Normalise a static player dict into a PlayerRef."""
     return PlayerRef(
         player_id=int(row["id"]),
         full_name=row["full_name"],
@@ -237,6 +238,7 @@ def player_ref_from_static(row: dict[str, Any]) -> PlayerRef:
 
 
 def team_ref_from_static(row: dict[str, Any]) -> TeamRef:
+    """Normalise a static team dict into a TeamRef."""
     return TeamRef(
         team_id=int(row["id"]),
         abbreviation=row["abbreviation"],
@@ -277,9 +279,6 @@ def apply_ages(bios: list[PlayerBio], age_rows: list[dict[str, Any]], season_off
     return count
 
 
-# ----------------------------------------------------------------------------- live provider
-
-
 def games_per_week(schedule: dict[str, Any]) -> dict[str, dict[str, int]]:
     """{team tricode: {NBA week number: regular-season games}} from a ScheduleLeagueV2 response.
 
@@ -301,16 +300,18 @@ def games_per_week(schedule: dict[str, Any]) -> dict[str, dict[str, int]]:
 
 
 class NbaApiProvider:
+    """Live nba_api provider: static lists, the player pool, game logs, standings, schedule and on-demand player detail, all through the retrying CallRunner."""
     source = "nba_api"
 
     def __init__(self, runner: CallRunner | None = None) -> None:
+        """Create the provider; `runner` paces and retries every call."""
         self.runner = runner or CallRunner()
         self._static_players: list[PlayerRef] | None = None
         self._static_teams: list[TeamRef] | None = None
 
-    # ---- static -------------------------------------------------------------------------
 
     def list_players(self, active_only: bool = True) -> list[PlayerRef]:
+        """The static player list (loaded once), active players only by default."""
         if self._static_players is None:
             from nba_api.stats.static import players as static_players
 
@@ -320,6 +321,7 @@ class NbaApiProvider:
         return list(self._static_players)
 
     def list_teams(self) -> list[TeamRef]:
+        """The static team list (loaded once)."""
         if self._static_teams is None:
             from nba_api.stats.static import teams as static_teams
 
@@ -327,17 +329,18 @@ class NbaApiProvider:
         return list(self._static_teams)
 
     def search_players(self, query: str, limit: int = 20) -> list[PlayerRef]:
+        """Search the static player list by name."""
         return search_refs(self.list_players(active_only=False), query, limit)
 
-    # ---- network helpers -----------------------------------------------------------------
 
     def _timeout(self) -> float:
+        """The per-call timeout from the retry policy."""
         return self.runner.policy.timeout_s
 
     def _normalized(self, label: str, factory) -> dict[str, list[dict[str, Any]]]:
+        """Run an nba_api endpoint through the call runner and return its normalized result sets."""
         return self.runner.call(label, lambda: factory().get_normalized_dict())
 
-    # ---- bulk ---------------------------------------------------------------------------
 
     def fetch_standings(self, season: str) -> dict[str, dict]:
         """Final regular-season record per team tricode: wins, losses, conference, point differential per game."""
@@ -377,6 +380,7 @@ class NbaApiProvider:
     def fetch_player_pool(
         self, roster_season: str, on_progress: ProgressCallback | None = None
     ) -> tuple[list[PlayerBio], FetchReport]:
+        """The player pool: PlayerIndex rows with ages from the season's bio stats (previous season plus one before the season starts), plus a FetchReport."""
         from nba_api.stats.endpoints import leaguedashplayerbiostats, playerindex
 
         started = utcnow()
@@ -423,6 +427,7 @@ class NbaApiProvider:
         player_ids: list[int],
         on_progress: ProgressCallback | None = None,
     ) -> tuple[dict[int, list[GameLine]], FetchReport]:
+        """Game logs for the wanted players: one batch request for the season, then a per-player fallback for anyone the batch missed; failures are reported, not raised."""
         from nba_api.stats.endpoints import playergamelog, playergamelogs
 
         started = utcnow()
@@ -481,9 +486,9 @@ class NbaApiProvider:
         )
         return result, report
 
-    # ---- on demand -----------------------------------------------------------------------
 
     def fetch_player_detail(self, player_id: int) -> PlayerDetail:
+        """A player's detail from CommonPlayerInfo and career stats; a player with no career stats yet still returns his bio."""
         from nba_api.stats.endpoints import commonplayerinfo, playercareerstats
 
         info = self._normalized(

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import NeonArrow from "../core/NeonArrow.jsx";
 
-// Horizontal, drag-to-reorder nomination rotation. Arrows work too. Click a name to make that manager next.
+/** Horizontal nomination rotation: drag a chip to reorder it, use its arrows, or click a name to make that manager next. */
 export default function NominationOrderBar({ managers, order, nextNominator, live, onReorder, onMakeNext }) {
   const [items, setItems] = useState(order);
   const [dragging, setDragging] = useState(null);
@@ -10,12 +10,14 @@ export default function NominationOrderBar({ managers, order, nextNominator, liv
   useEffect(() => { if (!busy) setItems(order); }, [order, busy]);
 
   const byId = Object.fromEntries((managers || []).map((m) => [m.manager_id, m]));
+  /** Show the new order at once and persist it through `onReorder` (skipped when nothing changed); blocks refresh from the server until it settles. */
   const commit = (next) => {
     setItems(next);
     if (next.join() === order.join()) return;
     setBusy(true);
     Promise.resolve(onReorder(next)).finally(() => setBusy(false));
   };
+  /** Move the manager at index `from` to index `to`, ignoring out-of-range or no-op moves. */
   const move = (from, to) => {
     if (to < 0 || to >= items.length || from === to) return;
     const next = items.slice();

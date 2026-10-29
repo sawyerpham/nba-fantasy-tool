@@ -19,6 +19,10 @@ import EditPickDialog from "./EditPickDialog.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
+/**
+ * The Draft tab: rankings (players, fantasy teams or NBA teams) with filters and sorting, the block / record bar for the player who is up, the room board, spending guide and market.
+ * With Sleeper sync on and the draft live it polls the Sleeper draft every second and records any pick made there that isn't here yet.
+ */
 export default function DraftPage({ leagueId }) {
   const [view, setView] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -45,11 +49,13 @@ export default function DraftPage({ leagueId }) {
   const SYNC_MS = 1000;   // Sleeper's public API allows ~1000 requests/min
   const [liveLot, setLiveLot] = useState(null);   // the lot in progress in Sleeper (player, high bid, leader, clock)
   const [toasts, setToasts] = useState([]);       // "X drafted Y for $Z" notices from Sleeper sync
+  /** Show "X drafted Y for $Z" notices (newest first, at most six) for 12 seconds each. */
   const toast = (items) => {
     const stamped = items.map((a, i) => ({ ...a, key: `${a.player_id}-${Date.now()}-${i}` }));
     setToasts((t) => [...stamped, ...t].slice(0, 6));
     setTimeout(() => setToasts((t) => t.filter((x) => !stamped.some((s) => s.key === x.key))), 12000);
   };
+  /** Scroll to a manager's card on the room board and flash it briefly. */
   const goToManager = (id) => {
     const el = document.querySelector(`[data-testid="manager-card-${id}"]`) || document.getElementById("room");
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -57,7 +63,9 @@ export default function DraftPage({ leagueId }) {
     setTimeout(() => el?.classList.remove("flash"), 1600);
   };
 
+  /** Reload the draft view (status, picks, managers, nomination order). */
   const loadView = useCallback(() => api.get(`/leagues/${leagueId}/draft`).then(setView), [leagueId]);
+  /** Reload the rankings for the current row limit and rosterable-only switch. */
   const loadRankings = useCallback(
     () => api.get(`/leagues/${leagueId}/rankings` + qs({ limit, include_unrosterable: showAll })).then(setRankings),
     [leagueId, limit, showAll],
@@ -69,8 +77,8 @@ export default function DraftPage({ leagueId }) {
     Promise.all([loadView(), loadRankings(), api.get(`/leagues/${leagueId}/settings`).then(setSettings)]).catch((e) => setError(e.message));
   }, [leagueId, loadView, loadRankings]);
 
-  // "/" focuses the mark-drafted search box (when not already typing somewhere).
   useEffect(() => {
+    /** "/" focuses the mark-drafted search box, unless the user is already typing somewhere. */
     const onKey = (e) => {
       if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
         e.preventDefault();
@@ -81,10 +89,10 @@ export default function DraftPage({ leagueId }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Live Sleeper sync: every SYNC_MS, record any pick made in the Sleeper draft that isn't here yet.
   useEffect(() => {
-    try { localStorage.setItem(`da.sync.${leagueId}`, sync ? "1" : "0"); } catch { /* ignore */ }
+    try { localStorage.setItem(`da.sync.${leagueId}`, sync ? "1" : "0"); } catch { }
     if (!sync || view?.status !== "live") return undefined;
+    /** One sync poll: record any picks made in Sleeper that aren't here yet, update the live lot and notify. Skipped while the previous poll is still running. */
     const tick = async () => {
       if (syncBusy.current) return;
       syncBusy.current = true;
@@ -118,6 +126,7 @@ export default function DraftPage({ leagueId }) {
   useLayoutEffect(() => {
     const el = colsRef.current;
     if (!el) return undefined;
+    /** Publish the columns' top offset as --cols-top so they can end at the bottom of the window. */
     const measure = () => {
       const top = `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`;
       if (el.style.getPropertyValue("--cols-top") !== top) el.style.setProperty("--cols-top", top);
@@ -136,12 +145,13 @@ export default function DraftPage({ leagueId }) {
     const { key, dir } = sort;
     const sign = dir === "asc" ? 1 : -1;
     return rows.slice().sort((a, b) => {
-      // Pos sorts by best in role: the positional rank number (#1s first), position order breaking ties.
+      /** Sort key for the Pos column: the positional rank number first (#1s first), position order breaking ties; 9999 when unranked. */
       const posRank = (r) => {
         const label = posFilter ? r.pos_ranks?.[posFilter] : r.pos_rank;
         const n = label ? Number(label.slice(1).split(" ")[0]) : 9999;
         return n * 10 + (label ? POSITIONS.indexOf(label.split(" ")[1]) : 9);
       };
+      /** The sortable value of a row for the current sort key. */
       const val = (r) => (key === "pos" ? posRank(r)
         : key === "min" ? (r.proj_min ?? r.last_min) : key === "fit" ? r.fit?.score : r[key]);
       const x = val(a), y = val(b);
@@ -156,8 +166,10 @@ export default function DraftPage({ leagueId }) {
   if (!view) return <p>{error || "Loading…"}</p>;
 
   const live = view.status === "live";
+  /** Refresh everything that reads the draft (spending guide, market, room board). */
   const bump = () => setRefreshKey((k) => k + 1);
 
+  /** Call a draft action (default POST), store the returned view and refresh rankings. Returns the view, or null after showing the error. */
   const act = async (path, body, method = "post") => {
     setError(""); setNotice("");
     try {
@@ -172,8 +184,7 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
-  // One action for "this player is up": nominate him (opens the record bar); if nominating isn't possible,
-  // just open the record bar for him.
+  /** "This player is up": nominate him (which opens the record bar); when nominating isn't possible, just open the record bar for him. */
   const putOnBlock = async (r) => {
     setPick(null);
     setDismissed(null);
@@ -181,6 +192,7 @@ export default function DraftPage({ leagueId }) {
     if (!v) { setError(""); setPick(r); }
   };
 
+  /** A pick was recorded: close the bar, store the new view, refresh rankings and put the cursor back in the mark-drafted search box. */
   const onPicked = async (v) => {
     setPick(null);
     setView(v);
@@ -189,6 +201,7 @@ export default function DraftPage({ leagueId }) {
     setTimeout(() => document.querySelector('[data-testid="search-input"]')?.focus(), 0);
   };
 
+  /** Export the league document and show the schema version and the path it was written to. */
   const exportLeague = async () => {
     setError(""); setNotice("");
     try {
@@ -199,7 +212,9 @@ export default function DraftPage({ leagueId }) {
     }
   };
 
+  /** Sort by `key`: a second click flips the direction; a new key starts ascending for text-like columns and descending otherwise. */
   const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : (["rank", "full_name", "team_abbr", "injury_status", "pos"].includes(key) ? "asc" : "desc") }));
+  /** Reload rankings and the draft view after a player override changes. */
   const onOverridesChanged = () => { loadRankings(); loadView(); };
   const nominated = view.current_nomination;
   const nominatedName = nominated ? (rankings.find((r) => r.player_id === nominated.player_id)?.full_name || `#${nominated.player_id}`) : null;
@@ -211,11 +226,12 @@ export default function DraftPage({ leagueId }) {
   );
   const recordTarget = pick || (nominated && dismissed !== nominated.player_id ? { player_id: nominated.player_id, full_name: nominatedName } : null);
   const userName = view.managers.find((m) => m.is_user)?.name || "you";
+  /** A manager's display name from its id (falls back to the id; null for none). */
   const nameOf = (id) => (id ? view.managers.find((m) => m.manager_id === id)?.name || id : null);
   const showOrder = orderOpen ?? !live;
-  // The next few nominators in rotation, skipping full rosters.
   const order = view.nomination_order;
   const start = Math.max(0, order.indexOf(view.next_nominator));
+  /** Whether a manager can still nominate (has mandatory roster spots open). */
   const canNominate = (id) => { const m = view.managers.find((x) => x.manager_id === id); return m && m.budget.open_mandatory > 0; };
   const upcoming = [...order.slice(start), ...order.slice(0, start)].filter(canNominate).slice(1, 3).map(nameOf);
 

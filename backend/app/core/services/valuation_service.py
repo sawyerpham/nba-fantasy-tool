@@ -22,14 +22,18 @@ log = logging.getLogger(__name__)
 
 
 class ValuationService:
+    """Computes and caches every player's valuation for a stats season and scoring setup."""
     def __init__(self, store: JsonStore, stats_season: str) -> None:
+        """Use the store and the stats season."""
         self.store = store
         self.stats_season = stats_season
 
     def cache_rel(self, scoring: ScoringSettings) -> str:
+        """Cache path for a scoring setup (keyed by its hash)."""
         return config.valuations_rel(self.stats_season, scoring.scoring_hash())
 
     def load_cached(self, scoring: ScoringSettings) -> dict[int, PlayerValuation] | None:
+        """The cached valuations for a scoring setup, or None."""
         rel = self.cache_rel(scoring)
         if not self.store.exists(rel):
             return None
@@ -42,6 +46,7 @@ class ValuationService:
         logs: Mapping[int, list[GameLine]] | None = None,
         force: bool = False,
     ) -> dict[int, PlayerValuation]:
+        """Valuations for a scoring setup: the cache unless `force`, else computed from the game logs (loaded from the store when not given) and cached."""
         if not force:
             cached = self.load_cached(scoring)
             if cached is not None:

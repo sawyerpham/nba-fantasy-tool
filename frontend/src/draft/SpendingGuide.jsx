@@ -3,14 +3,16 @@ import { PosTag } from "../core/Pos.jsx";
 import { api } from "../api.js";
 import { CallBadge, Term, TERMS, liveCall } from "../core/Terms.jsx";
 
+/** English ordinal for a number (1st, 2nd, 3rd, 11th, 22nd). */
 export const ordinal = (n) => {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
+/** Whether the guide is expanded (remembered in localStorage; open by default). */
 const readOpen = () => { try { return localStorage.getItem("da.spending.open") !== "0"; } catch { return true; } };
 
-// Your money against the room, the live call on the nominee, the plan for your open spots and everyone's money.
+/** Your money against the room, the live call on the nominee, the plan for your open spots and everyone's money. Collapsible; renders only while the draft is live. */
 export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lot, rankings }) {
   const [g, setG] = useState(null);
   const [open, setOpen] = useState(readOpen);
@@ -22,9 +24,10 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
 
   if (!live || !g) return null;
   const me = g.me;
+  /** Collapse or expand the guide and remember the choice. */
   const toggle = () => {
     setOpen(!open);
-    try { localStorage.setItem("da.spending.open", open ? "0" : "1"); } catch { /* ignore */ }
+    try { localStorage.setItem("da.spending.open", open ? "0" : "1"); } catch { }
   };
 
   return (
@@ -73,8 +76,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
             </div>
           )}
           {g.plan.length > 0 && (() => {
-            // One row per open starting spot: the best player left for it (his Fit, his Max coloured by the call)
-            // and the best one within your even split.
+            /** Find a ranked player by id. */
             const row = (id) => (rankings || []).find((r) => r.player_id === id);
             const lines = g.plan.map((p) => ({ p, r: row(p.best_id) }));
             return (

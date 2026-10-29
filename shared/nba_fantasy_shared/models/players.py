@@ -1,5 +1,3 @@
-"""Player-side models: identity, bio, fantasy attributes, overrides, stats."""
-
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -41,6 +39,7 @@ class PlayerRef(BaseModel):
 
 
 class TeamRef(BaseModel):
+    """An NBA team as listed in nba_api's static data."""
     team_id: int
     abbreviation: str
     full_name: str
@@ -228,6 +227,7 @@ class PlayerDetail(BaseModel):
 
 
 class ReconcileReport(BaseModel):
+    """The result of reconciling nba_api with Sleeper: pool sizes, match counts and every conflict, collision and unmatched player."""
     run_at: datetime
     roster_season: str
     nba_pool_size: int

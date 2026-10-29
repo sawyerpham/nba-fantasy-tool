@@ -18,6 +18,7 @@ TRIPLE_DOUBLE_STATS: tuple[str, ...] = ("pts", "reb", "ast", "stl", "blk")
 
 @dataclass(frozen=True)
 class GameScore:
+    """One game's fantasy points split into base points, bonus points and the ids of the bonus rules it hit."""
     fpts: float
     base_points: float
     bonus_points: float
@@ -25,6 +26,7 @@ class GameScore:
 
 
 def base_points(line: GameLine, base: BaseScoring) -> float:
+    """Base fantasy points for a game line: each counting stat times its per-stat value."""
     return (
         base.pts * line.pts
         + base.reb * line.reb
@@ -40,14 +42,17 @@ def base_points(line: GameLine, base: BaseScoring) -> float:
 
 
 def double_digit_categories(line: GameLine) -> int:
+    """How many of pts / reb / ast / stl / blk reach double digits."""
     return sum(1 for stat in TRIPLE_DOUBLE_STATS if getattr(line, stat) >= 10)
 
 
 def is_triple_double(line: GameLine) -> bool:
+    """Whether the line is a triple-double (10+ in at least three tracked categories)."""
     return double_digit_categories(line) >= 3
 
 
 def rule_hits(line: GameLine, rule: BonusRule) -> bool:
+    """Whether the game meets a bonus rule (a triple-double, or a stat at or above the rule's threshold)."""
     if rule.kind == "triple_double":
         return is_triple_double(line)
     if rule.kind == "stat_threshold":
@@ -58,6 +63,7 @@ def rule_hits(line: GameLine, rule: BonusRule) -> bool:
 
 
 def score_game(line: GameLine, settings: ScoringSettings) -> GameScore:
+    """Score a game: base points plus every bonus rule it meets (bonuses stack)."""
     base = base_points(line, settings.base)
     hit = tuple(rule.id for rule in settings.bonuses if rule_hits(line, rule))
     bonus = sum(rule.bonus for rule in settings.bonuses if rule.id in hit)

@@ -6,19 +6,19 @@ import { tierHue } from "../core/Pos.jsx";
 import { CallBadge, Term, TERMS, liveCall } from "../core/Terms.jsx";
 import { bidSound, nominationSound } from "../core/sounds.js";
 
-// Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now, his numbers, the
-// live high bid against his Worth and Max (and your walk-away) as a one-word call, the bid history down the right
-// (each bidder's cap), and below it: what winning him leaves you, the next best players for that spot, his Lock-In numbers, next year's keeper call, team role and injury.
+/**
+ * Replaces "On the block" while Sleeper sync is on: the player nominated in Sleeper right now with his numbers, the live high bid against his Worth and Max (and your walk-away) as a one-word call, and the bid history down the right (each bidder's cap).
+ * Below it: what winning him leaves you, the next best players for that spot, his Lock-In numbers, next year's keeper call, team role and injury. Blinks and chimes on a new high bid, and rises on a new nomination.
+ */
 export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen }) {
   const [spend, setSpend] = useState(null);
   const [extra, setExtra] = useState({});   // team role (player endpoint) and keeper outlook (fit endpoint)
   const [now, setNow] = useState(Date.now());
   const bids = useRef({ id: null, list: [] });   // every new high bid seen for this lot, from the sync polls
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
-  // A new high bid on the same player: blink the high-bid card and play the bid sound.
   const [flash, setFlash] = useState(0);
   const seen = useRef({ id: lot.player_id, bid: lot.high_bid });
-  useEffect(() => { nominationSound(); }, [lot.player_id]);   // a new player on the block (also when the block first appears)
+  useEffect(() => { nominationSound(); }, [lot.player_id]);
   useEffect(() => {
     const prev = seen.current;
     seen.current = { id: lot.player_id, bid: lot.high_bid };
@@ -54,7 +54,6 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
     return before || fan ? `${m.name} (${[before && "drafted him before", fan && `${lot.team_abbr} fan`].filter(Boolean).join(", ")})` : null;
   }).filter(Boolean);
 
-  // If you win: the next bid up (you already lead: the current one).
   const me = managers.find((m) => m.is_user);
   const leading = me && lot.leader === me.name;
   // where the live bid sits against your numbers; holding the high bid trumps the rest
@@ -66,7 +65,6 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
   const stillNeed = me ? Object.entries(me.open_slots).filter(([s, n]) => !["BN", "IR"].includes(s) && n - (s === slot ? 1 : 0) > 0)
     .map(([s, n]) => [s, n - (s === slot ? 1 : 0)]) : [];
 
-  // If you pass: the best players left who fit the same spot for you.
   const elig = new Set(slot && slot !== "BN" ? [slot] : row?.eligibility || []);
   const next = (rankings || []).filter((r) => r.player_id !== lot.player_id && r.rosterable && r.eligibility.some((p) => elig.has(p))).slice(0, 2);
 

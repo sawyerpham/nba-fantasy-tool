@@ -1,4 +1,3 @@
-"""Backend configuration: data directory and season defaults."""
 
 from __future__ import annotations
 
@@ -17,14 +16,17 @@ OVERRIDES_REL = "player_overrides.json"
 
 
 def nba_pool_rel(roster_season: str) -> str:
+    """Cache path of the reconciled nba_api player pool for a roster season."""
     return f"cache/nba_player_pool_{roster_season}.json"
 
 
 def game_logs_rel(stats_season: str) -> str:
+    """Cache path of the game logs for a stats season."""
     return f"cache/game_logs_{stats_season}.json"
 
 
 def standings_rel(stats_season: str) -> str:
+    """Cache path of the NBA standings for a stats season."""
     return f"cache/nba_standings_{stats_season}.json"
 
 
@@ -38,14 +40,17 @@ def prior_seasons(stats_season: str, n: int = 2) -> list[str]:
 
 
 def schedule_rel(roster_season: str) -> str:
+    """Cache path of the NBA schedule for a roster season."""
     return f"cache/nba_schedule_{roster_season}.json"
 
 
 def projections_rel(roster_season: str) -> str:
+    """Cache path of Sleeper's season projections for a roster season."""
     return f"cache/sleeper_projections_{roster_season}.json"
 
 
 def reconcile_rel(roster_season: str) -> str:
+    """Cache path of the reconcile report for a roster season."""
     return f"cache/reconcile_{roster_season}.json"
 
 
@@ -53,12 +58,15 @@ VALUATION_MODEL_VERSION = "v2"  # bump when PlayerValuation gains fields so stal
 
 
 def valuations_rel(stats_season: str, scoring_hash: str) -> str:
+    """Cache path of the valuations for a stats season under one scoring hash (and the valuation model version)."""
     return f"cache/valuations_{stats_season}_{scoring_hash}_{VALUATION_MODEL_VERSION}.json"
 
 
 def player_detail_rel(player_id: int) -> str:
+    """Cache path of one player's detail (CommonPlayerInfo and career stats)."""
     return f"cache/player_detail/{player_id}.json"
 
 
 def league_rel(league_id: str) -> str:
+    """Path of a league's document in the data directory."""
     return f"leagues/{league_id}.json"

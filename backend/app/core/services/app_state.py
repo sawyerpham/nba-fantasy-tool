@@ -1,4 +1,3 @@
-"""Process-wide state for the API: providers, JSON store, player pool, background pull, league sessions."""
 
 from __future__ import annotations
 
@@ -27,10 +26,12 @@ log = logging.getLogger(__name__)
 
 
 class PullAlreadyRunning(RuntimeError):
+    """Raised when a data pull is requested while one is already running."""
     pass
 
 
 class AppState:
+    """Process-wide state: the providers, the JSON store, the player pool and overrides, the background data pull and one DraftSession per league (all guarded by a lock)."""
     def __init__(
         self,
         store: JsonStore,
@@ -39,6 +40,7 @@ class AppState:
         roster_season: str = config.DEFAULT_ROSTER_SEASON,
         stats_season: str = config.DEFAULT_STATS_SEASON,
     ) -> None:
+        """Create the state with its providers and seasons; the player pool is loaded separately (load_pool)."""
         self.store = store
         self.stats = stats
         self.platform = platform
@@ -55,9 +57,9 @@ class AppState:
         self.last_pull: PullStatus | None = None
         self.load_pool()
 
-    # ------------------------------------------------------------------ player pool
 
     def load_pool(self) -> None:
+        """(Re)load the reconciled player pool with Sleeper projections attached, plus the overrides, and refresh any open sessions."""
         with self._lock:
             projections = load_projections(self.store, self.roster_season)
             self.players = {
@@ -76,9 +78,11 @@ class AppState:
         log.info("pool loaded: %d players, %d overrides", len(self.players), len(self.overrides))
 
     def _history(self, league: LeagueSettings) -> list[dict]:
+        """The cached Sleeper details of the league's history leagues."""
         return [d for d in (load_details(self.store, i) for i in league.sleeper_history_league_ids) if d]
 
     def valuations_for(self, scoring: ScoringSettings, stats_season: str | None = None) -> dict[int, PlayerValuation]:
+        """Valuations for a scoring setup and season (empty when no game logs are cached), with the three-season availability blend applied."""
         service = ValuationService(self.store, stats_season or self.stats_season)
         if not self.store.exists(config.game_logs_rel(service.stats_season)):
             return {}
@@ -105,7 +109,9 @@ class AppState:
         return out
 
     def data_status(self) -> dict:
+        """Status of the data pool for the Data panel: counts, cache ages in hours, the last pull and the reconcile summary."""
         def age(rel: str) -> float | None:
+            """A cache file's age in hours, or None when it doesn't exist."""
             delta = self.store.age(rel)
             return round(delta.total_seconds() / 3600, 2) if delta is not None else None
 
@@ -129,9 +135,9 @@ class AppState:
             "pull": self.pull_status(),
         }
 
-    # ------------------------------------------------------------------ overrides
 
     def save_overrides(self) -> None:
+        """Save the overrides and push them into every open session."""
         with self._lock:
             save_overrides(self.store, self.overrides)
             for session in self.sessions.values():
@@ -155,16 +161,18 @@ class AppState:
 
 
     def _injury_map(self) -> dict:
+        """The Sleeper injury-tag map from any open session's ranking settings (the defaults when none is open)."""
         for session in self.sessions.values():
             return session.league.ranking.sleeper_injury_map
         return LeagueSettings(league_id="_", name="_").ranking.sleeper_injury_map
 
-    # ------------------------------------------------------------------ background pull
 
     def pull_running(self) -> bool:
+        """Whether a pull thread is alive."""
         return self._pull_thread is not None and self._pull_thread.is_alive()
 
     def pull_status(self) -> dict:
+        """Progress of the current or last pull (idle when none has run)."""
         service = self._pull_service
         if service is None:
             return {"state": "idle", "phase": "", "progress": None}
@@ -172,6 +180,7 @@ class AppState:
 
     def start_pull(self, sources: Iterable[str] = ("nba_api", "sleeper"), force_sleeper: bool = False,
                    skip_game_logs: bool = False, wait: bool = False) -> dict:
+        """Start a pull on a background thread (PullAlreadyRunning when one is running); when it finishes, adopt its seasons and reload the pool. `wait` blocks until it is done."""
         with self._lock:
             if self.pull_running():
                 raise PullAlreadyRunning("a pull is already running")
@@ -181,6 +190,7 @@ class AppState:
             sources = list(sources)
 
             def run() -> None:
+                """Thread body: run the pull and record its final status."""
                 try:
                     service.run(sources=sources, force_sleeper=force_sleeper, skip_game_logs=skip_game_logs)
                 finally:
@@ -203,15 +213,17 @@ class AppState:
         return self.pull_status()
 
     def join_pull(self, timeout: float | None = None) -> None:
+        """Wait for the pull thread to finish (up to `timeout` seconds)."""
         if self._pull_thread is not None:
             self._pull_thread.join(timeout)
 
-    # ------------------------------------------------------------------ league sessions
 
     def list_leagues(self) -> list[dict]:
+        """Summaries of every league."""
         return self.leagues.summaries()
 
     def create_league(self, league: LeagueSettings, managers: list[Manager] | None = None) -> DraftSession:
+        """Create and save a new league document, and return its session (FileExistsError when the id is taken)."""
         with self._lock:
             if self.leagues.exists(league.league_id):
                 raise FileExistsError(league.league_id)
@@ -220,6 +232,7 @@ class AppState:
             return self.get_session(league.league_id)
 
     def get_session(self, league_id: str) -> DraftSession:
+        """The league's DraftSession, built from its document on first use and cached."""
         with self._lock:
             session = self.sessions.get(league_id)
             if session is None:
@@ -235,6 +248,7 @@ class AppState:
             return session
 
     def save_session(self, league_id: str) -> DraftExport:
+        """Write the league's session back to its document and return it."""
         with self._lock:
             session = self.get_session(league_id)
             session.league.num_managers = len(session.managers)
@@ -261,6 +275,7 @@ class AppState:
         return name
 
     def replace_league_settings(self, league_id: str, league: LeagueSettings) -> DraftSession:
+        """Replace a league's settings (the id can't change); recompute valuations when scoring or the stats season changed, and save."""
         with self._lock:
             session = self.get_session(league_id)
             if league.league_id != league_id:
@@ -276,11 +291,13 @@ class AppState:
             return session
 
     def delete_league(self, league_id: str) -> None:
+        """Delete a league's session and document."""
         with self._lock:
             self.sessions.pop(league_id, None)
             self.leagues.delete(league_id)
 
     def export_league(self, league_id: str) -> tuple[str, DraftExport]:
+        """Save the league and write a timestamped export copy; returns its path and the document."""
         with self._lock:
             doc = self.save_session(league_id)
             rel = self.leagues.export_copy(doc)

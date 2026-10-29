@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { fits, reseat, swapSteps } from "./swaps.js";
 
-// Replays the steps: every swap must be legal for both players, and the end lineup must be `after`.
+/** Replay the steps: every swap must be legal for both players, and the end lineup must be `after`. */
 function replay(before, after, pos) {
   const cur = { ...before }, steps = swapSteps(before, after, pos);
   for (const s of steps) {
@@ -22,11 +22,12 @@ assert.deepEqual(replay({ coward: "SG", wiggins: "PF", sabonis: "BN", grant: "PF
 const p2 = { kyrie: ["PG", "SG"], hali: ["PG", "SG"], derozan: ["SG", "SF", "PF"], nesmith: ["SG", "SF"], murray: ["PG"], bane: ["PG", "SG"] };
 const slots = ["PG", "PG", "SG", "SG", "SF", "BN", "BN"];
 const was = { murray: "PG", hali: "PG", bane: "SG", derozan: "SG", nesmith: "SF", kyrie: "BN" };
-const plan = { murray: "PG", hali: "SG", bane: "SG", derozan: "SF", nesmith: "BN", kyrie: "PG" };   // the plan's slots
+const plan = { murray: "PG", hali: "SG", bane: "SG", derozan: "SF", nesmith: "BN", kyrie: "PG" };
 assert.deepEqual(replay(was, reseat(was, plan, p2, slots), p2), ["kyrie<>derozan", "derozan<>nesmith"]);
 // The cards each step's arrow joins, taking earlier steps as done: after Kyrie <-> DeRozan, DeRozan sits in Kyrie's
 // (bench) card, so DeRozan <-> Nesmith joins Kyrie's card and Nesmith's. With the best lineup on screen the cards are
 // the final holders: Kyrie's SG slot is Kyrie's card, the bench slot Nesmith ends in is Nesmith's.
+/** The cards each step's arrow joins, taking earlier steps as done. */
 const cards = (shownAfter) => swapSteps(was, reseat(was, plan, p2, slots), p2, shownAfter).map((s) => `${s.a}-${s.b}`);
 assert.deepEqual(cards(false), ["kyrie-derozan", "kyrie-nesmith"]);
 assert.deepEqual(cards(true), ["nesmith-kyrie", "nesmith-derozan"]);
@@ -35,7 +36,7 @@ assert.deepEqual(cards(true), ["nesmith-kyrie", "nesmith-derozan"]);
 const p3 = { ...p2, bane: ["PG", "SG", "SF"] };
 const fixedBest = reseat(was, plan, p3, slots, new Set(["derozan"]));
 assert.equal(fixedBest.derozan, "SG");
-assert.deepEqual(replay(was, fixedBest, p3).length, 2);   // Kyrie <-> Bane (SG), Bane <-> Nesmith (SF)
+assert.deepEqual(replay(was, fixedBest, p3).length, 2);
 // A plain bench-for-starter swap stays one step; nothing to do = no steps.
 assert.deepEqual(replay({ grant: "PF", sabonis: "BN" }, { grant: "BN", sabonis: "PF" }, pos), ["sabonis<>grant"]);
 assert.deepEqual(swapSteps({ grant: "PF" }, { grant: "PF" }, pos), []);

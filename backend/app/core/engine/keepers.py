@@ -19,6 +19,7 @@ GOOD_MIN_FRACTION = 0.10
 
 @dataclass
 class KeeperCandidate:
+    """A keeper candidate: manager, player, last year's price and an optional explicit keeper price."""
     manager_id: str
     player_id: int
     last_price: int
@@ -27,6 +28,7 @@ class KeeperCandidate:
 
 @dataclass
 class KeeperEvaluation:
+    """The evaluation of one keeper candidate: his keeper price, fair value at draft start, surplus and the good / even / bad verdict."""
     manager_id: str
     player_id: int
     full_name: str
@@ -46,6 +48,7 @@ class KeeperEvaluation:
 
 
 def verdict_for(surplus: float, fair_value: float) -> str:
+    """good / even / bad from the surplus: good when it is at least max($2, 10% of fair value), bad when the deficit is at least that much."""
     threshold = max(GOOD_MIN_DOLLARS, GOOD_MIN_FRACTION * fair_value)
     if surplus >= threshold:
         return "good"
@@ -55,6 +58,7 @@ def verdict_for(surplus: float, fair_value: float) -> str:
 
 
 def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[KeeperEvaluation]:
+    """Evaluate keeper candidates: price each under the league's escalation rule (or an explicit price), compare it with the player's fair value at draft start and give the verdict."""
     rule = session.league.keeper.escalation
     out: list[KeeperEvaluation] = []
     for c in candidates:
@@ -87,7 +91,6 @@ def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[Kee
     return out
 
 
-# ---- keeper outlook for a player you could buy now (profile "Keeper next year")
 # next price = the escalation rule applied to his market price now (what you'd likely pay)
 # next worth = fair value of his healthy value a year older, at this year's draft-start $ per point (after keepers):
 #              current injury removed, the age penalty for next year's age (31+ loses 3 %/year)
@@ -99,6 +102,7 @@ OUT_NOW = ("out_short_term", "out_long_term", "out_season")
 
 
 def keeper_outlook(session, row, buy_price: int) -> dict:
+    """How good a keeper this player would be next year if bought now at `buy_price`: next year's price and worth, the call, the highest price that still makes him a good keep, and whether he is a stash (out now, good keep next year)."""
     from .bidding import replacement_value
     from .ranking import age_multiplier, player_value
 

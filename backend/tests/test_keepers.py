@@ -1,4 +1,3 @@
-"""Keeper price escalation and keep/let-go verdicts (P18)."""
 
 import pytest
 
@@ -17,10 +16,12 @@ JOKIC, S_CURRY, WALKER = 203999, 201939, 1629022
 
 @pytest.mark.parametrize("last, expected", [(17, 20), (4, 4), (5, 6), (9, 10), (10, 12), (20, 24), (49, 58), (50, 60), (0, 1), (1, 1)])
 def test_league_rule_one_dollar_per_full_five(last, expected):
+    """League rule one dollar per full five."""
     assert KeeperEscalation().price(last) == expected
 
 
 def test_escalation_is_editable_or_disabled():
+    """Escalation is editable or disabled."""
     assert KeeperEscalation(step_dollars=10, increase_per_step=2).price(25) == 29
     assert KeeperEscalation(enabled=False).price(17) == 17
     assert LeagueSettings(league_id="L", name="L").keeper.escalation.price(17) == 20  # default rule
@@ -29,11 +30,13 @@ def test_escalation_is_editable_or_disabled():
 @pytest.mark.parametrize("surplus, fair, expected", [(8, 28, "good"), (2, 15, "good"), (1.5, 15, "even"), (-1, 15, "even"),
                                                      (-2, 15, "bad"), (-3, 40, "even"), (-4, 40, "bad"), (5, 40, "good")])
 def test_verdict_thresholds(surplus, fair, expected):
+    """Verdict thresholds."""
     assert verdict_for(surplus, fair) == expected
 
 
 @pytest.fixture(scope="module")
 def session(tmp_path_factory, fixtures_dir):
+    """A session built from a fixture pull, for the keeper evaluations."""
     store = JsonStore(tmp_path_factory.mktemp("keepers"))
     assert PullService(store, FixtureStatsProvider(fixtures_dir), FixturePlatformProvider(fixtures_dir)).run().state == "done"
     players = {r.player_id: r for r in load_records(store, "2026-27")}
@@ -44,6 +47,7 @@ def session(tmp_path_factory, fixtures_dir):
 
 
 def test_evaluate_computes_price_and_verdict_before_the_draft(session):
+    """Evaluate computes price and verdict before the draft."""
     [jokic, walker] = evaluate_keepers(session, [KeeperCandidate("m1", JOKIC, last_price=17), KeeperCandidate("m2", WALKER, last_price=17)])
     assert jokic.computed_price == 20 and jokic.keeper_price == 20 and jokic.last_price == 17
     assert jokic.fair_value > 20 and jokic.surplus == round(jokic.fair_value - 20, 2) and jokic.verdict == "good"
@@ -52,6 +56,7 @@ def test_evaluate_computes_price_and_verdict_before_the_draft(session):
 
 
 def test_explicit_price_override_and_unaffordable_flag(session):
+    """Explicit price override and unaffordable flag."""
     [ev] = evaluate_keepers(session, [KeeperCandidate("m1", JOKIC, last_price=17, keeper_price=60)])
     assert ev.keeper_price == 60 and ev.computed_price == 20
     [too_much] = evaluate_keepers(session, [KeeperCandidate("m1", JOKIC, last_price=190)])
@@ -59,6 +64,7 @@ def test_explicit_price_override_and_unaffordable_flag(session):
 
 
 def test_unknown_player_is_a_draft_error(session):
+    """Unknown player is a draft error."""
     from app.core.engine.draft_state import DraftError
     with pytest.raises(DraftError):
         evaluate_keepers(session, [KeeperCandidate("m1", 1, 5)])

@@ -23,11 +23,13 @@ INJURY_LABEL = {"day_to_day": "Day-to-day", "out_short_term": "Out short term", 
 
 
 def verdict_for(score: int) -> str:
+    """strong (70+), decent (45+) or weak from a Fit score."""
     return "strong" if score >= 70 else "decent" if score >= 45 else "weak"
 
 
 @dataclass
 class TeamFit:
+    """How well a player fits a manager's team: a 0-100 score with verdict, headline, the score's three parts, context notes and the keeper outlook."""
     player_id: int
     score: int
     verdict: str                                   # strong | decent | weak (same colours as the Fit column)
@@ -39,10 +41,12 @@ class TeamFit:
 
 
 def _ordinal(n: int) -> str:
+    """English ordinal for a number."""
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
 def _best_value(session, manager_id: str) -> float:
+    """The best value among the available players the manager can roster (1 when there is none)."""
     rows = session.rank(session.engine.picks_for(manager_id), session.available_ids())
     return max((r.value for r in rows if r.rosterable), default=0.0) or 1.0
 

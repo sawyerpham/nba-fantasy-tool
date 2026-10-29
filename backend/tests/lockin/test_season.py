@@ -1,4 +1,3 @@
-"""Season week view: Sleeper schedule/rosters/matchups/projections/box scores + ESPN tips -> one week's data."""
 
 from datetime import date
 
@@ -7,6 +6,7 @@ from tests.test_session import JOKIC, fixture_world, make_session  # noqa: F401 
 
 
 def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
+    """Week view joins schedule projections scores and tips."""
     s = make_session(fixture_world, sleeper_league_id="L1")
     rec = s.players[JOKIC]
     s.players[JOKIC] = rec = rec.model_copy(update={"sleeper_id": "999", "team_abbr": "DEN"})
@@ -57,6 +57,7 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
 
 
 def test_current_week_is_the_monday_to_sunday_span_holding_today():
+    """Current week is the monday to sunday span holding today."""
     weeks = {1: ["2026-10-20", "2026-10-25"], 2: ["2026-10-26", "2026-11-01"]}
     assert current_week(weeks, date(2026, 10, 16)) == 1    # preseason: week 1
     assert current_week(weeks, date(2026, 10, 25)) == 1    # Sunday still week 1
@@ -65,6 +66,7 @@ def test_current_week_is_the_monday_to_sunday_span_holding_today():
 
 
 def test_lock_detection_and_your_answers():
+    """Lock detection and your answers."""
     from app.lockin.service import detect_lock
 
     games = [{"date": "2026-10-20", "fp": 18.5}, {"date": "2026-10-22", "fp": 11.0}, {"date": "2026-10-24", "fp": None}]
@@ -76,6 +78,7 @@ def test_lock_detection_and_your_answers():
 
 
 def test_lock_answers_are_saved_per_league_and_week(tmp_path):
+    """Lock answers are saved per league and week."""
     from app.lockin.service import read_locks, write_lock
     from nba_fantasy_shared.storage import JsonStore
 
@@ -88,6 +91,7 @@ def test_lock_answers_are_saved_per_league_and_week(tmp_path):
 
 
 def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_world):
+    """Roster rules flag a healthy player on ir and open ir spots."""
     from app.lockin.service import team_plan
 
     s = make_session(fixture_world)
@@ -104,6 +108,7 @@ def test_roster_rules_flag_a_healthy_player_on_ir_and_open_ir_spots(fixture_worl
 
 
 def test_a_counted_latest_game_is_guessed_locked_when_locking_beats_waiting(fixture_world):
+    """A counted latest game is guessed locked when locking beats waiting."""
     from app.lockin.service import team_plan
 
     s = make_session(fixture_world)
@@ -127,6 +132,7 @@ def test_a_counted_latest_game_is_guessed_locked_when_locking_beats_waiting(fixt
 
 
 def test_news_merges_my_players_newest_first_and_flags_injuries():
+    """News merges my players newest first and flags injuries."""
     from app.lockin.service import season_news
 
     note = lambda t, d, ms: {"published": ms, "metadata": {"title": t, "description": d}}   # noqa: E731 - Sleeper's shape
@@ -149,10 +155,12 @@ def test_news_merges_my_players_newest_first_and_flags_injuries():
 
 
 def test_acquisitions_draft_price_then_moves_in_order():
+    """Acquisitions draft price then moves in order."""
     from types import SimpleNamespace
     from app.lockin.service import acquisitions
 
     def fetch(url, ttl):
+        """Stub fetcher returning canned Sleeper league responses by URL."""
         if url.endswith("/league/L"):
             return {"draft_id": "D"}
         if "/draft/D/picks" in url:
@@ -170,6 +178,7 @@ def test_acquisitions_draft_price_then_moves_in_order():
 
 
 def test_faab_bid_paces_the_budget_over_the_season():
+    """Faab bid paces the budget over the season."""
     from app.lockin.service import faab_bid
 
     assert faab_bid(6.68, 89, 23) == 13     # a big upgrade early: about 3 weeks' share, not half the budget
@@ -182,6 +191,7 @@ def test_faab_bid_paces_the_budget_over_the_season():
 
 
 def test_waiver_demand_needs_him_to_outscore_your_drop():
+    """Waiver demand needs him to outscore your drop."""
     from app.lockin.service import waiver_demand
 
     assert waiver_demand(10.4, 5.0) == 1.0          # twice your drop: full bid
@@ -192,6 +202,7 @@ def test_waiver_demand_needs_him_to_outscore_your_drop():
 
 
 def test_long_out_reads_the_tag_and_the_latest_notes():
+    """Long out reads the tag and the latest notes."""
     from app.lockin import service
 
     notes = [{"headline": "Cason Wallace (labrum) out indefinitely", "story": ""}]
@@ -207,12 +218,14 @@ def test_long_out_reads_the_tag_and_the_latest_notes():
 
 
 def test_waivers_say_so_when_sleeper_sent_no_waiver_settings():
+    """Waivers say so when sleeper sent no waiver settings."""
     from app.lockin.service import waivers
 
     assert waivers(None, None, {"teams": [], "waiver": None}) == {"error": "Couldn't receive Sleeper waiver and FAAB data.", "claims": []}
 
 
 def test_timeline_hands_the_slot_to_a_later_player_at_his_check_in():
+    """Timeline hands the slot to a later player at his check in."""
     from app.lockin.service import week_timeline
     from app.lockin.weekplan import Game, PlanPlayer, plan_week
 
@@ -228,10 +241,12 @@ def test_timeline_hands_the_slot_to_a_later_player_at_his_check_in():
 
 
 def test_timeline_does_a_nights_swaps_at_one_check_in_and_never_moves_a_player_mid_game():
+    """Timeline does a nights swaps at one check in and never moves a player mid game."""
     from app.lockin.service import week_timeline
     from app.lockin.weekplan import Game, PlanPlayer, plan_week
 
     def guy(sid, slot, tip):   # Wed 10/21 (CDT = UTC-5)
+        """A one-game plan player in slot `slot`, tipping at `tip` on Wed 10/21 (CDT)."""
         return PlanPlayer(sid=sid, name=sid, eligibility=["C"], slot=slot, games=[Game("2026-10-21", 20, tip=tip)])
     six, six30, seven = guy("6:00", "C", "2026-10-21T23:00:00Z"), guy("6:30", "C", "2026-10-21T23:30:00Z"), guy("7:00", "C", "2026-10-22T00:00:00Z")
     nine, nine30 = guy("9:00", "BN", "2026-10-22T02:00:00Z"), guy("9:30", "BN", "2026-10-22T02:30:00Z")
@@ -245,6 +260,7 @@ def test_timeline_does_a_nights_swaps_at_one_check_in_and_never_moves_a_player_m
 
 
 def test_lead_stats_points_first_then_what_is_worth_fantasy_points(fixture_world):
+    """Lead stats points first then what is worth fantasy points."""
     from app.lockin.service import lead_stats
 
     s = make_session(fixture_world)
@@ -257,9 +273,11 @@ def test_lead_stats_points_first_then_what_is_worth_fantasy_points(fixture_world
 
 
 def test_team_ranks_offense_from_its_box_scores_and_defense_from_its_opponents():
+    """Team ranks offense from its box scores and defense from its opponents."""
     from app.lockin.service import team_ranks
 
     def row(team, opp, game="g1", **st):
+        """One team's box-score row for a game."""
         return {"player_id": f"TEAM_{team}", "team": team, "opponent": opp, "game_id": game, "stats": st}
     rows = [row("MEM", "BOS", pts=120, reb=50, to=20), row("BOS", "MEM", pts=100, reb=40, to=10),
             row("MEM", "DEN", pts=110, reb=50, to=18), row("DEN", "MEM", pts=130, reb=45, to=12),
@@ -277,6 +295,7 @@ def test_team_ranks_offense_from_its_box_scores_and_defense_from_its_opponents()
 
 
 def test_next_waiver_run_is_the_coming_saturday_or_sunday_at_2_am():
+    """Next waiver run is the coming saturday or sunday at 2 am."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -292,6 +311,7 @@ def test_next_waiver_run_is_the_coming_saturday_or_sunday_at_2_am():
 
 
 def test_season_averages_count_finished_games_in_league_scoring(fixture_world):
+    """Season averages count finished games in league scoring."""
     from app.lockin.service import season_averages
 
     s = make_session(fixture_world)
@@ -307,6 +327,7 @@ def test_season_averages_count_finished_games_in_league_scoring(fixture_world):
 
 
 def test_game_card_shows_both_teams_before_the_tip_with_their_ranks(fixture_world):
+    """Game card shows both teams before the tip with their ranks."""
     from app.lockin.service import game_detail
 
     s = make_session(fixture_world)
@@ -329,6 +350,7 @@ def test_game_card_shows_both_teams_before_the_tip_with_their_ranks(fixture_worl
 
 
 def test_sleeper_injuries_tag_every_hurt_player_red_or_yellow():
+    """Sleeper injuries tag every hurt player red or yellow."""
     from app.lockin.service import sleeper_injuries
 
     feed = {"1": {"full_name": "Zach Edey", "team": "MEM", "injury_status": "Out", "injury_body_part": "Ankle"},
@@ -344,6 +366,7 @@ def test_sleeper_injuries_tag_every_hurt_player_red_or_yellow():
 
 
 def test_team_card_schedule_stats_and_injury_report(fixture_world):
+    """Team card schedule stats and injury report."""
     from app.lockin.service import injury_report, team_player_stats, team_schedule
 
     sched = [{"date": "2026-10-22", "status": "complete", "home": {"team": "MEM", "points": 110}, "away": {"team": "UTA", "points": 120}},

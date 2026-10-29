@@ -2,24 +2,26 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Term } from "../core/Terms.jsx";
 
-// The rankings' Managers view: every fantasy team's money and two strength estimates (see backend engine/room.py).
 // [sort key, label or glossary term, class]
 const COLS = [
   ["name", "Manager"], ["fp_gen", "est_fpg", "num"], ["win_score", "win_score", "num"], ["remaining", "left", "num"],
   ["per_slot", "per_slot", "num"], ["max_bid", "cap", "num"], ["empty_starters", "open_starters", "num"],
 ];
 
+/** The rankings' Managers view: every fantasy team's money and two strength estimates (backend engine/room.py). Clicking a team opens it on the room board. */
 export default function TeamsTable({ leagueId, refreshKey, onOpenRoom }) {
   const [teams, setTeams] = useState([]);
   const [sort, setSort] = useState({ key: "win_score", dir: "desc" });
   useEffect(() => { api.get(`/leagues/${leagueId}/room`).then(setTeams).catch(() => setTeams([])); }, [leagueId, refreshKey]);
 
+  /** A sortable value for a team: money columns come from its budget, everything else from the team itself. */
   const val = (t, key) => (key === "remaining" || key === "max_bid" ? t.budget[key] : t[key]);
   const rows = teams.slice().sort((a, b) => {
     const x = val(a, sort.key), y = val(b, sort.key);
     return (x < y ? -1 : x > y ? 1 : 0) * (sort.dir === "asc" ? 1 : -1);
   });
   const byWin = teams.slice().sort((a, b) => b.win_score - a.win_score).map((t) => t.manager_id);
+  /** Sort by `key`: a second click flips the direction; a new key starts ascending for names and descending otherwise. */
   const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : key === "name" ? "asc" : "desc" }));
 
   return (

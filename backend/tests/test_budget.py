@@ -10,14 +10,17 @@ NOW = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
 
 def league(**kw) -> LeagueSettings:
+    """A LeagueSettings with test defaults."""
     return LeagueSettings(league_id="L", name="Test", **kw)
 
 
 def pick(n: int, manager_id: str, price: int, slot: str = "BN", player_id: int | None = None) -> Pick:
+    """A Pick for the budget tests."""
     return Pick(pick_number=n, player_id=player_id or 1000 + n, manager_id=manager_id, price=price, slot=slot, timestamp=NOW)
 
 
 def test_default_league_has_15_mandatory_and_2_ir_slots():
+    """Default league has 15 mandatory and 2 ir slots."""
     lg = league()
     assert lg.mandatory_slot_count() == 15
     assert lg.total_slot_count() == 17
@@ -36,16 +39,19 @@ def test_default_league_has_15_mandatory_and_2_ir_slots():
     ],
 )
 def test_max_bid_reserves_min_bid_for_every_other_open_slot(remaining, open_mandatory, min_bid, expected):
+    """Max bid reserves min bid for every other open slot."""
     assert max_bid(remaining, open_mandatory, min_bid) == expected
 
 
 def test_discretionary_dollars_is_money_above_the_bare_minimum():
+    """Discretionary dollars is money above the bare minimum."""
     assert discretionary_dollars(200, 15, 1) == 185
     assert discretionary_dollars(15, 15, 1) == 0
     assert discretionary_dollars(10, 15, 1) == 0
 
 
 def test_manager_budget_ignores_ir_picks_for_mandatory_count_but_counts_their_cost():
+    """Manager budget ignores ir picks for mandatory count but counts their cost."""
     lg = league()
     m = Manager(manager_id="m1", name="Me", is_user=True, budget_total=200)
     picks = [pick(1, "m1", 60, "UTIL"), pick(2, "m1", 5, "IR"), pick(3, "m2", 40, "BN")]
@@ -60,6 +66,7 @@ def test_manager_budget_ignores_ir_picks_for_mandatory_count_but_counts_their_co
 
 
 def test_validate_bid_rejects_bids_that_would_strand_the_roster():
+    """Validate bid rejects bids that would strand the roster."""
     lg = league()
     m = Manager(manager_id="m1", name="Me", budget_total=200)
     b = manager_budget(lg, m, [])
@@ -70,6 +77,7 @@ def test_validate_bid_rejects_bids_that_would_strand_the_roster():
 
 
 def test_validate_bid_when_roster_is_full():
+    """Validate bid when roster is full."""
     lg = league()
     m = Manager(manager_id="m1", name="Me", budget_total=200)
     picks = [pick(i, "m1", 1) for i in range(1, 16)]
@@ -93,5 +101,6 @@ def test_sequence_of_max_bids_always_leaves_the_roster_fillable():
 
 
 def test_league_rejects_budget_that_cannot_fill_mandatory_slots():
+    """League rejects budget that cannot fill mandatory slots."""
     with pytest.raises(ValueError):
         league(budget_per_manager=14)

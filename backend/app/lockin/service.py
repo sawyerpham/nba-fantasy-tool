@@ -26,6 +26,7 @@ CT = ZoneInfo("America/Chicago")   # default; each league picks its own (LeagueS
 
 
 def league_tz(lg) -> ZoneInfo:
+    """The league's time zone (America/Chicago when unset or unknown)."""
     try:
         return ZoneInfo(getattr(lg, "timezone", None) or "America/Chicago")
     except Exception:   # an unknown zone name: fall back rather than break the page
@@ -56,6 +57,7 @@ _cache: dict[str, tuple[float, Any]] = {}
 def http_fetch(platform: Any) -> Fetch:
     """GET JSON through the Sleeper provider's HTTP session, cached per URL for `ttl` seconds; None on 404."""
     def fetch(url: str, ttl: int) -> Any:
+        """Cached GET: reuse a response younger than `ttl` seconds, else fetch it."""
         hit = _cache.get(url)
         if hit and time.monotonic() - hit[0] < ttl:
             return hit[1]
@@ -68,15 +70,18 @@ def http_fetch(platform: Any) -> Fetch:
 
 
 def today_ct(tz: ZoneInfo = CT) -> date:
+    """Today's date in the given time zone."""
     return datetime.now(tz).date()
 
 
 def projected_fp(stats: dict, scoring, bonus_per_game: float = 0.0) -> float:
+    """A projected stat line in league fantasy points (base values plus the bonus per game)."""
     line = SimpleNamespace(**{f: float(stats.get(k) or 0.0) for f, k in STAT_KEYS.items()})
     return base_points(line, scoring.base) + bonus_per_game
 
 
 def actual_fp(stats: dict, scoring) -> float:
+    """A box-score stat line in league fantasy points."""
     line = GameLine(player_id=0, season="", game_id="", game_date=date(2000, 1, 1), team_abbr="", opponent_abbr="",
                     home=False, minutes=float(stats.get("sp") or 0) / 60,
                     **{f: int(round(float(stats.get(k) or 0))) for f, k in STAT_KEYS.items()})
@@ -84,6 +89,7 @@ def actual_fp(stats: dict, scoring) -> float:
 
 
 def week_dates(schedule: list[dict]) -> dict[int, list[str]]:
+    """The dates of each fantasy week (week number -> game dates) from the schedule."""
     out: dict[int, set[str]] = {}
     for g in schedule:
         out.setdefault(int(g["week"]), set()).add(g["date"])
@@ -124,6 +130,7 @@ SLEEPER_FLIP_HOUR = 4   # ponytail: guessed hour (ET) Sleeper's lineup day rolls
 
 
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
+    """The fantasy week view: matchups, standings, every rostered player's games with projections, scores, injuries and locks, the lineup day and the Sleeper gap. Reads Sleeper and ESPN through the cached fetcher."""
     from .weekplan import Game, beat_chance, live_estimate, swing_of
 
     lg = session.league
@@ -285,6 +292,7 @@ ESPN_PAIRS = {"fieldGoalsMade-fieldGoalsAttempted": ("fgm", "fga"), "threePointF
 
 
 def _num(s) -> float:
+    """A stat string as a number (+/- signs removed; 0 when it isn't one)."""
     try:
         return float(str(s).replace("+", ""))
     except ValueError:
@@ -379,6 +387,7 @@ def detect_lock(counted: float | None, games: list[dict], manual: str | None) ->
 
 
 def read_locks(store, league_id: str, week: int) -> dict[str, str]:
+    """The saved lock answers for a league and week (Sleeper id -> game date or "")."""
     data = store.read_json(LOCKS_FILE) if store.exists(LOCKS_FILE) else {}
     return data.get(league_id, {}).get(str(week), {})
 
@@ -395,6 +404,7 @@ def write_lock(store, league_id: str, week: int, sid: str, game_date: str | None
 
 
 def _slot_counts(positions: list[str]) -> dict[str, int]:
+    """Count the starting slots of each type (bench and IR excluded)."""
     counts: dict[str, int] = {}
     for pos in positions:
         if pos not in ("BN", "IR"):
@@ -403,6 +413,7 @@ def _slot_counts(positions: list[str]) -> dict[str, int]:
 
 
 def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
+    """Build the plan players for one team: games with projections and results, current slots, locks and values, as the week plan needs them."""
     from .weekplan import Game, PlanPlayer, swing_of, wait_value
 
     positions = view["roster_positions"]
@@ -411,6 +422,7 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
     counted = side.get("players_points") or {}
     now = datetime.fromisoformat(view["now"]) if view.get("now") else None
     def tipped(g: dict) -> bool:   # the clock says he has tipped off (ESPN's state can lag a minute or two)
+        """Whether the clock says the game has tipped (ESPN's state can lag a minute or two)."""
         return bool(now and g["tip"] and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) <= now)
     out, locks = [], {}
     for sid in team["players"]:
@@ -444,6 +456,7 @@ GAME_MINUTES = 135       # ponytail: a game runs ~2 h 15 m; overtime runs longer
 
 
 def _team_tag(team: dict) -> dict:   # what the frontend's TeamName shows
+    """A team's identity fields as the frontend's TeamName shows them."""
     return {k: team.get(k) for k in ("roster_id", "name", "user", "avatar", "wins", "losses", "last")}
 
 
@@ -464,14 +477,17 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
         return {"start": start.isoformat(), "end": end.isoformat(), "segments": []}
 
     def at(iso: str) -> datetime:
+        """Parse an ISO timestamp."""
         return datetime.fromisoformat(iso.replace("Z", "+00:00"))
     active = [p for p in players if p.slot != "IR"]
     tips = sorted({at(g.tip) for p in active for g in p.games if g.tip and not g.started})
 
     def starters(seats: dict) -> set[str]:
+        """The player ids seated in a starting slot."""
         return {sid for ids in seats.values() for sid in ids}
 
     def next_day() -> str | None:   # the date of the next game still to tip
+        """The date of the next game still to tip."""
         g = min((g for p in active for g in p.games if not g.started), key=lambda g: (g.date, g.tip or "~"), default=None)
         return g.date if g else None
     saved = {id(g): (g.started, g.live) for p in players for g in p.games}
@@ -598,6 +614,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
 
 
 def _player_out(q, locks: dict) -> dict:
+    """A plan player as the API returns him: ids, slot, seat, value, swing, lock state and the win chances."""
     status, when = locks.get(q.sid, ("no", None))
     return {"sid": q.sid, "name": q.name, "pos": q.eligibility, "slot": q.slot, "seat": q.seat, "x": q.x,
             "w": round(q.w, 2), "value": round(q.value, 2), "swing": round(q.swing, 2), "locked": q.locked,
@@ -608,7 +625,6 @@ def _player_out(q, locks: dict) -> dict:
             "lock_at": q.lock_at, "x_final": q.x_final}
 
 
-# ---- injuries, league-wide -------------------------------------------------------------------------------
 SLEEPER_PLAYERS = SLEEPER + "/v1/players/nba"
 INJURY_TTL = 10 * 60   # Sleeper's player list (every player's injury tag) is re-read this often: the depth charts stay live
 OUT_TAGS = {"Out", "IR", "Sus", "Doubtful"}   # red; any other tag (Questionable, GTD, DTD, Probable) is yellow
@@ -645,7 +661,6 @@ def injury_report(hurt: dict[str, dict]) -> list[dict]:
                   key=lambda t: (-t["starters_out"], -t["starters_q"], -t["out"], -(t["out"] + t["q"]), t["abbr"]))
 
 
-# ---- an NBA team's card ----------------------------------------------------------------------------------
 TEAM_STAT_KEYS = ("pts", "reb", "ast", "stl", "blk", "to", "pf", "fgm", "fga", "ftm", "fta", "tpm", "tpa")
 
 
@@ -715,7 +730,6 @@ def team_news(session, fetch: Fetch, abbr: str) -> list[dict]:
     return sorted(out, key=lambda n: n["published"] or "", reverse=True)
 
 
-# ---- one player's season page --------------------------------------------------------------------------
 SLEEPER_NEWS = "https://api.sleeper.com/players/nba/{}/news"   # undocumented: the feed the Sleeper app shows
 NEWS_TTL = 15 * 60
 GAME_LOG = 10
@@ -757,6 +771,7 @@ def season_news(view: dict, fetch: Fetch, free: list[str] = ()) -> dict:
     free = [s for s in dict.fromkeys(free) if s not in owner and (players.get(s) or {}).get("player_id")]
 
     def notes(sid: str) -> list[dict]:
+        """A player's news notes with his identity, injury tag and owner."""
         p, t = players[sid], owner.get(sid)
         return [{**n, "sid": sid, "player_id": p["player_id"], "name": p["name"], "team": p.get("team"),
                  "injury_tag": p.get("injury_tag"), "injury_note": p.get("injury_note"), "owner": t["name"] if t else None,
@@ -948,7 +963,6 @@ def season_player(session, fetch: Fetch, player_id: int, week: int | None = None
             "news": player_news(fetch, sid)}
 
 
-# ---- waivers ---------------------------------------------------------------------------------------------
 FAAB_TOTAL = 100   # fallback only: the budget comes from the league's settings (waiver_budget)
 WAIVER_TYPES = {0: "rolling", 1: "reverse standings", 2: "FAAB"}   # Sleeper settings.waiver_type
 WAIVER_SHOW = 12
@@ -976,6 +990,7 @@ LONG_OUT = re.compile(r"surger|indefinite|season-ending|for the season|torn|\bte
 
 
 def long_out(fetch: Fetch, sid: str, tag: str | None) -> bool:
+    """Whether an Out / IR player's latest notes say he is done for the season."""
     return tag in ("Out", "IR") and any(LONG_OUT.search(f"{n['headline']} {n['story']}") for n in player_news(fetch, sid)[:3])
 
 

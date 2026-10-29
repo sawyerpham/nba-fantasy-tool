@@ -40,6 +40,7 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class PullStatus:
+    """Progress of a pull: state (idle / running / done / failed), phase, progress counter, timings, error and the provider reports."""
     state: str = "idle"  # idle | running | done | failed
     phase: str = ""
     progress: FetchProgress | None = None
@@ -54,6 +55,7 @@ class PullStatus:
     error: str | None = None
 
     def as_dict(self) -> dict:
+        """The status as a JSON-ready dict."""
         return {
             "state": self.state,
             "phase": self.phase,
@@ -74,10 +76,12 @@ class PlayerDetailCache:
     """On-demand PlayerDetail fetch with on-disk cache; used for birthdate tiebreaks and the sidebar."""
 
     def __init__(self, store: JsonStore, stats: StatsProvider) -> None:
+        """Use the store and the nba_api provider."""
         self.store = store
         self.stats = stats
 
     def get(self, player_id: int) -> PlayerDetail | None:
+        """A player's detail from the disk cache, else fetched and cached; None when it can't be fetched."""
         rel = config.player_detail_rel(player_id)
         cached = self.store.read_model_or_none(rel, PlayerDetail)
         if cached is not None:
@@ -91,11 +95,13 @@ class PlayerDetailCache:
         return detail
 
     def birthdate(self, player_id: int) -> date | None:
+        """A player's birthdate, via his detail."""
         detail = self.get(player_id)
         return detail.birthdate if detail else None
 
 
 def load_overrides(store: JsonStore) -> dict[int, PlayerOverrides]:
+    """Load the per-player overrides from the data directory."""
     if not store.exists(config.OVERRIDES_REL):
         return {}
     raw = store.read_json(config.OVERRIDES_REL)
@@ -103,6 +109,7 @@ def load_overrides(store: JsonStore) -> dict[int, PlayerOverrides]:
 
 
 def save_overrides(store: JsonStore, overrides: Mapping[int, PlayerOverrides]) -> None:
+    """Save the overrides (sorted by player id)."""
     store.write_json(
         config.OVERRIDES_REL,
         {str(k): v.model_dump(mode="json") for k, v in sorted(overrides.items())},
@@ -110,6 +117,7 @@ def save_overrides(store: JsonStore, overrides: Mapping[int, PlayerOverrides]) -
 
 
 def load_records(store: JsonStore, roster_season: str) -> list[PlayerRecord]:
+    """The reconciled player records for a roster season (empty before the first pull)."""
     rel = config.reconcile_rel(roster_season)
     if not store.exists(rel):
         return []
@@ -117,16 +125,19 @@ def load_records(store: JsonStore, roster_season: str) -> list[PlayerRecord]:
 
 
 def load_projections(store: JsonStore, roster_season: str) -> dict[str, dict[str, float]]:
+    """Sleeper's season projections by Sleeper id (empty when not pulled)."""
     rel = config.projections_rel(roster_season)
     return store.read_json(rel)["projections"] if store.exists(rel) else {}
 
 
 def load_schedule(store: JsonStore, roster_season: str) -> dict[str, dict[str, int]]:
+    """The NBA games-per-week schedule by team (empty when not pulled)."""
     rel = config.schedule_rel(roster_season)
     return store.read_json(rel)["games"] if store.exists(rel) else {}
 
 
 def load_game_logs(store: JsonStore, stats_season: str) -> dict[int, list[GameLine]]:
+    """The cached game logs by player id (empty when not pulled)."""
     rel = config.game_logs_rel(stats_season)
     if not store.exists(rel):
         return {}
@@ -135,6 +146,7 @@ def load_game_logs(store: JsonStore, stats_season: str) -> dict[int, list[GameLi
 
 
 class PullService:
+    """Orchestrates the pre-draft pull: nba_api pool and Sleeper players, reconcile, game logs, then seeding overrides. Runs synchronously and publishes its status for polling."""
     def __init__(
         self,
         store: JsonStore,
@@ -144,6 +156,7 @@ class PullService:
         stats_season: str | None = None,
         injury_map: Mapping[str, InjuryStatus] | None = None,
     ) -> None:
+        """Create the service with its providers; seasons default from Sleeper's state and the previous season."""
         self.store = store
         self.stats = stats
         self.platform = platform
@@ -153,17 +166,17 @@ class PullService:
         self.status = PullStatus()
         self.details = PlayerDetailCache(store, stats)
 
-    # ---- progress plumbing --------------------------------------------------------------------
 
     def _phase(self, name: str) -> None:
+        """Enter a named phase and reset the progress counter."""
         self.status.phase = name
         self.status.progress = None
         log.info("pull phase: %s", name)
 
     def _on_progress(self, progress: FetchProgress) -> None:
+        """Store the latest progress from a provider."""
         self.status.progress = progress
 
-    # ---- main entry -----------------------------------------------------------------------------
 
     def run(
         self,
@@ -171,6 +184,7 @@ class PullService:
         force_sleeper: bool = False,
         skip_game_logs: bool = False,
     ) -> PullStatus:
+        """Run the whole pull for the chosen sources; failures are recorded in the status and returned, not raised."""
         sources = set(sources)
         st = self.status
         st.state, st.started_at, st.error = "running", utcnow(), None
@@ -198,9 +212,9 @@ class PullService:
             st.phase = "finished" if st.state == "done" else st.phase
         return st
 
-    # ---- steps ----------------------------------------------------------------------------------
 
     def _resolve_seasons(self, sources: set[str]) -> None:
+        """Work out the roster and stats seasons (from Sleeper's state when not given)."""
         if self.platform is not None and "sleeper" in sources:
             self._phase("sleeper_state")
             try:
@@ -216,6 +230,7 @@ class PullService:
         self.stats_season = self.stats_season or config.DEFAULT_STATS_SEASON
 
     def _pull_nba_pool(self) -> list[PlayerBio]:
+        """Pull the nba_api player pool and cache it."""
         self._phase("nba_pool")
         bios, report = self.stats.fetch_player_pool(self.roster_season, self._on_progress)
         self.status.reports.append(report)
@@ -259,6 +274,7 @@ class PullService:
         self.store.write_json(config.AVAILABILITY_HISTORY_REL, {"pulled_at": utcnow().isoformat(), "seasons": seasons}, indent=None)
 
     def _pull_schedule(self) -> None:
+        """Pull the NBA schedule (games per week) when the provider supports it; failures don't stop the pull."""
         if not hasattr(self.stats, "fetch_schedule"):
             return
         self._phase("nba_schedule")
@@ -272,6 +288,7 @@ class PullService:
                                   {"pulled_at": utcnow().isoformat(), "games": games}, indent=None)
 
     def _pull_sleeper(self, sources: set[str], force: bool) -> tuple[list[PlayerBio], dict[str, FantasyAttributes]]:
+        """Pull the Sleeper player pool and fantasy attributes (including unrostered players)."""
         if self.platform is None or "sleeper" not in sources:
             return [], {}
         self._phase("sleeper_players")
@@ -284,6 +301,7 @@ class PullService:
         return bios, attrs
 
     def _pull_projections(self, sources: set[str]) -> None:
+        """Pull Sleeper's season projections when supported; failures don't stop the pull."""
         if self.platform is None or "sleeper" not in sources or not hasattr(self.platform, "fetch_projections"):
             return
         self._phase("sleeper_projections")
@@ -325,6 +343,7 @@ class PullService:
     def _reconcile(
         self, nba_bios: list[PlayerBio], sleeper_all: list[PlayerBio], fantasy: dict[str, FantasyAttributes]
     ) -> tuple[list[PlayerRecord], ReconcileReport]:
+        """Reconcile the nba_api pool with Sleeper's players, save the records and the report."""
         self._phase("reconcile")
         inputs = ReconcileInputs(
             roster_season=self.roster_season,
@@ -344,6 +363,7 @@ class PullService:
         return records, report
 
     def _pull_game_logs(self, records: list[PlayerRecord]) -> dict[int, list[GameLine]]:
+        """Pull game logs for every player with stats and cache them."""
         self._phase("game_logs")
         ids = [r.player_id for r in records if r.has_stats]
         logs, report = self.stats.fetch_game_logs(self.stats_season, ids, self._on_progress)
@@ -359,6 +379,7 @@ class PullService:
         return logs
 
     def _seed(self, records: list[PlayerRecord]) -> None:
+        """Seed the overrides from Sleeper (eligibility, injury), ignoring short-term injuries in the preseason."""
         self._phase("seed_overrides")
         existing = load_overrides(self.store)
         state = self.status.platform_state

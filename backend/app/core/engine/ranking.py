@@ -30,6 +30,7 @@ from . import roster
 
 @dataclass
 class RankedPlayer:
+    """One ranked player for a manager: identity, team, eligibility, projections, availability, value factors, scarcity and whether he can fill an open slot."""
     player_id: int
     full_name: str
     sleeper_id: str | None
@@ -75,10 +76,12 @@ class RankedPlayer:
 
 
 def injury_multiplier(status: str, ranking: RankingSettings) -> float:
+    """Value multiplier for an injury status (1 when unknown)."""
     return float(ranking.injury_multipliers.get(status, 1.0))
 
 
 def age_multiplier(age: float | None, ranking: RankingSettings) -> float:
+    """Value multiplier for age: no penalty before the start age, then a yearly penalty up to a cap."""
     if age is None:
         return 1.0
     years_over = max(0.0, age - ranking.age_penalty_start)
@@ -118,6 +121,7 @@ def expected_fpts(
 def _expected_fpts(
     record: PlayerRecord, valuation: PlayerValuation | None, ranking: RankingSettings, scoring: ScoringSettings | None
 ) -> tuple[float, float]:
+    """Expected (FP/G, ceiling) for a player: the projection blended with last season's FP/G, with the ceiling scaled the same way; last season alone without a projection."""
     proj = projected_fpts(record, valuation, scoring)
     last = valuation.avg_fpts if valuation else 0.0
     if proj is None:
@@ -262,6 +266,7 @@ def rank_players(
     schedule: Mapping[str, float] | None = None,
     scarcity: Mapping[int, float] | None = None,
 ) -> list[RankedPlayer]:
+    """Rank the players still available for one manager by value, with eligibility, same-team stacking, schedule and scarcity applied; players who can't fill any open slot sink to the bottom."""
     schedule, scarcity = schedule or {}, scarcity or {}
     my_picks = list(my_picks)
     stack = roster.team_stack(players, my_picks)

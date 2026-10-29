@@ -19,6 +19,7 @@ from ..core.engine.ranking import expected_fpts
 
 
 def room_board(session, my_manager_id: str) -> list[dict]:
+    """The room board: one entry per manager with money, roster by spot (each sale coloured against the Worth it had when it sold), needs, strength estimates, habits, and the players to nominate to make each rival spend. `my_manager_id` marks you."""
     lg = session.league
     schedule = session.schedule()
     worths = sale_worths(session)   # each sale's Worth when it sold, for the over / fair / steal colours

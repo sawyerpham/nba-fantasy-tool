@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 
-// The rankings' NBA Teams view: projected wins (preseason betting win totals, data/win_totals.json), projected
-// fantasy talent and last season's record. Click a team to open its best player.
 const COLS = [
   ["name", "Team", ""],
   ["conference", "Conf", "East or West", ""],
@@ -14,6 +12,7 @@ const COLS = [
   ["best_fpg", "Best player", "", ""],
 ];
 
+/** The rankings' NBA Teams view: projected wins (preseason betting win totals from data/win_totals.json), projected fantasy talent and last season's record. Clicking a team opens its best player. */
 export default function NbaTeamsTable({ leagueId, refreshKey, onSelectPlayer }) {
   const [teams, setTeams] = useState([]);
   const [sort, setSort] = useState({ key: "proj_wins", dir: "desc" });
@@ -22,6 +21,7 @@ export default function NbaTeamsTable({ leagueId, refreshKey, onSelectPlayer }) 
     const x = a[sort.key] ?? -1e9, y = b[sort.key] ?? -1e9;
     return (x < y ? -1 : x > y ? 1 : 0) * (sort.dir === "asc" ? 1 : -1);
   });
+  /** Sort by `key`: a second click flips the direction; a new key starts ascending for names and descending otherwise. */
   const onSort = (key) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === "asc" ? "desc" : "asc") : key === "name" ? "asc" : "desc" }));
 
   return (

@@ -23,10 +23,12 @@ STAT_KEYS: tuple[str, ...] = ("pts", "reb", "ast", "stl", "blk", "tov", "fgm", "
 
 
 def monday_of(day: date) -> date:
+    """The Monday that starts the fantasy week containing `day`."""
     return day - timedelta(days=day.weekday())
 
 
 def week_index(day: date, season_start: date) -> int:
+    """Zero-based index of the fantasy week (Mon-Sun) containing `day`, counted from the season's first week."""
     return (day - season_start).days // 7
 
 
@@ -47,6 +49,7 @@ def valuate(
     season_start: date | None = None,
     season_weeks: int | None = None,
 ) -> PlayerValuation:
+    """Aggregate one player's game lines into a PlayerValuation: FP/G, best game, weekly-best average, top-quarter average, weeks played and availability, confidence, per-stat averages and bonus frequency, under the given scoring."""
     ordered = sorted(lines, key=lambda g: (g.game_date, g.game_id))
     scores = [score_game(g, settings) for g in ordered]
     per_game = [round(s.fpts, 2) for s in scores]
@@ -103,6 +106,7 @@ def valuate_all(
     stats_season: str,
     player_ids: Iterable[int] | None = None,
 ) -> dict[int, PlayerValuation]:
+    """Valuate many players at once (default: every player with logs), sharing one season span so availability is measured against the same weeks."""
     materialized = {pid: list(lines) for pid, lines in logs.items()}
     season_start, season_weeks = season_span(materialized)
     ids = list(player_ids) if player_ids is not None else list(materialized.keys())
@@ -113,12 +117,14 @@ def valuate_all(
 
 
 def confidence_factor(games_played: int, min_games: int) -> float:
+    """Sample-size confidence: min(1, games played / min_games); 1 when min_games is not positive."""
     if min_games <= 0:
         return 1.0
     return max(0.0, min(1.0, games_played / min_games))
 
 
 def ceiling_value(valuation: PlayerValuation, ranking: RankingSettings) -> float:
+    """The ceiling used for ranking, per the ranking settings: weekly-best average (default), best single game or top-quarter average."""
     if ranking.ceiling_metric == "best_game":
         return valuation.best_game_fpts
     if ranking.ceiling_metric == "top_quarter":
@@ -132,6 +138,7 @@ NO_GAMES_AVAILABILITY = 0.88
 
 
 def availability_factor(valuation: PlayerValuation, ranking: RankingSettings) -> float:
+    """Ranking multiplier from availability: 1 - weight * (1 - availability), where availability is the three-season blend (typical availability stands in for a rookie). 1 when the weight is 0 or the league has no season weeks."""
     w = max(0.0, min(1.0, ranking.availability_weight))
     if w == 0 or valuation.season_weeks == 0:
         return 1.0

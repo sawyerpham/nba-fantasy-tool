@@ -22,6 +22,7 @@ from .core.services.valuation_service import ValuationService
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: compute valuations from the cached game logs, then print a leaderboard (or one player's detail with --player). Returns 1 when that player has no valuation."""
     parser = argparse.ArgumentParser(description="Compute fantasy valuations from cached game logs")
     parser.add_argument("--data-dir", type=Path, default=config.DEFAULT_DATA_DIR)
     parser.add_argument("--stats-season", default=config.DEFAULT_STATS_SEASON)

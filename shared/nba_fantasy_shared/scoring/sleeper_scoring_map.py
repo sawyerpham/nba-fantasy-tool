@@ -55,6 +55,7 @@ EXPECTED_KEYS: tuple[str, ...] = tuple(BASE_KEYS) + (
 
 @dataclass
 class SleeperScoringMapResult:
+    """The result of mapping a Sleeper league's scoring: the ScoringSettings plus what was applied and everything that couldn't be (unknown keys, unsupported non-zero categories, missing expected keys)."""
     settings: ScoringSettings
     applied: dict[str, str] = field(default_factory=dict)          # sleeper key -> "base.pts" / "bonus.pts_40"
     unknown_keys: list[str] = field(default_factory=list)
@@ -68,10 +69,12 @@ class SleeperScoringMapResult:
 
     @property
     def clean(self) -> bool:
+        """True when nothing in the Sleeper scoring was unknown, unsupported or missing."""
         return not self.unknown_keys and not self.unsupported_nonzero and not self.missing_expected
 
 
 def map_sleeper_scoring(scoring_settings: Mapping[str, float]) -> SleeperScoringMapResult:
+    """Map a Sleeper league's flat `scoring_settings` dict onto ScoringSettings. Base keys and bonus keys (either spelling, e.g. bonus_pt_40 / bonus_pt_40p) are applied in SPEC order; anything else is reported, never silently ignored."""
     base = BaseScoring()
     bonuses: list[BonusRule] = []
     result = SleeperScoringMapResult(settings=ScoringSettings(base=base, bonuses=bonuses, source="sleeper"))

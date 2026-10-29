@@ -1,4 +1,3 @@
-"""Normalization against real captured responses (tests/fixtures, pulled 2026-09-02)."""
 
 import json
 from datetime import date
@@ -26,11 +25,13 @@ JOKIC = 203999
 
 
 def load(fixtures_dir, rel):
+    """Load a JSON fixture by relative path."""
     with (fixtures_dir / rel).open(encoding="utf-8") as fh:
         return json.load(fh)
 
 
 def test_parsers():
+    """Parsers."""
     assert parse_height("6-11") == 83 and parse_height("83") == 83 and parse_height(None) is None
     assert parse_matchup("DEN @ SAS") == ("DEN", "SAS", False)
     assert parse_matchup("DEN vs. SAS") == ("DEN", "SAS", True)
@@ -40,6 +41,7 @@ def test_parsers():
 
 
 def test_per_player_and_batch_rows_normalize_to_identical_game_lines(fixtures_dir):
+    """Per player and batch rows normalize to identical game lines."""
     per_player = [game_line_from_row(r) for r in load(fixtures_dir, "nba/playergamelog_203999_2025-26.json")]
     batch = [game_line_from_row(r) for r in load(fixtures_dir, "nba/playergamelogs_2025-26.json") if r["PLAYER_ID"] == JOKIC]
     assert len(per_player) == 65 == len(batch)
@@ -58,6 +60,7 @@ def test_per_player_and_batch_rows_normalize_to_identical_game_lines(fixtures_di
 
 
 def test_playerindex_row_to_bio(fixtures_dir):
+    """Playerindex row to bio."""
     rows = {r["PERSON_ID"]: r for r in load(fixtures_dir, "nba/playerindex_2026-27.json")}
     bio = bio_from_playerindex_row(rows[JOKIC])
     assert bio.source == "nba_api" and bio.source_id == "203999"
@@ -69,6 +72,7 @@ def test_playerindex_row_to_bio(fixtures_dir):
 
 
 def test_sleeper_entry_to_bio_and_fantasy_attributes(fixtures_dir):
+    """Sleeper entry to bio and fantasy attributes."""
     payload = load(fixtures_dir, "sleeper/players_nba.json")
     jokic = payload["1658"]
     bio = bio_from_sleeper_entry(jokic)
@@ -86,6 +90,7 @@ def test_sleeper_entry_to_bio_and_fantasy_attributes(fixtures_dir):
 
 
 def test_sleeper_placeholders_are_filtered(fixtures_dir):
+    """Sleeper placeholders are filtered."""
     payload = load(fixtures_dir, "sleeper/players_nba.json")
     defs = [e for e in payload.values() if e.get("position") == "DEF"]
     dups = [e for e in payload.values() if e.get("status") == "DUP"]
@@ -97,6 +102,7 @@ def test_sleeper_placeholders_are_filtered(fixtures_dir):
 
 
 def test_detail_from_responses_with_and_without_career(fixtures_dir):
+    """Detail from responses with and without career."""
     jokic = detail_from_responses(JOKIC, load(fixtures_dir, "nba/commonplayerinfo_203999.json"),
                                   load(fixtures_dir, "nba/playercareerstats_203999.json"))
     assert jokic.birthdate == date(1995, 2, 19) and jokic.season_exp == 11 and jokic.height_in == 83
@@ -109,6 +115,7 @@ def test_detail_from_responses_with_and_without_career(fixtures_dir):
 
 
 def test_platform_state_and_league(fixtures_dir):
+    """Platform state and league."""
     state = platform_state_from_json(load(fixtures_dir, "sleeper/state_nba.json"))
     assert state.season == "2026" and state.season_type == "off" and state.previous_season == "2025"
     assert state.season_start_date == date(2026, 10, 20)

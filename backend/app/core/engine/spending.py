@@ -40,6 +40,7 @@ NOMINATE_DRAIN, NOMINATE_SNEAK = 5, 3   # how many of each the guide lists
 
 @dataclass
 class ManagerMoney:
+    """One manager's money for the room table: remaining, open slots, cap, per-slot money and where he ranks."""
     manager_id: str
     name: str
     is_user: bool
@@ -55,6 +56,7 @@ class ManagerMoney:
 
 @dataclass
 class SlotPlan:
+    """The plan for one open slot: its budget, the best player left for it and the best one within the budget."""
     slot: str
     budget: int
     best_id: int | None = None
@@ -67,6 +69,7 @@ class SlotPlan:
 
 @dataclass
 class TargetAdvice:
+    """Advice on one player: the slot he would fill, the market price, comfort limit, walk-away, your max, the competition and the call (buy / star / pricey / cannot)."""
     player_id: int
     name: str
     slot: str | None                 # slot they would take on my roster
@@ -89,6 +92,7 @@ class TargetAdvice:
 
 @dataclass
 class SpendingGuide:
+    """The whole spending guide: your money against the room, inflation, the plan for open spots, nomination ideas, advice on the focus player and headline advice."""
     manager_id: str
     name: str
     me: ManagerMoney
@@ -120,11 +124,13 @@ class SpendingGuide:
 
 
 def ordinal(n: int) -> str:
+    """English ordinal for a number."""
     suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
 
 
 def manager_money(league: LeagueSettings, manager: Manager, picks: Iterable[Pick]) -> ManagerMoney:
+    """A manager's money summary from his picks."""
     picks = list(picks)
     b = manager_budget(league, manager, picks)
     own = [p for p in picks if p.manager_id == manager.manager_id]
@@ -159,6 +165,7 @@ def spending_guide(
     targets_n: int = DEFAULT_TARGETS,
     call_ids: Iterable[int] = (),
 ) -> SpendingGuide:
+    """Build the spending guide for one manager: money against the room, inflation against the opening prices, a plan for each open slot, nomination ideas (drain / sneak) and the call on `focus_player_id`."""
     min_bid = league.min_bid
     money = [manager_money(league, m, picks) for m in managers]
     me = next(x for x in money if x.manager_id == my_manager_id)
@@ -184,15 +191,18 @@ def spending_guide(
     recs: dict[int, BidRecommendation] = {}
 
     def rec_for(p: RankedPlayer) -> BidRecommendation:
+        """The bid recommendation for a player (cached per player)."""
         if p.player_id not in recs:
             recs[p.player_id] = recommend_bid(league, managers, picks, my_manager_id, p, available, pool_values, progress, rate=rate)
         return recs[p.player_id]
 
     def price(p: RankedPlayer) -> int:
+        """The price used in the plan: the recommended max, or fair value when he can't be bid on."""
         r = rec_for(p)
         return r.recommended_max if r.can_bid else max(min_bid, int(round(r.fair_value)))
 
     def build_plan(exclude: set[int], skip_slot: str | None = None) -> list[SlotPlan]:
+        """Plan each open starting slot (and bench at the minimum), never using a player twice."""
         plan: list[SlotPlan] = []
         used: set[int] = set(exclude)
         skipped = False
@@ -231,6 +241,7 @@ def spending_guide(
     rich = money_rank <= max(1, -(-n // 3))  # top third of the room by money left
 
     def tier_of(p: RankedPlayer) -> str:
+        """Whether a candidate is a top, starter or bench target by his rank among the candidates."""
         idx = next((i for i, c in enumerate(candidates) if c.player_id == p.player_id), len(candidates))
         if idx < top_n:
             return "top"
@@ -239,9 +250,11 @@ def spending_guide(
         return "bench"
 
     def clamp(x: float) -> int:
+        """Clamp a price to the legal range for me."""
         return int(max(min_bid, min(int(x), me.max_bid)))
 
     def advise(target: RankedPlayer) -> TargetAdvice:
+        """The call and prices for one target: market price, comfort limit, walk-away, your max and the buy / star / pricey / cannot call."""
         r = rec_for(target)
         slot = roster.assign_slot(league, my_picks, target.eligibility)
         tier = tier_of(target)
@@ -262,6 +275,7 @@ def spending_guide(
         bench_after = bench_total - (0 if starter_slot else min_bid)
 
         def per_starter(x: int) -> float:
+            """My money per open starter after paying `x`."""
             left = me.remaining - x - bench_after
             return left / starters_after if starters_after > 0 else float(left)
 
@@ -273,6 +287,7 @@ def spending_guide(
         walk = max(walk, stretch)
 
         def tail(x: int) -> str:
+            """A short description of what the rest of the roster gets after paying `x`."""
             left = me.remaining - x
             slots = me.open_mandatory - 1
             if slots <= 0:
@@ -329,7 +344,6 @@ def spending_guide(
                 continue
             targets.append(advise(p))
 
-    # ---- nomination ideas
     # drain: players the room will pay a lot for that you won't buy (no fitting slot, above your cap, or too pricey);
     # sneak: players you want that few rivals can afford right now, so they may go near fair value.
     # ponytail: scans the top NOMINATION_SCAN available; widen if late-draft suggestions run dry.
@@ -362,7 +376,6 @@ def spending_guide(
                                 "who": who(payers), "why": "",
                                 "reason": f"only {len(payers)} rival{'s' if len(payers) != 1 else ''} can reach ${suggested} right now"})
 
-    # ---- headline advice
     advice: list[str] = []
     if me.open_mandatory == 0:
         advice.append(f"Roster full: ${me.remaining} unspent.")
