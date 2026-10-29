@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import Headshot from "./Headshot.jsx";
 import { PosList } from "./Pos.jsx";
 import { api, qs } from "../api.js";
 
@@ -17,6 +18,7 @@ export default function PlayerSearch({ leagueId, onSelect, onSelectTeam, placeho
   const [hits, setHits] = useState([]);
   const [open, setOpen] = useState(false);
   const timer = useRef(null);
+  const input = useRef(null);
 
   const needle = q.trim().toLowerCase();
   const teams = onSelectTeam && needle.length >= 2 ? TEAMS.filter((t) => t.abbr.toLowerCase() === needle || t.name.toLowerCase().includes(needle)) : [];
@@ -46,6 +48,7 @@ export default function PlayerSearch({ leagueId, onSelect, onSelectTeam, placeho
   return (
     <div className="search-wrap">
       <input
+        ref={input}
         type="text"
         value={q}
         placeholder={placeholder}
@@ -67,6 +70,7 @@ export default function PlayerSearch({ leagueId, onSelect, onSelectTeam, placeho
           ))}
           {hits.map((p) => (
             <div key={p.player_id} onClick={() => choose(p)} data-testid={`search-result-${p.player_id}`}>
+              <Headshot sleeperId={p.sleeper_id} name={p.full_name} size={28} />
               {p.full_name} <span className="muted">{p.team_abbr || "FA"} · {p.eligibility.length ? <PosList list={p.eligibility} /> : "no position"}</span>
               {p.drafted_by && <span className="badge">drafted: {p.drafted_by}</span>}
               {!p.has_stats && <span className="badge warn">no stats</span>}
@@ -74,6 +78,7 @@ export default function PlayerSearch({ leagueId, onSelect, onSelectTeam, placeho
           ))}
         </div>
       )}
+      {q && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => { setQ(""); setOpen(false); input.current?.focus(); }}>✕</button>}
     </div>
   );
 }
