@@ -9,13 +9,12 @@ import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
-  ["settings", "Settings"],   // the league's managers, keepers, settings, data pull and wallpaper
-  ["draft", "Draft"],
-  ["season", "Season"],      // the rest are SeasonPage's views
+  ["season", "Season"],      // these are SeasonPage's views (Settings is the cogwheel at the top right)
   ["news", "News"],
   ["standings", "League"],
   ["waivers", "Waivers"],
 ];
+const TAB_COLORS = { season: "#3b82f6", news: "#f59e0b", standings: "#10b981", waivers: "#ec4899" };   // each tab's own hue (see header.top nav button in styles.css)
 const SEASON_VIEWS = { season: "week", news: "news", standings: "league", waivers: "waivers" };
 
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
@@ -78,13 +77,15 @@ export default function App() {
         <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo">🏀</span>NBA Fantasy Tool</span>
         <nav>
           {TABS.map(([id, label]) => (
-            <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`tab-${id}`}>
+            <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} style={{ "--c": TAB_COLORS[id] }} data-testid={`tab-${id}`}>
               {label}
             </button>
           ))}
         </nav>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         {health && !health.ok && <span className="meta"><span className="small warn-text" data-testid="health">API unreachable</span></span>}
+        {/* the league's managers, keepers, settings, data pull and wallpaper */}
+        <button className={`cog ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")} data-testid="tab-settings" aria-label="Settings" title="Settings">⚙&#xFE0E;</button>
       </header>
       <main>
         {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
