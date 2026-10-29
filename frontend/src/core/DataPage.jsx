@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api.js";
 
+/** Table of per-source pull reports (calls, cache hits, requested / succeeded / failed); failures expand to their detail. Renders nothing for an empty list. */
 function Reports({ reports }) {
   if (!reports || !reports.length) return null;
   return (
@@ -21,6 +22,7 @@ function Reports({ reports }) {
   );
 }
 
+/** Collapsible list of reconcile names (open when 12 or fewer), formatted by `fmt`; "none" when empty. */
 function NameList({ title, rows, fmt }) {
   if (!rows || !rows.length) return <p className="muted">{title}: none</p>;
   return (
@@ -31,6 +33,10 @@ function NameList({ title, rows, fmt }) {
   );
 }
 
+/**
+ * Data-pool panel: start a pull (nba_api and/or Sleeper), poll its progress every second while it runs, and show cache status and the reconcile report.
+ * Calls `onPoolChanged` when a pull finishes so the rest of the app refreshes.
+ */
 export default function DataPage({ onPoolChanged }) {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
@@ -38,6 +44,7 @@ export default function DataPage({ onPoolChanged }) {
   const [forceSleeper, setForceSleeper] = useState(false);
   const [skipLogs, setSkipLogs] = useState(false);
 
+  /** Reload /data/status into state. */
   const refresh = useCallback(() => api.get("/data/status").then(setStatus).catch((e) => setError(e.message)), []);
 
   useEffect(() => {
@@ -55,6 +62,7 @@ export default function DataPage({ onPoolChanged }) {
     if (status?.pull?.state === "done") onPoolChanged?.();
   }, [status?.pull?.state, onPoolChanged]);
 
+  /** Start a data pull for the ticked sources (with the force-Sleeper and skip-game-logs options) and refresh the status. */
   const startPull = async () => {
     setError("");
     try {

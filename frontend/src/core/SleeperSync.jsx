@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../api.js";
 
+/** Format an ISO timestamp in the browser's locale ("Oct 19, 1:00 AM"); "" for none. */
 const when = (iso) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
-// Sleeper times inside entry text (e.g. "draft scheduled for 2026-10-19T01:00:28+00:00") shown in local time.
+/** Rewrite the ISO timestamps embedded in Sleeper activity text ("draft scheduled for 2026-10-19T01:00:28+00:00") into local time. */
 const localize = (text) => text.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+\+00:00/g, (iso) => when(iso));
 const KIND = { trade: "trade", waiver: "waiver", free_agent: "free agent", commissioner: "commish", keeper: "keeper", member: "member", rules: "rules", draft: "draft" };
 
-// One-click sync with the linked Sleeper league, plus the league's activity log (who did what, when).
+/** One-click sync with the linked Sleeper league, plus the league's activity log (who did what, when). */
 export default function SleeperSync({ leagueId, sleeperLeagueId, onSynced }) {
   const [log, setLog] = useState([]);
   const [result, setResult] = useState(null);
@@ -14,9 +15,11 @@ export default function SleeperSync({ leagueId, sleeperLeagueId, onSynced }) {
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
 
+  /** Reload the Sleeper activity log (empty on failure). */
   const loadLog = useCallback(() => api.get(`/leagues/${leagueId}/sleeper/changelog`).then(setLog).catch(() => setLog([])), [leagueId]);
   useEffect(() => { loadLog(); }, [loadLog]);
 
+  /** Run the Sleeper sync, show its result, refresh the log and call `onSynced`. */
   const sync = async () => {
     setBusy(true); setError(""); setResult(null);
     try {

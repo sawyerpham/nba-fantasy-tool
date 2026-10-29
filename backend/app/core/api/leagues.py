@@ -1,4 +1,3 @@
-"""League documents: settings, managers, keeper history, Sleeper preview/apply, export."""
 
 from __future__ import annotations
 
@@ -22,11 +21,13 @@ router = APIRouter(prefix="/leagues", tags=["leagues"])
 
 @router.get("")
 def list_leagues(state: AppState = Depends(get_state)) -> list[dict]:
+    """List every league (id, name, status)."""
     return state.list_leagues()
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_league(body: CreateLeague, state: AppState = Depends(get_state)) -> dict:
+    """Create a league (optionally with settings and managers); 201."""
     try:
         validate_league_id(body.league_id)
     except ValueError as exc:
@@ -45,24 +46,26 @@ def create_league(body: CreateLeague, state: AppState = Depends(get_state)) -> d
 
 @router.get("/{league_id}")
 def get_league(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """A league's document."""
     return _session(state, league_id).to_export().model_dump(mode="json")
 
 
 @router.delete("/{league_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_league(league_id: str, state: AppState = Depends(get_state)) -> None:
+    """Delete a league; 204."""
     _session(state, league_id)
     state.delete_league(league_id)
 
 
-# ------------------------------------------------------------------ settings
-
 @router.get("/{league_id}/settings")
 def get_settings(league_id: str, state: AppState = Depends(get_state)) -> LeagueSettings:
+    """A league's settings."""
     return _session(state, league_id).league
 
 
 @router.put("/{league_id}/settings")
 def put_settings(league_id: str, body: LeagueSettings, state: AppState = Depends(get_state)) -> LeagueSettings:
+    """Replace a league's settings (validated; valuations recompute when scoring changed)."""
     _session(state, league_id)
     try:
         session = state.replace_league_settings(league_id, body)
@@ -71,15 +74,15 @@ def put_settings(league_id: str, body: LeagueSettings, state: AppState = Depends
     return session.league
 
 
-# ------------------------------------------------------------------ managers
-
 @router.get("/{league_id}/managers")
 def get_managers(league_id: str, state: AppState = Depends(get_state)) -> list[Manager]:
+    """A league's managers."""
     return _session(state, league_id).managers
 
 
 @router.put("/{league_id}/managers")
 def put_managers(league_id: str, body: list[Manager], state: AppState = Depends(get_state)) -> list[Manager]:
+    """Replace the league's managers (draft setup only)."""
     session = _session(state, league_id)
     if session.draft.status != "setup":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "managers can only be replaced while the draft is in setup; use PATCH")
@@ -113,6 +116,7 @@ def load_managers_from_sleeper(league_id: str, state: AppState = Depends(get_sta
 
 @router.patch("/{league_id}/managers/{manager_id}")
 def patch_manager(league_id: str, manager_id: str, body: ManagerPatch, state: AppState = Depends(get_state)) -> Manager:
+    """Patch one manager (name, is-you, budget, behaviour, Sleeper ids); marking one as you un-marks the others."""
     session = _session(state, league_id)
     target = next((m for m in session.managers if m.manager_id == manager_id), None)
     if target is None:
@@ -128,16 +132,16 @@ def patch_manager(league_id: str, manager_id: str, body: ManagerPatch, state: Ap
     return target
 
 
-# ------------------------------------------------------------------ keeper history
-
 @router.get("/{league_id}/keepers/history")
 def get_keeper_history(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """The league's keeper history."""
     session = _session(state, league_id)
     return {"records": [r.model_dump(mode="json") for r in session.keeper_history.records]}
 
 
 @router.put("/{league_id}/keepers/history")
 def put_keeper_history(league_id: str, body: KeeperHistoryIn, state: AppState = Depends(get_state)) -> dict:
+    """Replace the league's keeper history."""
     session = _session(state, league_id)
     per_season_manager = Counter((r.season, r.manager_id) for r in body.records)
     over = [k for k, n in per_season_manager.items() if n > session.league.keeper.max_per_manager]
@@ -151,6 +155,7 @@ def put_keeper_history(league_id: str, body: KeeperHistoryIn, state: AppState = 
 
 @router.post("/{league_id}/keepers/evaluate")
 def evaluate_keepers_route(league_id: str, body: KeeperEvaluateIn, state: AppState = Depends(get_state)) -> list[dict]:
+    """Evaluate keeper candidates: this year's price under the escalation rule and a keep / let-go verdict for each."""
     from ..engine.draft_state import DraftError
     from ..engine.keepers import KeeperCandidate, evaluate_keepers
 
@@ -162,9 +167,8 @@ def evaluate_keepers_route(league_id: str, body: KeeperEvaluateIn, state: AppSta
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
-# ------------------------------------------------------------------ Sleeper preview / apply
-
 def _sleeper_league(state: AppState, sleeper_league_id: str):
+    """Fetch an NBA Sleeper league through the provider (503 without one, 404 when missing, 400 when it isn't NBA)."""
     if state.platform is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sleeper provider not configured")
     league = state.platform.fetch_league(sleeper_league_id)
@@ -184,6 +188,7 @@ def _sleeper_positions(league) -> list[str]:
 
 
 def _roster_specs(positions: list[str]) -> tuple[list[RosterSlotSpec], list[str]]:
+    """Count roster positions into RosterSlotSpecs; returns (specs, positions the app doesn't know)."""
     counts = Counter(positions)
     specs, unknown = [], []
     for slot, n in counts.items():
@@ -195,6 +200,7 @@ def _roster_specs(positions: list[str]) -> tuple[list[RosterSlotSpec], list[str]
 
 
 def _diffs(session, league, mapping) -> list[dict]:
+    """Compare the league's current settings with a Sleeper league: name, scoring, roster slots, manager count and keeper limit; one entry per difference."""
     diffs: list[dict] = []
     current = session.league
     if league.name and league.name != current.name:
@@ -224,6 +230,7 @@ def _diffs(session, league, mapping) -> list[dict]:
 
 @router.post("/{league_id}/sleeper/preview")
 def sleeper_preview(league_id: str, body: SleeperPreviewIn, state: AppState = Depends(get_state)) -> dict:
+    """Preview what applying a Sleeper league would change (differences and scoring-map warnings)."""
     session = _session(state, league_id)
     league = _sleeper_league(state, body.sleeper_league_id)
     mapping = map_sleeper_scoring(league.scoring_settings)
@@ -236,6 +243,7 @@ def sleeper_preview(league_id: str, body: SleeperPreviewIn, state: AppState = De
 
 @router.post("/{league_id}/sleeper/apply")
 def sleeper_apply(league_id: str, body: SleeperApplyIn, state: AppState = Depends(get_state)) -> LeagueSettings:
+    """Apply the chosen Sleeper fields to the league and return the new settings."""
     session = _session(state, league_id)
     league = _sleeper_league(state, body.sleeper_league_id)
     new = _applied(session, league, body.sleeper_league_id, body.apply)
@@ -350,6 +358,7 @@ def sleeper_sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
 
 
 def _describe(d: dict) -> str:
+    """A one-line description of a settings difference for the activity log."""
     field, cur, new = d["field"], d["current"], d["sleeper"]
     if field == "roster_slots":
         fmt = lambda c: " ".join(f"{k}×{v}" for k, v in (c or {}).items() if v)
@@ -366,15 +375,15 @@ def _describe(d: dict) -> str:
 
 @router.get("/{league_id}/sleeper/changelog")
 def sleeper_changelog(league_id: str, state: AppState = Depends(get_state)) -> list[dict]:
+    """The league's Sleeper activity log (trades, waivers, keepers, rule changes)."""
     from ..services.sleeper_changelog import load_changelog
 
     return load_changelog(state.store, _session(state, league_id).league.sleeper_league_id)
 
 
-# ------------------------------------------------------------------ export
-
 @router.post("/{league_id}/export")
 def export_league(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Write the versioned export document to the data directory and return it with its path."""
     _session(state, league_id)
     rel, doc = state.export_league(league_id)
     return {"path": str(state.store.path(rel)), "relative_path": rel, "document": doc.model_dump(mode="json")}

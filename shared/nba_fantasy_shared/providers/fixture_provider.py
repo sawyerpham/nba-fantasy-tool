@@ -46,10 +46,12 @@ from .sleeper_provider import (
 
 
 class FixtureMissing(FileNotFoundError):
+    """Raised when a fixture file that was asked for does not exist."""
     pass
 
 
 def _load(path: Path) -> Any:
+    """Read a JSON fixture (FixtureMissing when the file is absent)."""
     if not path.is_file():
         raise FixtureMissing(str(path))
     with path.open("r", encoding="utf-8") as fh:
@@ -57,26 +59,32 @@ def _load(path: Path) -> Any:
 
 
 class FixtureStatsProvider:
+    """nba_api stand-in that serves captured real responses from a fixtures directory, with the same surface as the live provider."""
     source = "nba_api"
 
     def __init__(self, root: Path | str, fetched_at: datetime | None = None) -> None:
+        """Point at a fixtures root (its nba/ folder) and stamp bios with `fetched_at`."""
         self.root = Path(root) / "nba"
         self.fetched_at = fetched_at or utcnow()
         self.calls = 0
 
     def list_players(self, active_only: bool = True) -> list[PlayerRef]:
+        """The static player list, active players only by default."""
         refs = [player_ref_from_static(r) for r in _load(self.root / "static_players.json")]
         return [r for r in refs if r.is_active] if active_only else refs
 
     def list_teams(self) -> list[TeamRef]:
+        """The static team list."""
         return [team_ref_from_static(r) for r in _load(self.root / "static_teams.json")]
 
     def search_players(self, query: str, limit: int = 20) -> list[PlayerRef]:
+        """Search the static player list by name."""
         return search_refs(self.list_players(active_only=False), query, limit)
 
     def fetch_player_pool(
         self, roster_season: str, on_progress: ProgressCallback | None = None
     ) -> tuple[list[PlayerBio], FetchReport]:
+        """The player pool from the season's PlayerIndex fixture, with ages from the season's (or previous season's) bio stats."""
         started = utcnow()
         self.calls += 1
         rows = _load(self.root / f"playerindex_{roster_season}.json")
@@ -94,6 +102,7 @@ class FixtureStatsProvider:
     def fetch_game_logs(
         self, stats_season: str, player_ids: list[int], on_progress: ProgressCallback | None = None
     ) -> tuple[dict[int, list[GameLine]], FetchReport]:
+        """Game logs from the season's batch fixture, falling back to per-player fixtures; players with neither are reported as failed."""
         started = utcnow()
         failed: dict[str, str] = {}
         grouped: dict[int, list[GameLine]] = {}
@@ -118,6 +127,7 @@ class FixtureStatsProvider:
         return result, make_report("nba_api", "game_logs", started, len(wanted), len(result), failed, self.calls, True)
 
     def fetch_player_detail(self, player_id: int) -> PlayerDetail:
+        """A player's detail from his CommonPlayerInfo and career-stats fixtures."""
         self.calls += 2
         info = _load(self.root / f"commonplayerinfo_{player_id}.json")
         career = _load(self.root / f"playercareerstats_{player_id}.json")
@@ -125,13 +135,16 @@ class FixtureStatsProvider:
 
 
 class FixturePlatformProvider:
+    """Sleeper stand-in that serves captured responses from a fixtures directory."""
     source = "sleeper"
 
     def __init__(self, root: Path | str, fetched_at: datetime | None = None) -> None:
+        """Point at a fixtures root (its sleeper/ folder) and stamp bios with `fetched_at`."""
         self.root = Path(root) / "sleeper"
         self.fetched_at = fetched_at or utcnow()
 
     def _payload(self) -> dict[str, Any]:
+        """The captured players_nba payload."""
         return _load(self.root / "players_nba.json")
 
     def fetch_player_pool(
@@ -141,6 +154,7 @@ class FixturePlatformProvider:
         include_unrostered: bool = False,
         force: bool = False,
     ) -> tuple[list[PlayerBio], FetchReport]:
+        """The Sleeper player pool from the captured file, without placeholders."""
         started = utcnow()
         entries = [e for e in self._payload().values() if isinstance(e, dict) and not is_placeholder(e)]
         if not include_unrostered:
@@ -150,6 +164,7 @@ class FixturePlatformProvider:
         return bios, make_report("sleeper", "player_pool", started, 1, 1, served_from_cache=True)
 
     def fetch_fantasy_attributes(self, force: bool = False) -> tuple[dict[str, FantasyAttributes], FetchReport]:
+        """Fantasy attributes (positions, ranks, projections) per Sleeper id from the captured file."""
         started = utcnow()
         attrs = {
             str(e["player_id"]): fantasy_attributes_from_entry(e)
@@ -159,9 +174,11 @@ class FixturePlatformProvider:
         return attrs, make_report("sleeper", "fantasy_attributes", started, 1, 1, served_from_cache=True)
 
     def fetch_platform_state(self) -> PlatformState:
+        """Sleeper's NBA state from the captured file."""
         return platform_state_from_json(_load(self.root / "state_nba.json"))
 
     def fetch_league(self, sleeper_league_id: str) -> PlatformLeague | None:
+        """A captured league document by id (hand-named fixtures are matched on their league_id field), or None."""
         path = self.root / f"league_{sleeper_league_id}.json"
         if path.is_file():
             return platform_league_from_json(_load(path))
@@ -173,6 +190,7 @@ class FixturePlatformProvider:
         return None
 
     def search_players(self, query: str, limit: int = 20) -> list[PlayerRef]:
+        """Search the Sleeper pool by name."""
         refs = [
             PlayerRef(
                 player_id=-int(e["player_id"]),

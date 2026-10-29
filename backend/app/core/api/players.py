@@ -1,4 +1,3 @@
-"""Player search (autocomplete), detail (sidebar), and the user's per-player notes."""
 
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ router = APIRouter(prefix="/players", tags=["players"])
 
 
 def _brief(state: AppState, player_id: int, drafted_by: str | None = None) -> dict:
+    """A short player row for search results and lists: ids, team, eligibility, injury, stats availability and who drafted him."""
     rec = state.players[player_id]
     ov = state.overrides.get(player_id)
     return {
@@ -39,6 +39,7 @@ def search_players(
     league_id: str | None = Query(None, description="mark players already drafted in this league"),
     state: AppState = Depends(get_state),
 ) -> list[dict]:
+    """Player search for autocomplete: matches names, marks who drafted each player in the league."""
     query = normalize_name(q)
     drafted: dict[int, str] = {}
     if league_id:
@@ -65,6 +66,7 @@ def player_detail(
     include_history: bool = Query(True, description="fetch per-season totals (network on first request, cached)"),
     state: AppState = Depends(get_state),
 ) -> dict:
+    """A player's full detail for the sidebar: record, overrides, valuation, fantasy info and (optionally) season history."""
     rec = state.players.get(player_id)
     if rec is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown player {player_id}")
@@ -88,6 +90,7 @@ def player_detail(
 
 @router.patch("/{player_id}/overrides")
 def patch_overrides(player_id: int, body: OverridePatch, state: AppState = Depends(get_state)) -> dict:
+    """Save the user's notes on a player."""
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "nothing to change")
@@ -129,6 +132,7 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
     pos_order = ("PG", "SG", "SF", "PF", "C")
 
     def depth(pid: int) -> tuple[int, int]:
+        """Sort key for a teammate card: his depth-chart order, then the position order; unranked players last."""
         f = session.players[pid].fantasy
         if not f or not f.depth_chart_order or f.depth_chart_position not in pos_order:
             return (99, 9)
@@ -140,6 +144,7 @@ def _team_block(state: AppState, session, player_id: int) -> dict:
     fpg_of = {pid: f for f, pid in roster}
 
     def mate(fpg: float, pid: int) -> dict:
+        """A teammate card: ids, projected FP/G, depth-chart slot, starter flag, projected minutes, eligibility and who drafted him."""
         rec = session.players[pid]
         proj_min = (rec.projection or {}).get("sp")
         f = rec.fantasy
@@ -196,12 +201,14 @@ def depth_grid(session, roster: list[tuple[float, int]], self_id: int | None = N
     fpg_of = {pid: f for f, pid in roster}
 
     def cell(pid: int) -> dict:
+        """One depth-chart cell: the player with his projected FP/G, drafter and live injury tag."""
         rec = session.players[pid]
         return {"player_id": pid, "name": rec.full_name, "sleeper_id": rec.sleeper_id, "fpg": round(fpg_of[pid], 1),
                 "drafted_by": names.get(drafted.get(pid)), "is_self": pid == self_id,
                 **{k: (inj.get(rec.sleeper_id) or {}).get(f) for k, f in (("injury", "status"), ("health", "group"), ("injury_body", "body"))}}
 
     def at(pos: str) -> list[int]:
+        """The (up to three) players at one position, in depth-chart order."""
         f = lambda pid: session.players[pid].fantasy
         return sorted((pid for pid in fpg_of if f(pid) and f(pid).depth_chart_position == pos and f(pid).depth_chart_order),
                       key=lambda pid: f(pid).depth_chart_order)[:3]

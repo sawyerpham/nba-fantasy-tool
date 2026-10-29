@@ -33,6 +33,7 @@ BirthdateLookup = Callable[[int], date | None]
 
 @dataclass
 class ReconcileInputs:
+    """Everything the reconciler needs: the roster season, the nba_api pool, every Sleeper entry, Sleeper fantasy attributes and nba_api's static player list."""
     roster_season: str
     nba_pool: list[PlayerBio]
     sleeper_all: list[PlayerBio]  # every non-placeholder Sleeper entry, rostered or not
@@ -41,6 +42,7 @@ class ReconcileInputs:
 
 
 def sleeper_is_rostered(bio: PlayerBio) -> bool:
+    """Whether Sleeper lists him as an active player on a team (the ones expected in nba_api's pool)."""
     return bool(bio.is_active) and bool(bio.team_abbr)
 
 
@@ -70,6 +72,7 @@ def merge_bio(nba: PlayerBio | None, sleeper: PlayerBio | None) -> PlayerBio:
 
 
 def _brief(bio: PlayerBio) -> dict:
+    """A short description of a Sleeper entry for the report."""
     return {
         "source_id": bio.source_id,
         "name": bio.full_name,
@@ -80,7 +83,9 @@ def _brief(bio: PlayerBio) -> dict:
 
 
 class _Reconciler:
+    """Runs the stages in order, accumulating records, counts and the report's conflict lists."""
     def __init__(self, inputs: ReconcileInputs, birthdate_lookup: BirthdateLookup | None) -> None:
+        """Index the inputs: rostered Sleeper players by (name, team) and by name, and the static list by name."""
         self.inputs = inputs
         self.lookup = birthdate_lookup
         self.records: list[PlayerRecord] = []
@@ -105,20 +110,22 @@ class _Reconciler:
         for ref in inputs.nba_static:
             self.static_by_name[normalize_name(ref.full_name)].append(ref)
 
-    # ---- helpers --------------------------------------------------------------------------
 
     def _nba_birthdate(self, player_id: int) -> date | None:
+        """An nba_api player's birthdate, looked up on demand and cached."""
         if player_id not in self._nba_birthdates:
             self._nba_birthdates[player_id] = self.lookup(player_id) if self.lookup else None
         return self._nba_birthdates[player_id]
 
     def _pick_by_birthdate(self, target: date | None, candidates: list[PlayerBio]) -> PlayerBio | None:
+        """The single candidate whose birthdate equals `target`, else None."""
         if target is None:
             return None
         hits = [c for c in candidates if c.birthdate == target]
         return hits[0] if len(hits) == 1 else None
 
     def _add(self, nba: PlayerBio | None, sleeper: PlayerBio | None, method: MatchMethod, player_id: int) -> PlayerRecord:
+        """Create the PlayerRecord for a match (nba_api, Sleeper or both): merge the bios, let Sleeper's team win (flagging conflicts and unsigned players), and update counts and used ids."""
         primary = nba or sleeper
         assert primary is not None
         team_conflict = None
@@ -164,16 +171,16 @@ class _Reconciler:
         return record
 
     def _available(self, candidates: list[PlayerBio]) -> list[PlayerBio]:
+        """Candidates not already matched to another player."""
         return [c for c in candidates if c.source_id not in self.used_sleeper]
 
-    # ---- stages ----------------------------------------------------------------------------
 
     def run_nba_side(self) -> None:
+        """Stages 1-3: match each nba_api player to a Sleeper entry by name and team, then by name alone, resolving ties by birthdate; unmatched ones become nba_only."""
         for nba in self.inputs.nba_pool:
             player_id = int(nba.source_id)
             if player_id in self.used_player_ids:
                 continue
-            # Stage 1: name + team among rostered Sleeper players
             cands = self._available(self.by_name_team.get((nba.normalized_name, nba.team_abbr or ""), []))
             if len(cands) == 1:
                 self._add(nba, cands[0], "name_team", player_id)
@@ -183,7 +190,6 @@ class _Reconciler:
                     continue
                 self._unmatched_nba(nba, player_id, "collision_unresolved")
                 continue
-            # Stage 2: name only across the whole Sleeper file
             cands = self._available(self.by_name_all.get(nba.normalized_name, []))
             if len(cands) == 1:
                 self._add(nba, cands[0], "name_only", player_id)
@@ -196,6 +202,7 @@ class _Reconciler:
             self._unmatched_nba(nba, player_id, "no_sleeper_name_match")
 
     def _resolve_collision(self, nba: PlayerBio, player_id: int, cands: list[PlayerBio], stage: str) -> bool:
+        """Resolve several Sleeper candidates by birthdate and log the collision; returns whether one was chosen."""
         target = nba.birthdate or self._nba_birthdate(player_id)
         chosen = self._pick_by_birthdate(target, cands)
         entry = {
@@ -213,14 +220,15 @@ class _Reconciler:
         return True
 
     def _unmatched_nba(self, nba: PlayerBio, player_id: int, reason: str) -> None:
+        """Record an nba_api player with no Sleeper match (nba_only) and why."""
         self._add(nba, None, "nba_only", player_id)
         self.unmatched_nba.append({"player_id": player_id, "name": nba.full_name, "team": nba.team_abbr, "reason": reason})
 
     def run_sleeper_side(self) -> None:
+        """Stage 4-5: match leftover Sleeper-rostered players to nba_api's static list by name (birthdate on ties); the rest become sleeper_only with a synthetic id."""
         for sl in self.sleeper_rostered:
             if sl.source_id in self.used_sleeper:
                 continue
-            # Stage 4: nba_api static list by normalized name
             refs = [r for r in self.static_by_name.get(sl.normalized_name, []) if r.player_id not in self.used_player_ids]
             if len(refs) == 1:
                 self._add(None, sl, "static_list", refs[0].player_id)
@@ -235,6 +243,7 @@ class _Reconciler:
             self._unmatched_sleeper(sl, "not_in_nba_static_list")
 
     def _pick_static_by_birthdate(self, sl: PlayerBio, refs: list[PlayerRef]) -> PlayerRef | None:
+        """Pick the one static-list player whose birthdate equals the Sleeper player's, logging the collision."""
         hits: list[PlayerRef] = []
         if sl.birthdate is not None and self.lookup is not None:
             for ref in refs:
@@ -253,12 +262,14 @@ class _Reconciler:
         return hits[0] if len(hits) == 1 else None
 
     def _unmatched_sleeper(self, sl: PlayerBio, reason: str) -> None:
+        """Record a Sleeper player with no nba_api match (sleeper_only, synthetic id) and why."""
         self._add(None, sl, "sleeper_only", synthetic_player_id(sl.source_id))
         self.unmatched_sleeper.append(
             {"sleeper_id": sl.source_id, "name": sl.full_name, "team": sl.team_abbr, "status": sl.roster_status, "reason": reason}
         )
 
     def report(self) -> ReconcileReport:
+        """The ReconcileReport: pool sizes, counts by method and every conflict, collision and unmatched player."""
         return ReconcileReport(
             run_at=utcnow(),
             roster_season=self.inputs.roster_season,
@@ -277,6 +288,7 @@ class _Reconciler:
 def reconcile(
     inputs: ReconcileInputs, birthdate_lookup: BirthdateLookup | None = None
 ) -> tuple[list[PlayerRecord], ReconcileReport]:
+    """Reconcile the nba_api pool with Sleeper's player file into PlayerRecords plus a ReconcileReport. `birthdate_lookup(player_id)` fetches an nba_api birthdate on demand for tiebreaks."""
     engine = _Reconciler(inputs, birthdate_lookup)
     engine.run_nba_side()
     engine.run_sleeper_side()

@@ -4,11 +4,12 @@ const INJ_TAG = {
   Doubtful: ["D", "out", "doubtful"], DTD: ["DTD", "", "day-to-day"], GTD: ["GTD", "", "game-time decision"],
   Questionable: ["Q", "", "questionable"], Probable: ["P", "ok", "probable"],
 };
-export const isOut = (tag) => INJ_TAG[tag]?.[1] === "out";   // the red tags
+/** True for Sleeper injury tags that mean he won't (or likely won't) play: Out, IR, Suspended, Doubtful. */
+export const isOut = (tag) => INJ_TAG[tag]?.[1] === "out";
+/** Small badge for a player's Sleeper injury tag: abbreviation, colour class, and a hover with the meaning plus Sleeper's note. Renders nothing without a tag. */
 export default function InjuryTag({ tag, note }) {
   if (!tag) return null;
   const [abbr, cls, meaning] = INJ_TAG[tag] || [tag, "", tag];
-  // the hover spells out the tag only when the tag is an abbreviation (OUT already says it), then Sleeper's note
   const say = abbr.toLowerCase() === meaning ? "" : `${meaning[0].toUpperCase()}${meaning.slice(1)}`;
   return <span className={`inj ${cls}`} data-tip={[say, note].filter(Boolean).join(" · ") || undefined}>{abbr}</span>;
 }

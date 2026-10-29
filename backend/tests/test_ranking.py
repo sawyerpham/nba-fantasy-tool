@@ -1,4 +1,3 @@
-"""Ranking modifiers (injury, age, confidence) and roster-driven re-sorting."""
 
 import pytest
 
@@ -9,16 +8,19 @@ from tests.factories import NOW, default_world, override, record, small_league, 
 
 
 def pick(n, pid, slot, manager="m1"):
+    """A $1 pick of a player into a slot."""
     return Pick(pick_number=n, player_id=pid, manager_id=manager, price=1, slot=slot, timestamp=NOW)
 
 
 @pytest.mark.parametrize("status, expected", [("healthy", 1.0), ("day_to_day", 0.95), ("out_short_term", 0.85),
                                               ("out_long_term", 0.6), ("out_season", 0.0)])
 def test_injury_multipliers_default(status, expected):
+    """Injury multipliers default."""
     assert injury_multiplier(status, RankingSettings()) == expected
 
 
 def test_injury_multipliers_are_editable():
+    """Injury multipliers are editable."""
     custom = RankingSettings(injury_multipliers={"healthy": 1.0, "out_season": 0.5})
     assert injury_multiplier("out_season", custom) == 0.5
     assert injury_multiplier("unknown_status", custom) == 1.0
@@ -26,10 +28,12 @@ def test_injury_multipliers_are_editable():
 
 @pytest.mark.parametrize("age, expected", [(None, 1.0), (22.0, 1.0), (31.0, 1.0), (33.0, 0.94), (36.0, 0.85), (45.0, 0.75)])
 def test_age_penalty_starts_at_31_three_percent_per_year_capped_at_25(age, expected):
+    """Age penalty starts at 31 three percent per year capped at 25."""
     assert age_multiplier(age, RankingSettings()) == pytest.approx(expected)
 
 
 def test_player_value_composition():
+    """Player value composition."""
     rec = record(1, "Test Player", "DEN", age=34.0)
     v = valuation(1, avg=50.0, best=80.0, gp=65)
     r = RankingSettings()
@@ -46,6 +50,7 @@ def test_player_value_composition():
 
 
 def test_rank_order_and_flags():
+    """Rank order and flags."""
     players, overrides, valuations = default_world()
     lg = small_league()
     rows = rank_players(lg, players, overrides, valuations, my_picks=[], available_ids=list(players))
@@ -63,6 +68,7 @@ def test_rank_order_and_flags():
 
 
 def test_unrosterable_players_sink_as_roster_fills():
+    """Unrosterable players sink as roster fills."""
     players, overrides, valuations = default_world()
     lg = small_league()
     # my roster: PG, SG, UTIL, BN, BN filled -> only C open
@@ -78,6 +84,7 @@ def test_unrosterable_players_sink_as_roster_fills():
 
 
 def test_stack_if_added_reflects_my_roster():
+    """Stack if added reflects my roster."""
     players, overrides, valuations = default_world()
     lg = small_league()
     rows = rank_players(lg, players, overrides, valuations, [pick(1, 1, "C")], [2, 3])
@@ -87,6 +94,7 @@ def test_stack_if_added_reflects_my_roster():
 
 
 def test_override_edit_changes_ranking_immediately():
+    """Override edit changes ranking immediately."""
     players, overrides, valuations = default_world()
     lg = small_league()
     before = rank_players(lg, players, overrides, valuations, [], list(players))
@@ -101,6 +109,7 @@ def test_override_edit_changes_ranking_immediately():
 
 
 def test_pool_values_cover_every_player_including_no_stats():
+    """Pool values cover every player including no stats."""
     players, overrides, valuations = default_world()
     players[99] = record(99, "No Stats", "UTA", has_stats=False)
     values = pool_values(players, overrides, valuations, RankingSettings())
@@ -108,6 +117,7 @@ def test_pool_values_cover_every_player_including_no_stats():
 
 
 def test_no_games_last_season_is_not_treated_as_never_available():
+    """No games last season is not treated as never available."""
     from nba_fantasy_shared.scoring.aggregate import NO_GAMES_AVAILABILITY, availability_factor
 
     r = RankingSettings(availability_weight=0.3)

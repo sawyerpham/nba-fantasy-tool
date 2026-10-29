@@ -1,4 +1,3 @@
-"""Sleeper scoring-key map: mapped values, unknown/unsupported/missing reporting."""
 
 import json
 
@@ -9,11 +8,13 @@ from nba_fantasy_shared.scoring.sleeper_scoring_map import EXPECTED_KEYS
 
 
 def load(fixtures_dir, rel):
+    """Load a JSON fixture by relative path."""
     with (fixtures_dir / rel).open(encoding="utf-8") as fh:
         return json.load(fh)
 
 
 def test_provisional_nba_fixture_maps_exactly_onto_spec_defaults(fixtures_dir):
+    """Provisional nba fixture maps exactly onto spec defaults."""
     raw = load(fixtures_dir, "sleeper/league_nba_provisional.json")
     assert "PROVISIONAL" in raw["_fixture_note"]  # hand-written, not a captured response
     league = platform_league_from_json(raw)
@@ -32,6 +33,7 @@ def test_provisional_nba_fixture_maps_exactly_onto_spec_defaults(fixtures_dir):
 
 
 def test_real_nba_league_keys_map_cleanly():
+    """Real nba league keys map cleanly."""
     # the real league's scoring_settings (2026-10-19): bonuses carry a "p" suffix; ff / tf are fouls scored 0
     real = {"ast": 0.5, "blk": 0.75, "bonus_ast_15p": 4.0, "bonus_pt_40p": 4.0, "bonus_pt_50p": 1.0, "bonus_reb_20p": 4.0,
             "fga": -0.1, "fgm": 0.25, "ftm": 0.05, "pts": 0.25, "reb": 0.4, "stl": 0.75, "td": 2.0, "to": -0.5, "tpm": 0.3,
@@ -42,24 +44,28 @@ def test_real_nba_league_keys_map_cleanly():
 
 
 def test_unknown_keys_are_reported_not_ignored():
+    """Unknown keys are reported not ignored."""
     result = map_sleeper_scoring({"pts": 0.25, "some_new_key": 3.0, "another": 0.0})
     assert result.unknown_keys == ["some_new_key", "another"]
     assert not result.clean
 
 
 def test_unsupported_categories_reported_only_when_nonzero():
+    """Unsupported categories reported only when nonzero."""
     result = map_sleeper_scoring({"pts": 0.25, "dd": 1.5, "fta": 0.0, "oreb": 0.0})
     assert result.unsupported_nonzero == {"dd": 1.5}
     assert result.unknown_keys == []
 
 
 def test_missing_expected_keys_are_listed():
+    """Missing expected keys are listed."""
     result = map_sleeper_scoring({})
     assert result.missing_expected == list(EXPECTED_KEYS)
     assert result.settings.bonuses == []
 
 
 def test_dynamic_bonus_thresholds_are_parsed():
+    """Dynamic bonus thresholds are parsed."""
     result = map_sleeper_scoring({"bonus_stl_5": 2.0, "bonus_pts_30": 1.5, "bonus_blk_5": 2.5})
     rules = {r.id: r for r in result.settings.bonuses}
     assert rules["stl_5"].stat == "stl" and rules["stl_5"].threshold == 5 and rules["stl_5"].bonus == 2.0
@@ -69,6 +75,7 @@ def test_dynamic_bonus_thresholds_are_parsed():
 
 
 def test_values_override_spec_defaults():
+    """Values override spec defaults."""
     result = map_sleeper_scoring({"pts": 1.0, "reb": 1.2, "td": 5.0, "bonus_pt_40": 0.0})
     assert result.settings.base.pts == 1.0 and result.settings.base.reb == 1.2
     assert result.settings.base.ast == BaseScoring().ast  # untouched keys keep SPEC defaults
@@ -77,6 +84,7 @@ def test_values_override_spec_defaults():
 
 
 def test_nfl_league_is_mostly_unknown_keys(fixtures_dir):
+    """Nfl league is mostly unknown keys."""
     league = platform_league_from_json(load(fixtures_dir, "sleeper/league_289646328504385536.json"))
     assert league.sport == "nfl"
     result = map_sleeper_scoring(league.scoring_settings)

@@ -1,4 +1,3 @@
-"""Draft state machine: keepers, nomination rotation, picks, undo, and the reservation rule end to end."""
 
 import pytest
 
@@ -8,14 +7,14 @@ from tests.factories import NOW, default_world, fresh_draft, managers, override,
 
 
 def engine(num_managers=3, budget=50, **league_kw) -> DraftEngine:
+    """A DraftEngine over the default world and a small league."""
     players, overrides, _ = default_world()
     lg = small_league(num_managers=num_managers, budget=budget, **league_kw)
     return DraftEngine(lg, managers(num_managers, budget), fresh_draft(), players, overrides, now=lambda: NOW)
 
 
-# ------------------------------------------------------------------ start / keepers
-
 def test_start_sets_live_default_order_and_keeper_picks():
+    """Start sets live default order and keeper picks."""
     e = engine()
     picks = e.start([KeeperAssignment("m1", 1, 20), KeeperAssignment("m2", 2, 15)])
     assert e.draft.status == "live" and e.draft.nomination_order == ["m1", "m2", "m3"]
@@ -27,6 +26,7 @@ def test_start_sets_live_default_order_and_keeper_picks():
 
 
 def test_default_max_one_keeper_per_manager_is_enforced():
+    """Default max one keeper per manager is enforced."""
     e = engine()
     with pytest.raises(DraftError, match="more than 1 keeper"):
         e.start([KeeperAssignment("m1", 1, 10), KeeperAssignment("m1", 2, 10)])
@@ -35,6 +35,7 @@ def test_default_max_one_keeper_per_manager_is_enforced():
 
 @pytest.mark.parametrize("max_keepers, kept", [(2, 2), (3, 3)])
 def test_managers_may_keep_more_than_one_when_the_setting_allows(max_keepers, kept):
+    """Managers may keep more than one when the setting allows."""
     e = engine(keeper=KeeperSettings(enabled=True, max_per_manager=max_keepers))
     assignments = [KeeperAssignment("m1", pid, 5) for pid in range(1, kept + 1)]
     e.start(assignments)
@@ -47,6 +48,7 @@ def test_managers_may_keep_more_than_one_when_the_setting_allows(max_keepers, ke
 
 
 def test_keepers_disabled_rejects_keepers_and_keeper_cost_obeys_reservation():
+    """Keepers disabled rejects keepers and keeper cost obeys reservation."""
     with pytest.raises(DraftError, match="disabled"):
         engine(keeper=KeeperSettings(enabled=False)).start([KeeperAssignment("m1", 1, 5)])
     e = engine()
@@ -56,6 +58,7 @@ def test_keepers_disabled_rejects_keepers_and_keeper_cost_obeys_reservation():
 
 
 def test_cannot_start_twice_or_act_before_start():
+    """Cannot start twice or act before start."""
     e = engine()
     with pytest.raises(DraftError, match="not live"):
         e.pick(1, "m1", 5)
@@ -64,9 +67,8 @@ def test_cannot_start_twice_or_act_before_start():
         e.start()
 
 
-# ------------------------------------------------------------------ nomination
-
 def test_fixed_rotation_advances_per_pick_regardless_of_winner():
+    """Fixed rotation advances per pick regardless of winner."""
     e = engine()
     e.start()
     seen = []
@@ -78,6 +80,7 @@ def test_fixed_rotation_advances_per_pick_regardless_of_winner():
 
 
 def test_snake_nomination_reverses_each_round():
+    """Snake nomination reverses each round."""
     e = engine(nomination_order_type="snake")
     e.start()
     seen = []
@@ -88,6 +91,7 @@ def test_snake_nomination_reverses_each_round():
 
 
 def test_nominate_validates_turn_and_availability():
+    """Nominate validates turn and availability."""
     e = engine()
     e.start()
     nom = e.nominate(5)
@@ -103,6 +107,7 @@ def test_nominate_validates_turn_and_availability():
 
 
 def test_rotation_skips_managers_who_cannot_draft():
+    """Rotation skips managers who cannot draft."""
     e = engine()
     e.start()
     for pid in (1, 2, 3, 4, 5, 6):
@@ -116,6 +121,7 @@ def test_rotation_skips_managers_who_cannot_draft():
 
 
 def test_reorder_mid_draft_keeps_the_current_nominator_and_make_next_skips_ahead():
+    """Reorder mid draft keeps the current nominator and make next skips ahead."""
     e = engine()
     e.start()
     e.pick(1, "m1", 5)  # m1 nominated -> m2 is next
@@ -137,6 +143,7 @@ def test_reorder_mid_draft_keeps_the_current_nominator_and_make_next_skips_ahead
 
 
 def test_reorder_before_start_sets_first_nominator():
+    """Reorder before start sets first nominator."""
     e = engine()
     e.set_nomination_order(["m2", "m3", "m1"])
     e.start()
@@ -144,6 +151,7 @@ def test_reorder_before_start_sets_first_nominator():
 
 
 def test_set_nomination_order_must_cover_every_manager_once():
+    """Set nomination order must cover every manager once."""
     e = engine()
     with pytest.raises(DraftError):
         e.set_nomination_order(["m1", "m2"])
@@ -152,9 +160,8 @@ def test_set_nomination_order_must_cover_every_manager_once():
     assert e.next_nominator() == "m3"
 
 
-# ------------------------------------------------------------------ picks
-
 def test_pick_validations():
+    """Pick validations."""
     e = engine()
     e.start()
     with pytest.raises(DraftError, match="unknown manager"):
@@ -175,6 +182,7 @@ def test_pick_validations():
 
 
 def test_pick_fails_when_no_slot_fits():
+    """Pick fails when no slot fits."""
     e = engine()
     e.start()
     for pid, slot in [(2, "PG"), (4, "UTIL"), (7, "BN"), (11, "BN")]:
@@ -211,6 +219,7 @@ def test_reservation_rule_holds_for_every_manager_through_a_full_draft():
 
 
 def test_bid_increment_enforced_when_greater_than_one():
+    """Bid increment enforced when greater than one."""
     e = engine(bid_increment=5)
     e.start()
     with pytest.raises(DraftError, match="multiple"):
@@ -218,9 +227,8 @@ def test_bid_increment_enforced_when_greater_than_one():
     assert e.pick(1, "m1", 6).price == 6
 
 
-# ------------------------------------------------------------------ undo / reassign / reset
-
 def test_undo_restores_availability_budget_and_pointer_but_not_keepers():
+    """Undo restores availability budget and pointer but not keepers."""
     e = engine()
     e.start([KeeperAssignment("m1", 1, 20)])
     e.pick(2, "m2", 10)
@@ -237,6 +245,7 @@ def test_undo_restores_availability_budget_and_pointer_but_not_keepers():
 
 
 def test_reassign_slot():
+    """Reassign slot."""
     e = engine()
     e.start()
     p = e.pick(2, "m1", 5)  # PG/SG -> PG
@@ -250,6 +259,7 @@ def test_reassign_slot():
 
 
 def test_progress_and_keeper_records():
+    """Progress and keeper records."""
     e = engine()
     e.start([KeeperAssignment("m2", 2, 9)])
     assert e.progress() == 0.0
@@ -260,9 +270,8 @@ def test_progress_and_keeper_records():
     assert recs[0].cost.type == "auction" and recs[0].cost.amount == 9
 
 
-# ------------------------------------------------------------------ editing recorded picks (who drafted whom)
-
 def live_engine() -> DraftEngine:
+    """A started engine with the first center kept by m1 for $20."""
     e = engine()
     e.start([KeeperAssignment("m1", 1, 20)])   # Ace Center kept by m1 for $20 (C)
     e.nominate(2)
@@ -273,6 +282,7 @@ def live_engine() -> DraftEngine:
 
 
 def test_edit_pick_moves_a_pick_to_another_manager_with_an_auto_slot():
+    """Edit pick moves a pick to another manager with an auto slot."""
     e = live_engine()
     p = e.edit_pick(2, manager_id="m3")
     assert (p.manager_id, p.price, p.slot, p.pick_number) == ("m3", 15, "PG", 2)
@@ -282,6 +292,7 @@ def test_edit_pick_moves_a_pick_to_another_manager_with_an_auto_slot():
 
 
 def test_edit_pick_changes_price_and_slot_for_the_same_manager():
+    """Edit pick changes price and slot for the same manager."""
     e = live_engine()
     p = e.edit_pick(2, price=22)
     assert p.price == 22 and p.slot == "PG" and e.budget("m2").remaining == 28
@@ -290,6 +301,7 @@ def test_edit_pick_changes_price_and_slot_for_the_same_manager():
 
 
 def test_edit_pick_enforces_the_reservation_rule_for_the_new_manager():
+    """Edit pick enforces the reservation rule for the new manager."""
     e = live_engine()
     with pytest.raises(DraftError, match="exceeds the cap"):
         e.edit_pick(2, manager_id="m3", price=37)   # m3: $40 left, 5 open slots after this pick -> max $36
@@ -298,6 +310,7 @@ def test_edit_pick_enforces_the_reservation_rule_for_the_new_manager():
 
 
 def test_edit_pick_rejects_a_slot_that_does_not_fit_and_unknown_picks():
+    """Edit pick rejects a slot that does not fit and unknown picks."""
     e = live_engine()
     with pytest.raises(DraftError, match="not eligible"):
         e.edit_pick(2, slot="C")   # Bo Guard is PG/SG
@@ -307,6 +320,7 @@ def test_edit_pick_rejects_a_slot_that_does_not_fit_and_unknown_picks():
 
 
 def test_keeper_pick_can_move_between_managers():
+    """Keeper pick can move between managers."""
     e = live_engine()
     p = e.edit_pick(1, manager_id="m2", price=25)
     assert p.is_keeper and (p.manager_id, p.price, p.slot) == ("m2", 25, "C")
@@ -315,6 +329,7 @@ def test_keeper_pick_can_move_between_managers():
 
 
 def test_remove_pick_renumbers_frees_the_player_and_steps_the_pointer_back():
+    """Remove pick renumbers frees the player and steps the pointer back."""
     e = live_engine()
     removed = e.remove_pick(2)
     assert removed.player_id == 2 and e.is_available(2)
@@ -326,8 +341,8 @@ def test_remove_pick_renumbers_frees_the_player_and_steps_the_pointer_back():
         e.remove_pick(5)
 
 
-
 def test_make_room_slides_a_multi_position_player_to_the_open_slot():
+    """Make room slides a multi position player to the open slot."""
     from app.core.engine import roster
     from nba_fantasy_shared.models.draft import Pick
     from nba_fantasy_shared.models.league import RosterSlotSpec
@@ -343,6 +358,7 @@ def test_make_room_slides_a_multi_position_player_to_the_open_slot():
 
 
 def test_make_room_chains_moves_and_benches_the_newcomer_first():
+    """Make room chains moves and benches the newcomer first."""
     from app.core.engine import roster
     from nba_fantasy_shared.models.draft import Pick
     from nba_fantasy_shared.models.league import RosterSlotSpec

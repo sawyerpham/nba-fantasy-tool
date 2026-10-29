@@ -1,4 +1,3 @@
-"""DraftSession on the real fixture world: rankings, recommendation, picks, stacking, export round trip."""
 
 import json
 
@@ -20,6 +19,7 @@ JOKIC, WALKER, DONCIC, BUTLER, ODURO = 203999, 1629022, 1629029, 202710, -2871
 
 @pytest.fixture(scope="module")
 def fixture_world(tmp_path_factory, fixtures_dir):
+    """Players, overrides and valuations from a fixture pull."""
     store = JsonStore(tmp_path_factory.mktemp("data"))
     assert PullService(store, FixtureStatsProvider(fixtures_dir), FixturePlatformProvider(fixtures_dir)).run().state == "done"
     players = {r.player_id: r for r in load_records(store, "2026-27")}
@@ -29,6 +29,7 @@ def fixture_world(tmp_path_factory, fixtures_dir):
 
 
 def make_session(fixture_world, **league_kw) -> DraftSession:
+    """A DraftSession over the fixture world with the given league settings."""
     players, overrides, valuations = fixture_world
     league = LeagueSettings(league_id="lg1", name="Fixture League", **league_kw)
     managers = [Manager(manager_id=f"m{i}", name=f"Team {i}", is_user=(i == 1)) for i in range(1, 13)]
@@ -37,6 +38,7 @@ def make_session(fixture_world, **league_kw) -> DraftSession:
 
 
 def test_rankings_recommendation_pick_and_stacking(fixture_world):
+    """Rankings recommendation pick and stacking."""
     s = make_session(fixture_world)
     s.start([])
     rows = s.rankings()
@@ -66,6 +68,7 @@ def test_rankings_recommendation_pick_and_stacking(fixture_world):
 
 
 def test_override_edit_propagates_into_rankings_and_recommendation(fixture_world):
+    """Override edit propagates into rankings and recommendation."""
     s = make_session(fixture_world)
     s.start([])
     before = s.recommend(JOKIC).fair_value
@@ -76,6 +79,7 @@ def test_override_edit_propagates_into_rankings_and_recommendation(fixture_world
 
 
 def test_hide_unrosterable_setting(fixture_world):
+    """Hide unrosterable setting."""
     s = make_session(fixture_world)
     s.start([])
     # fill every slot a guard can take: PG, SG, UTIL×2, BN×8 -> 12 picks of PG/SG-eligible players
@@ -92,6 +96,7 @@ def test_hide_unrosterable_setting(fixture_world):
 
 
 def test_keepers_multiple_per_manager_and_history(fixture_world):
+    """Keepers multiple per manager and history."""
     s = make_session(fixture_world, keeper=KeeperSettings(enabled=True, max_per_manager=2))
     s.start([KeeperAssignment("m1", JOKIC, 60), KeeperAssignment("m1", DONCIC, 55), KeeperAssignment("m2", BUTLER, 20)])
     assert [p.is_keeper for p in s.draft.picks] == [True, True, True]
@@ -105,6 +110,7 @@ def test_keepers_multiple_per_manager_and_history(fixture_world):
 
 
 def test_export_round_trip(fixture_world):
+    """Export round trip."""
     s = make_session(fixture_world)
     s.start([KeeperAssignment("m3", DONCIC, 50)])
     s.engine.pick(JOKIC, "m1", 70)
@@ -133,6 +139,7 @@ def test_export_round_trip(fixture_world):
 
 
 def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
+    """Fit card and fit column give the same score."""
     from app.draft.fit import fit_scores, team_fit
 
     s = make_session(fixture_world)
@@ -157,6 +164,7 @@ def test_fit_card_and_fit_column_give_the_same_score(fixture_world):
     assert bench.score_lines[1].startswith("Role: bench only") and "bench only" in bench.headline
 
 def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
+    """Fit scores drop bench only and unaffordable players."""
     from app.draft.fit import fit_scores
 
     s = make_session(fixture_world)
@@ -175,6 +183,7 @@ def test_fit_scores_drop_bench_only_and_unaffordable_players(fixture_world):
 
 
 def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixture_world):
+    """Room board lists every manager with photos and who can outbid me."""
     from app.draft.room import room_board
 
     s = make_session(fixture_world)
@@ -187,6 +196,7 @@ def test_room_board_lists_every_manager_with_photos_and_who_can_outbid_me(fixtur
 
 
 def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(fixture_world):
+    """Market board counts need and supply and prices each sale at its moment."""
     from app.draft.market import market_board
 
     s = make_session(fixture_world)
@@ -210,6 +220,7 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
 
 
 def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(fixture_world):
+    """Keeper outlook prices next year with the league rule and flags stashes."""
     from app.draft.fit import team_fit
     from app.core.engine.keepers import keeper_outlook
 
@@ -230,6 +241,7 @@ def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(
 
 
 def test_pre_draft_worth_counts_keepers_and_matches_draft_start(fixture_world):
+    """Pre draft worth counts keepers and matches draft start."""
     s = make_session(fixture_world, keeper=KeeperSettings(enabled=True))
     luka = lambda: next(r for r in s.rank([], s.available_ids()) if r.player_id == DONCIC).value
     no_keepers = s.keeper_start_rate().free_dollars

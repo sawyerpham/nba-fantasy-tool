@@ -1,5 +1,3 @@
-"""Draft state and keeper history."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,6 +9,7 @@ from .players import SlotType
 
 
 class Pick(BaseModel):
+    """One draft pick (or keeper): who took which player, at what price, in which roster slot."""
     pick_number: int
     player_id: int
     manager_id: str
@@ -22,12 +21,14 @@ class Pick(BaseModel):
 
 
 class CurrentNomination(BaseModel):
+    """The player currently on the block and who nominated him."""
     player_id: int
     nominated_by: str
     opened_at: datetime
 
 
 class DraftState(BaseModel):
+    """Auction draft state: status (setup / live / complete), nomination order and pointer, the current nomination and every pick."""
     status: Literal["setup", "live", "complete"] = "setup"
     nomination_order: list[str] = Field(default_factory=list)
     nomination_pointer: int = 0
@@ -36,6 +37,7 @@ class DraftState(BaseModel):
 
 
 class KeeperCost(BaseModel):
+    """What a keeper costs: an auction amount, or a draft round / pick."""
     type: Literal["auction", "draft"]
     amount: int | None = None
     round: int | None = None
@@ -43,6 +45,7 @@ class KeeperCost(BaseModel):
 
 
 class KeeperRecord(BaseModel):
+    """A past season's keeper: which manager kept which player at what cost."""
     season: str
     manager_id: str
     player_id: int
@@ -51,4 +54,5 @@ class KeeperRecord(BaseModel):
 
 
 class KeeperHistory(BaseModel):
+    """All recorded keepers from prior seasons."""
     records: list[KeeperRecord] = Field(default_factory=list)

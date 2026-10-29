@@ -24,10 +24,12 @@ MAX_SEASONS = 3
 
 
 def details_rel(sleeper_league_id: str) -> str:
+    """Relative path of the cached details for a Sleeper league."""
     return f"cache/sleeper_details_{sleeper_league_id}.json"  # not sleeper_league_<id>: SleeperProvider.fetch_league owns that name
 
 
 def pull_details(platform: Any, store: JsonStore, sleeper_league_id: str) -> dict:
+    """Download a Sleeper league's details and its previous seasons (up to MAX_SEASONS): users, rosters, draft and picks, plus draft ADP; cache and return them."""
     seasons: list[dict] = []
     league_id: str | None = sleeper_league_id
     while league_id and league_id != "0" and len(seasons) < MAX_SEASONS:
@@ -75,12 +77,14 @@ def _draft_adp(platform: Any, league: dict, draft: dict | None, picks: list[dict
 
 
 def load_details(store: JsonStore, sleeper_league_id: str | None) -> dict | None:
+    """Load the cached details (None when missing)."""
     if not sleeper_league_id or not store.exists(details_rel(sleeper_league_id)):
         return None
     return store.read_json(details_rel(sleeper_league_id))
 
 
 def _amount(pick: dict) -> int:
+    """A pick's auction amount (0 when missing or invalid)."""
     try:
         return int((pick.get("metadata") or {}).get("amount") or 0)
     except (TypeError, ValueError):
@@ -252,6 +256,7 @@ def write_profiles(store: JsonStore) -> dict:
 
 
 def manager_tendency(details: dict | None, manager: Manager) -> dict | None:
+    """A manager's drafting tendencies from the details (None without a linked Sleeper user)."""
     if not manager.sleeper_user_id:
         return None
     return tendencies(details).get(manager.sleeper_user_id)
@@ -313,6 +318,7 @@ def managers_from_sleeper(details: dict | None, existing: list[Manager]) -> list
 
 
 def draft_id(details: dict | None, override: str | None = None) -> str | None:
+    """The draft id to sync: an override, else the newest season's draft."""
     if override:
         return override
     seasons = (details or {}).get("seasons") or []
@@ -375,6 +381,7 @@ def sync_picks(platform: Any, session: Any, sleeper_draft_id: str) -> dict:
     seat_roster = {int(slot): rid for slot, rid in (draft.get("slot_to_roster_id") or {}).items()}
 
     def manager_for(p: dict):
+        """The manager a pick belongs to, found by Sleeper user, roster or draft seat."""
         seat = p.get("draft_slot")
         return (by_user.get(p.get("picked_by")) or by_roster.get(p.get("roster_id"))
                 or by_user.get(seat_user.get(seat)) or by_roster.get(seat_roster.get(seat)))

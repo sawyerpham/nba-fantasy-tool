@@ -1,4 +1,3 @@
-"""Synthetic inputs that exercise every reconciliation stage without fixtures."""
 
 from datetime import date, datetime, timezone
 
@@ -9,6 +8,7 @@ NOW = datetime(2026, 9, 2, tzinfo=timezone.utc)
 
 
 def nba(pid: int, name: str, team: str | None, birthdate: date | None = None) -> PlayerBio:
+    """A nba_api PlayerBio."""
     first, last = name.split(" ", 1)
     return PlayerBio(source="nba_api", source_id=str(pid), full_name=name, first_name=first, last_name=last,
                      normalized_name=normalize_name(name), team_abbr=team, team_id=1 if team else None,
@@ -17,6 +17,7 @@ def nba(pid: int, name: str, team: str | None, birthdate: date | None = None) ->
 
 def sleeper(sid: str, name: str, team: str | None, status: str = "ACT", active: bool = True,
             birthdate: date | None = None) -> PlayerBio:
+    """A Sleeper PlayerBio."""
     first, last = name.split(" ", 1)
     return PlayerBio(source="sleeper", source_id=sid, full_name=name, first_name=first, last_name=last,
                      normalized_name=normalize_name(name), team_abbr=team, roster_status=status, is_active=active,
@@ -24,15 +25,18 @@ def sleeper(sid: str, name: str, team: str | None, status: str = "ACT", active: 
 
 
 def ref(pid: int, name: str, active: bool = True) -> PlayerRef:
+    """A static-list PlayerRef."""
     first, last = name.split(" ", 1)
     return PlayerRef(player_id=pid, full_name=name, first_name=first, last_name=last, is_active=active)
 
 
 def fa(sid: str, *positions: str) -> FantasyAttributes:
+    """FantasyAttributes with the given positions."""
     return FantasyAttributes(sleeper_id=sid, fantasy_positions=list(positions))
 
 
 def run(nba_pool, sleeper_all, static=(), fantasy=None, lookup=None):
+    """Run the reconciler on the given inputs."""
     inputs = ReconcileInputs(roster_season="2026-27", nba_pool=list(nba_pool), sleeper_all=list(sleeper_all),
                              fantasy=fantasy or {}, nba_static=list(static))
     records, report = reconcile(inputs, birthdate_lookup=lookup)
@@ -40,6 +44,7 @@ def run(nba_pool, sleeper_all, static=(), fantasy=None, lookup=None):
 
 
 def test_stage1_name_and_team_match_merges_bio_and_attaches_fantasy():
+    """Stage1 name and team match merges bio and attaches fantasy."""
     recs, report = run([nba(203999, "Nikola Jokić", "DEN")],
                        [sleeper("1658", "Nikola Jokić", "DEN", birthdate=date(1995, 2, 19))],
                        fantasy={"1658": fa("1658", "C")})
@@ -51,6 +56,7 @@ def test_stage1_name_and_team_match_merges_bio_and_attaches_fantasy():
 
 
 def test_stage2_name_only_records_team_conflict_and_sleeper_wins():
+    """Stage2 name only records team conflict and sleeper wins."""
     recs, report = run([nba(1, "Jonathan Kuminga", "ATL")], [sleeper("10", "Jonathan Kuminga", "MIN")])
     r = recs[1]
     assert r.match_method == "name_only" and r.team_abbr == "MIN"
@@ -59,6 +65,7 @@ def test_stage2_name_only_records_team_conflict_and_sleeper_wins():
 
 
 def test_stage2_unsigned_per_sleeper_keeps_nba_team_and_flags():
+    """Stage2 unsigned per sleeper keeps nba team and flags."""
     recs, report = run([nba(2, "Seth Curry", "GSW")], [sleeper("11", "Seth Curry", None, status="FA", active=True)])
     r = recs[2]
     assert r.match_method == "name_only" and r.team_abbr == "GSW" and r.unsigned_per_sleeper
@@ -66,9 +73,11 @@ def test_stage2_unsigned_per_sleeper_keeps_nba_team_and_flags():
 
 
 def test_stage3_birthdate_tiebreak_resolves_collision_using_lookup():
+    """Stage3 birthdate tiebreak resolves collision using lookup."""
     lookup_calls = []
 
     def lookup(pid: int):
+        """Birthdate lookup that records calls and returns a fixed date."""
         lookup_calls.append(pid)
         return date(2001, 8, 7)
 
@@ -92,6 +101,7 @@ def test_stage3_birthdate_tiebreak_resolves_collision_using_lookup():
 
 
 def test_stage4_sleeper_only_player_recovered_from_static_list_keeps_nba_id():
+    """Stage4 sleeper only player recovered from static list keeps nba id."""
     recs, report = run([], [sleeper("30", "Lonnie Walker", "DEN")], static=[ref(1629022, "Lonnie Walker IV", active=False)])
     r = recs[1629022]
     assert r.match_method == "static_list" and r.sleeper_id == "30" and r.has_stats and r.team_abbr == "DEN"
@@ -99,7 +109,9 @@ def test_stage4_sleeper_only_player_recovered_from_static_list_keeps_nba_id():
 
 
 def test_stage4_static_collision_uses_birthdate_lookup():
+    """Stage4 static collision uses birthdate lookup."""
     def lookup(pid: int):
+        """Birthdate lookup with different dates for the two candidates."""
         return {41: date(2000, 1, 1), 42: date(1990, 1, 1)}[pid]
 
     recs, report = run([], [sleeper("31", "Chris Smith", "LAL", birthdate=date(1990, 1, 1))],
@@ -109,6 +121,7 @@ def test_stage4_static_collision_uses_birthdate_lookup():
 
 
 def test_stage5_sleeper_only_gets_synthetic_negative_id_and_no_stats():
+    """Stage5 sleeper only gets synthetic negative id and no stats."""
     recs, report = run([], [sleeper("4460", "Josh Oduro", "NOP", status="TWO-WAY")])
     r = recs[-4460]
     assert r.match_method == "sleeper_only" and not r.has_stats and r.sleeper_id == "4460"
@@ -116,17 +129,20 @@ def test_stage5_sleeper_only_gets_synthetic_negative_id_and_no_stats():
 
 
 def test_stage5_nba_only_is_listed_not_dropped():
+    """Stage5 nba only is listed not dropped."""
     recs, report = run([nba(5, "Nate Bittle", "TOR")], [])
     assert recs[5].match_method == "nba_only" and recs[5].fantasy is None and recs[5].has_stats
     assert report.unmatched_nba == [{"player_id": 5, "name": "Nate Bittle", "team": "TOR", "reason": "no_sleeper_name_match"}]
 
 
 def test_unrostered_sleeper_players_are_not_added_as_records():
+    """Unrostered sleeper players are not added as records."""
     recs, report = run([], [sleeper("50", "Kyle Lowry", None, status="RET", active=False)])
     assert recs == {} and report.sleeper_rostered_size == 0 and report.sleeper_all_size == 1
 
 
 def test_each_sleeper_player_matches_at_most_once():
+    """Each sleeper player matches at most once."""
     recs, report = run([nba(1, "Jaylin Williams", "OKC"), nba(2, "Jaylin Williams", "MIA")],
                        [sleeper("60", "Jaylin Williams", "OKC")])
     assert recs[1].sleeper_id == "60" and recs[1].match_method == "name_team"

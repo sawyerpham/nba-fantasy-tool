@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 
-// The site's vocabulary: one word, one meaning, everywhere. Wrap a term in <Term k="..."> (dotted underline)
-// and hovering it shows the definition. Any element with data-tip gets the same tooltip.
 export const TERMS = {
   worth: ["Worth", "What he's worth in this room: $1 + his value above replacement × the room's $ per point of value. Same for every manager; shifts as money and talent leave. Bid up to this freely."],
   max: ["Max", "Worth plus up to 15% when rivals can afford him and have a spot: where bidding will likely end. Past it, someone is overpaying; don't be you."],
@@ -47,6 +45,7 @@ export const TERMS = {
   keep_call: ["Keep call", "GOOD keep: keeper price is under his draft-start worth by at least $2 and 10%. BAD keep: over by that much. EVEN: between."],
 };
 
+/** Wrap a term from TERMS in a dotted underline whose hover tooltip is its definition. `children` overrides the label. */
 export function Term({ k, children, className = "" }) {
   const [label, tip] = TERMS[k];
   return <span className={`term ${className}`} data-tip={tip}>{children ?? label}</span>;
@@ -54,13 +53,16 @@ export function Term({ k, children, className = "" }) {
 
 const CALLS = { buy: "good", star: "even", pricey: "bad", cannot: "bad" };
 
+/** Verdict badge for a spending call (buy, star, pricey, cannot), coloured by how good the call is, with the call's definition as its tooltip. */
 export function CallBadge({ call }) {
   if (!call) return null;
   return <span className={`verdict ${CALLS[call] || ""}`} data-tip={TERMS[call]?.[1]} data-testid="spend-verdict-badge">{TERMS[call]?.[0] || call}</span>;
 }
 
-// Where Sleeper's live high bid sits against your numbers for this player (c = the spending guide's call):
-// one word (BID / STRETCH / STOP / CAN'T) and a short why.
+/**
+ * Where Sleeper's live high bid sits against your numbers for a player.
+ * `c` is the spending guide's call. Returns { cls, word, text }: BID (under his Worth), STRETCH (past Worth, under Max and walk-away), STOP (at or past Max or walk-away) or CAN'T.
+ */
 export function liveCall(bid, c) {
   if (!c || c.verdict === "cannot") return { cls: "bad", word: "CAN'T", text: "no open spot he fits, or over your cap" };
   const worth = Math.round(c.fair_value), max = c.recommended, stop = Math.min(max, c.walk_away);
@@ -69,8 +71,10 @@ export function liveCall(bid, c) {
   return { cls: "bad", word: "STOP", text: bid >= c.walk_away ? `at or past your walk-away $${c.walk_away}` : `at or past his Max $${max}` };
 }
 
-// A sale's price against his Worth when he sold (within $2 = about right, as everywhere on the site):
-// STEAL $3+ under (blue), FAIR (green), OVER $3-9 over (red), WAY OVER $10+ over (dark red). Keepers aren't sales.
+/**
+ * Classify a sale's price against his Worth when he sold (within $2 is about right).
+ * Returns { cls, tip }: STEAL ($3+ under), FAIR, OVER ($3-9 over) or WAY OVER ($10+ over); keepers aren't sales and get no tone.
+ */
 export function priceTone(price, worth, isKeeper) {
   if (isKeeper || worth == null) return { cls: "", tip: isKeeper ? "keeper price" : "" };
   const d = price - worth, tip = `Worth $${worth} when he sold: ${d > 0 ? `$${d} over` : d < 0 ? `$${-d} under` : "right on it"}.`;
@@ -80,16 +84,18 @@ export function priceTone(price, worth, isKeeper) {
   return { cls: "tone-way", tip: `Way overpaid. ${tip}` };
 }
 
-// One tooltip for every [data-tip] on the page: instant, never clipped by a scrolling panel.
+/** One tooltip for every element with a data-tip attribute: shown instantly on hover, flipped above the element near the bottom edge, clamped to the window, and never clipped by a scrolling panel. */
 export function TipLayer() {
   const [tip, setTip] = useState(null);
   useEffect(() => {
+    /** Show the tooltip for the [data-tip] element under the pointer, or hide it when there is none. */
     const over = (e) => {
       const el = e.target.closest?.("[data-tip]");
       if (!el || !el.dataset.tip) return setTip(null);
       const r = el.getBoundingClientRect();
       setTip({ text: el.dataset.tip, x: r.left + r.width / 2, below: r.bottom + 8, above: r.top - 8 });
     };
+    /** Hide the tooltip. */
     const hide = () => setTip(null);
     document.addEventListener("mouseover", over);
     document.addEventListener("scroll", hide, true);

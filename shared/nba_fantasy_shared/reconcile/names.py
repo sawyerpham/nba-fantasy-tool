@@ -14,11 +14,13 @@ _NON_LETTERS = re.compile(r"[^a-z ]")
 
 
 def strip_accents(text: str) -> str:
+    """Remove accents ("Jokić" -> "Jokic")."""
     decomposed = unicodedata.normalize("NFD", text)
     return "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
 
 
 def normalize_name(text: str | None) -> str:
+    """Normalise a player name for matching across sources: no accents, lower case, letters and spaces only, no Jr / Sr / II-V suffix, single spaces. "" for None."""
     if not text:
         return ""
     lowered = strip_accents(text).lower()

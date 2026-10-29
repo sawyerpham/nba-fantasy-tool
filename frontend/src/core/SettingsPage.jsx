@@ -8,6 +8,7 @@ const INJURY_STATUSES = ["healthy", "day_to_day", "out_short_term", "out_long_te
 const SLEEPER_RAW = ["DTD", "Out", "IR"];
 const STATS = ["pts", "reb", "ast", "stl", "blk"];
 
+/** Number input that reports null for an empty box and a Number otherwise. */
 function Num({ value, onChange, step = "any", ...rest }) {
   return <input type="number" step={step} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} {...rest} />;
 }
@@ -20,6 +21,10 @@ const TIMEZONES = [
   ["Asia/Tokyo", "Tokyo (JST)"], ["Australia/Sydney", "Sydney (AET)"],
 ];
 
+/**
+ * The league's settings editor: general, roster slots, keepers, scoring, per-game bonuses, ranking and the optional Sleeper link.
+ * Saves with Ctrl+S; Sleeper settings can be previewed and applied field by field.
+ */
 export default function SettingsPage({ leagueId }) {
   const [s, setS] = useState(null);
   const [saved, setSaved] = useState(null);
@@ -29,13 +34,15 @@ export default function SettingsPage({ leagueId }) {
   const [preview, setPreview] = useState(null);
   const [applyFields, setApplyFields] = useState({ name: false, scoring: true, roster_slots: true, num_managers: false, keepers: true });
   const [managers, setManagers] = useState([]);
+  /** Load the league's managers (empty on failure). */
   const loadManagers = useCallback(() => {
     if (leagueId) api.get(`/leagues/${leagueId}/managers`).then(setManagers).catch(() => setManagers([]));
   }, [leagueId]);
   useEffect(() => { loadManagers(); }, [loadManagers]);
-  // which manager you are: saved at once (the PATCH un-marks everyone else)
+  /** Mark a manager as you and save at once. The backend PATCH un-marks every other manager. */
   const markMe = (id) => api.patch(`/leagues/${leagueId}/managers/${id}`, { is_user: true }).then(() => { loadManagers(); setMsg("Saved: that manager is you."); }).catch((e) => setError(e.message));
 
+  /** Load the league's settings and the linked Sleeper league id. */
   const load = useCallback(() => {
     if (!leagueId) return;
     api.get(`/leagues/${leagueId}/settings`).then((data) => { setS(data); setSaved(data); setSleeperId(data.sleeper_league_id || ""); }).catch((e) => setError(e.message));
@@ -44,6 +51,7 @@ export default function SettingsPage({ leagueId }) {
 
   const dirty = s && saved && JSON.stringify(s) !== JSON.stringify(saved);
 
+  /** Save the edited settings; valuations recompute server-side when scoring changed. */
   const save = useCallback(async () => {
     if (!s) return;
     setMsg(""); setError("");
@@ -60,15 +68,20 @@ export default function SettingsPage({ leagueId }) {
   if (!leagueId) return <p className="muted">Select or create a league on the Settings tab first.</p>;
   if (!s) return <p>{error || "Loading…"}</p>;
 
+  /** Shallow-merge `patch` into the settings. */
   const set = (patch) => setS({ ...s, ...patch });
+  /** Shallow-merge `patch` into one nested settings object (`key`). */
   const setDeep = (key, patch) => setS({ ...s, [key]: { ...s[key], ...patch } });
+  /** How many of a roster slot the league has (0 when absent). */
   const slotCount = (slot) => s.roster_slots.find((r) => r.slot === slot)?.count ?? 0;
+  /** Set a roster slot's count; a count of 0 removes the slot. */
   const setSlot = (slot, count) => {
     const others = s.roster_slots.filter((r) => r.slot !== slot);
     set({ roster_slots: count > 0 ? [...others, { slot, count }] : others });
   };
   const mandatory = s.roster_slots.filter((r) => r.slot !== "IR").reduce((a, r) => a + r.count, 0);
 
+  /** Fetch what applying the linked Sleeper league would change. */
   const doPreview = async () => {
     setError(""); setPreview(null);
     try {
@@ -77,6 +90,7 @@ export default function SettingsPage({ leagueId }) {
       setError(e.message);
     }
   };
+  /** Apply the ticked Sleeper fields to this league and replace the settings with the result. */
   const doApply = async () => {
     setError("");
     try {
@@ -91,6 +105,7 @@ export default function SettingsPage({ leagueId }) {
   };
 
   const bonus = s.scoring.bonuses;
+  /** Patch bonus rule `i` of the scoring bonuses. */
   const setBonus = (i, patch) => setDeep("scoring", { bonuses: bonus.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
 
   return (
@@ -127,7 +142,7 @@ export default function SettingsPage({ leagueId }) {
             {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name}</option>)}</select>
             <span className="muted small">Your team: your side of the matchup, waivers, news. Saves at once.</span></label>
           <label>Player nicknames <select defaultValue={(() => { try { return localStorage.getItem("da.nicks") || "on"; } catch { return "on"; } })()}
-              onChange={(e) => { try { localStorage.setItem("da.nicks", e.target.value); setMsg("Saved."); } catch { /* ignore */ } }} data-testid="nicks">
+              onChange={(e) => { try { localStorage.setItem("da.nicks", e.target.value); setMsg("Saved."); } catch { } }} data-testid="nicks">
             <option value="on">Show</option><option value="off">Hide</option></select>
             <span className="muted small">The nicknames managers gave their players on Sleeper, under each name on the Season tab. Saves at once (this browser).</span></label>
           <label>Draft type <select value={s.draft_type} onChange={(e) => set({ draft_type: e.target.value })}><option value="auction">Auction</option><option value="snake">Snake</option></select></label>

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/data", tags=["data"])
 
 @router.post("/pull", status_code=status.HTTP_202_ACCEPTED)
 def start_pull(body: PullRequest, state: AppState = Depends(get_state)) -> dict:
+    """Start a background data pull (202); 409 when one is already running."""
     try:
         return state.start_pull(sources=body.sources, force_sleeper=body.force_sleeper, skip_game_logs=body.skip_game_logs)
     except PullAlreadyRunning as exc:
@@ -21,9 +22,11 @@ def start_pull(body: PullRequest, state: AppState = Depends(get_state)) -> dict:
 
 @router.get("/pull/status")
 def pull_status(state: AppState = Depends(get_state)) -> dict:
+    """Progress of the current or last pull."""
     return state.pull_status()
 
 
 @router.get("/status")
 def data_status(state: AppState = Depends(get_state)) -> dict:
+    """Status of the data pool and its caches."""
     return state.data_status()

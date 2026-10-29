@@ -14,8 +14,7 @@ const COLS = [
 ];
 const HEAD = { rank: "#", pos_rank: "Pos" };
 
-// ▲ / ▼ when Sleeper's projection is at least half a point of FP/G away from last season.
-// Hover text for the Value cell: every factor that moved this player away from plain FP.
+/** Hover text for the Value cell: every factor that moved this player away from plain FP (confidence, injury, age, availability, schedule, position scarcity). */
 const valueWhy = (r) => [
   r.confidence !== 1 && `× ${r.confidence} games confidence`,
   r.injury_multiplier !== 1 && `× ${r.injury_multiplier} injury`,
@@ -25,17 +24,20 @@ const valueWhy = (r) => [
   r.scarcity && `${r.scarcity > 0 ? "+" : ""}${r.scarcity.toFixed(2)} position scarcity`,
 ].filter(Boolean).join(" · ");
 
-// Projection vs last season: one arrow per step (0.5 / 1.5 / 3 FP/G), green up, red down.
+/** Projection vs last season: { dir, n, diff } with one arrow per step (0.5 / 1.5 / 3 FP/G), up or down; n = 0 when the change is under half a point or there is no history. */
 const trend = (r) => {
   if (r.proj_fpts == null || !r.last_fpts) return { dir: "", n: 0, diff: 0 };
   const diff = r.proj_fpts - r.last_fpts, a = Math.abs(diff);
   return { dir: diff > 0 ? "up" : "down", n: a >= 3 ? 3 : a >= 1.5 ? 2 : a >= 0.5 ? 1 : 0, diff };
 };
 
-// Tier colour: T1 red (best) fading to green by T15 (about the last drafted player in a 12-team league).
 
+/**
+ * Sortable rankings table: one row per player with position, projections, Fit, Worth and Max (the last two once the draft is live).
+ * Click a row to select it, double-click to open the block bar while live. `posFilter` shows that position's rank instead of the overall one.
+ */
 export default function RankingsTable({ rows, selectedId, onSelect, onBlock, live, sort, onSort, posFilter }) {
-  // Fixed-width arrow slot on every sortable header, so nothing shifts when the sort changes.
+  /** Sort arrow for a header, in a fixed-width slot so nothing shifts when the sort changes. */
   const arrow = (key) => <span className="sort-arrow">{sort && sort.key === key ? (sort.dir === "asc" ? "↑" : "↓") : ""}</span>;
   const byRank = !sort || sort.key === "rank";
   return (

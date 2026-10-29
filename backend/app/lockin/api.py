@@ -19,6 +19,7 @@ router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
 
 
 def _fetch(state: AppState):
+    """The Sleeper HTTP fetcher for in-season data (503 when no live Sleeper provider is configured)."""
     if state.platform is None or not hasattr(state.platform, "session"):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Sleeper provider not configured")
     return http_fetch(state.platform)
@@ -26,6 +27,7 @@ def _fetch(state: AppState):
 
 @router.get("/week")
 def week(league_id: str, week: int | None = Query(None, ge=1), state: AppState = Depends(get_state)) -> dict:
+    """The fantasy week: matchups, standings and every rostered player's games with projections and scores."""
     session = _session(state, league_id)
     try:
         return week_view(session, _fetch(state), week)
@@ -112,6 +114,7 @@ def sync(league_id: str, state: AppState = Depends(get_state)) -> dict:
 
 
 class LockIn(BaseModel):
+    """Body to set a lock answer: week, Sleeper player id and the locked game's date ("" = not locked, null = forget)."""
     week: int
     sleeper_id: str
     game_date: str | None   # the locked game's date; "" = not locked; null = forget (use detection)
@@ -119,6 +122,7 @@ class LockIn(BaseModel):
 
 @router.post("/locks")
 def set_lock(league_id: str, body: LockIn, state: AppState = Depends(get_state)) -> dict:
+    """Save a lock answer and return the week's locks."""
     _session(state, league_id)
     write_lock(state.store, league_id, body.week, body.sleeper_id, body.game_date)
     return {"locks": read_locks(state.store, league_id, body.week)}
@@ -126,6 +130,7 @@ def set_lock(league_id: str, body: LockIn, state: AppState = Depends(get_state))
 
 @router.get("/player/{player_id}")
 def player(league_id: str, player_id: int, week: int | None = Query(None, ge=1), state: AppState = Depends(get_state)) -> dict:
+    """A player's in-season profile (summary, game log, history)."""
     session = _session(state, league_id)
     try:
         return season_player(session, _fetch(state), player_id, week)
@@ -135,6 +140,7 @@ def player(league_id: str, player_id: int, week: int | None = Query(None, ge=1),
 
 @router.get("/news")
 def news(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Fantasy news: notes on your players, then on the other teams' players."""
     session = _session(state, league_id)
     fetch = _fetch(state)
     try:
@@ -146,6 +152,7 @@ def news(league_id: str, state: AppState = Depends(get_state)) -> dict:
 
 @router.get("/waivers")
 def waiver_claims(league_id: str, state: AppState = Depends(get_state)) -> dict:
+    """Waiver claims: free agents ranked by upgrade over your weakest player, with guide bids and the next waiver run."""
     session = _session(state, league_id)
     try:
         fetch = _fetch(state)

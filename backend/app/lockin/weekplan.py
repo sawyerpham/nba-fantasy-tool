@@ -52,6 +52,7 @@ def play_chance(g: "Game", injury: str, first: bool) -> float:
 
 @dataclass
 class Game:
+    """One game of a player's week: projection, actual points, tip-off, whether it is in progress or over, minutes and clock, and whether his team played the night before."""
     date: str
     proj: float | None          # Sleeper projection in league FP; None = no projection
     fp: float | None = None     # actual FP once played
@@ -68,6 +69,7 @@ class Game:
 
 @dataclass
 class PlanPlayer:
+    """One player in the week plan: his slot, games, locked score, value of waiting, the LOCK / PASS call, win chances and the open-slot and lock-slot options."""
     sid: str
     name: str
     eligibility: list[str]
@@ -93,12 +95,14 @@ class PlanPlayer:
 
 @dataclass
 class WeekPlan:
+    """The week plan for one team: every player, the expected score and the slot counts."""
     players: list[PlanPlayer]
     expected: float             # expected FP of all slots
     slots: dict[str, int] = field(default_factory=dict)
 
 
 def swing_of(per_game_fpts: list[float]) -> float:
+    """How much one game can swing a player's night: the spread of his per-game fantasy points (0 with too few games)."""
     games = [f for f in per_game_fpts if f is not None]
     m = sum(games) / len(games) if games else 0.0   # float math: statistics.mean/pstdev run exact fractions, ~400 calls a page
     if len(games) < MIN_GAMES_FOR_SWING or m <= 0:
@@ -107,10 +111,12 @@ def swing_of(per_game_fpts: list[float]) -> float:
 
 
 def _phi(z: float) -> float:
+    """The standard normal density at z."""
     return math.exp(-z * z / 2) / math.sqrt(2 * math.pi)
 
 
 def _cdf(z: float) -> float:
+    """The standard normal cumulative distribution at z."""
     return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 
 
@@ -183,6 +189,7 @@ def seat_players(order: list[PlanPlayer], slot_counts: dict[str, int], pinned=()
         seats[p.slot].append(p)
 
     def place(p: PlanPlayer, seen: set[str]) -> bool:
+        """Seat one player in the first slot he can play (his current slot first), sliding other players along a chain when that is needed; False when no seat is possible."""
         slots = roster.candidate_slots(p.eligibility)
         if p.slot in slots:   # his current slot first: fewest moves for the same result
             slots = [p.slot] + [x for x in slots if x != p.slot]
@@ -213,6 +220,7 @@ def seat_players(order: list[PlanPlayer], slot_counts: dict[str, int], pinned=()
 
 
 def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPlan:
+    """Plan the week: seat the players in the starting slots (his current slot first, fewest moves) and value each unlocked slot by what waiting on its games is worth; a played, final game gets a LOCK / PASS call."""
     starting = set(slot_counts)
     for p in players:
         played = [g for g in p.games if g.fp is not None]
@@ -261,7 +269,6 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
     return WeekPlan(players=players, expected=round(expected, 2), slots=dict(slot_counts))
 
 
-# ---- today's lineup ------------------------------------------------------------------------------------------
 # Every unlocked slot is a free chance at a pop-off on any day: start everyone who plays today, as long as that
 # doesn't cost a game worth keeping. Seating order:
 #   pinned  - locked players, and anyone whose game is in progress (he can't be moved), in their current slot;
@@ -274,12 +281,14 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 
 @dataclass
 class TodayLineup:
+    """Today's lineup: the seat of each player, the moves from the current Sleeper lineup and the swap-watch and GTD lines."""
     seats: dict[str, list[str]]          # slot -> player ids
     moves: list[dict]                    # {sid, name, from, to, by}: `by` = tip-off the move must beat (UTC ISO)
     watch: list[dict]                    # swap-watch and GTD lines (see today_watch)
 
 
 def _today(p: PlanPlayer, today: str) -> Game | None:
+    """The player's game on `today`, if any."""
     return next((g for g in p.games if g.date == today), None)
 
 
@@ -291,6 +300,7 @@ def _by_tip(ps: list[PlanPlayer], game) -> list[PlanPlayer]:
     tips = [game(q).tip for q in ps]
 
     def first(a: PlanPlayer, b: PlanPlayer) -> int:   # -1: a starts ahead of b
+        """Order two players by seating priority: -1 when `a` starts ahead of `b` (earlier tip group first, then the bigger projection; a near tie goes to the earlier tip)."""
         A, B = game(a), game(b)
         ga, gb = _tip_group(A.tip, tips), _tip_group(B.tip, tips)
         if ga != gb:
@@ -303,6 +313,7 @@ def _by_tip(ps: list[PlanPlayer], game) -> list[PlanPlayer]:
 
 
 def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: str) -> TodayLineup:
+    """Plan today's lineup: pin locked and in-progress players, then seat everyone who plays today (LOCK players first, then by projection), then players by next tip, with moves from the current Sleeper lineup."""
     live_today = {id(p) for p in players if _today(p, today) and _today(p, today).live}
     pinned = [p for p in players if p.slot in slot_counts and (p.locked is not None or id(p) in live_today)]
     free = [p for p in players if p not in pinned and id(p) not in live_today and p.slot != "IR" and p.locked is None]
@@ -313,6 +324,7 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     # lineup is already set for the coming games and nobody waits for game day to be moved in. Then current
     # starters with no next game (or ruled OUT) hold whatever is still free.
     def nxt(p: PlanPlayer) -> Game | None:
+        """A player's next game after today that hasn't started."""
         return next((g for g in p.games if g.date > today and not g.started), None)
     rest = [p for p in free if p not in tier1 and p not in tier2]
     # ...except a starter who already played this week, today included (unlocked): benching him gives up locking that game, and on a
@@ -370,6 +382,7 @@ OUT = ("out_short_term", "out_long_term", "out_season")
 
 
 def _minutes(iso: str | None) -> float:
+    """An ISO timestamp as minutes since the epoch (infinity when missing)."""
     from datetime import datetime
     return datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() / 60 if iso else float("inf")
 
@@ -457,6 +470,7 @@ def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
 
 
 def _minus_minutes(iso: str | None, minutes: int) -> str | None:
+    """An ISO timestamp minus some minutes (None when missing)."""
     from datetime import datetime, timedelta, timezone
     if not iso:
         return None
@@ -525,7 +539,6 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
     return lines
 
 
-# ---- win chance -----------------------------------------------------------------------------------------
 # The decision rule for locks, passes and swaps: the choice with the higher chance to win the week, not the higher
 # expected points. Each team's final = its counted/locked points (certain) + every other slot's value, which is
 # uncertain while it still waits on games (spread = value × the player's swing × SPREAD). Chance to win =
@@ -546,6 +559,7 @@ def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
 
 
 def team_total(players: list[PlanPlayer], skip: PlanPlayer | None = None) -> tuple[float, float]:
+    """A team's expected total and variance across its seated players (optionally leaving one out)."""
     mean = var = 0.0
     for p in players:
         if p.seat is None or p is skip:
@@ -568,6 +582,7 @@ def scenario_total(players: list[PlanPlayer], lock_all: bool) -> tuple[float, fl
 
 
 def win_chance(mine: tuple[float, float], theirs: tuple[float, float]) -> float:
+    """Chance to win the week: the normal CDF of the difference of totals over the combined spread."""
     sd = math.sqrt(mine[1] + theirs[1])
     if sd == 0:
         return 1.0 if mine[0] > theirs[0] else 0.5 if mine[0] == theirs[0] else 0.0

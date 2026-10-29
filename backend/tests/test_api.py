@@ -1,4 +1,3 @@
-"""API layer end to end on the fixture world. The final test is the Phase 1D gate: export round trip."""
 
 import json
 import threading
@@ -19,6 +18,7 @@ NFL_LEAGUE = "289646328504385536"
 
 @pytest.fixture(scope="module")
 def env(tmp_path_factory, fixtures_dir):
+    """A test client over an AppState backed by fixture providers and a temp store."""
     store = JsonStore(tmp_path_factory.mktemp("api-data"))
     state = AppState(store, FixtureStatsProvider(fixtures_dir), FixturePlatformProvider(fixtures_dir))
     client = TestClient(create_app(state))
@@ -27,6 +27,7 @@ def env(tmp_path_factory, fixtures_dir):
 
 @pytest.fixture(scope="module")
 def pulled(env):
+    """The env after a fixture data pull has finished."""
     client, state, *_ = env
     r = client.post("/api/data/pull", json={})
     assert r.status_code == 202 and r.json()["state"] in ("running", "done")
@@ -37,14 +38,14 @@ def pulled(env):
 
 
 def league(client, league_id="lg1", name="League One"):
+    """Create a league through the API and return its JSON."""
     r = client.post("/api/leagues", json={"league_id": league_id, "name": name})
     assert r.status_code == 201, r.text
     return r.json()
 
 
-# ------------------------------------------------------------------ data
-
 def test_health_and_empty_status_before_pull(env):
+    """Health and empty status before pull."""
     client, state, *_ = env
     assert client.get("/api/health").json()["ok"] is True
     status = client.get("/api/data/status").json()
@@ -52,6 +53,7 @@ def test_health_and_empty_status_before_pull(env):
 
 
 def test_pull_reports_progress_and_reloads_the_pool(pulled):
+    """Pull reports progress and reloads the pool."""
     client, state, *_ = pulled
     status = client.get("/api/data/pull/status").json()
     assert status["state"] == "done" and status["records"] == 23 and status["game_log_players"] == 19
@@ -64,6 +66,7 @@ def test_pull_reports_progress_and_reloads_the_pool(pulled):
 
 
 def test_second_pull_request_while_running_is_rejected(pulled):
+    """Second pull request while running is rejected."""
     client, state, *_ = pulled
     gate = threading.Event()
     blocker = threading.Thread(target=gate.wait, daemon=True)
@@ -78,9 +81,8 @@ def test_second_pull_request_while_running_is_rejected(pulled):
         state._pull_thread = original
 
 
-# ------------------------------------------------------------------ players
-
 def test_player_search_is_accent_insensitive_and_marks_drafted(pulled):
+    """Player search is accent insensitive and marks drafted."""
     client, *_ = pulled
     hits = client.get("/api/players", params={"q": "jok"}).json()
     assert hits[0]["player_id"] == JOKIC and hits[0]["eligibility"] == ["C"] and hits[0]["injury_status"] == "healthy"
@@ -90,6 +92,7 @@ def test_player_search_is_accent_insensitive_and_marks_drafted(pulled):
 
 
 def test_player_detail_with_valuation_and_history(pulled):
+    """Player detail with valuation and history."""
     client, *_ = pulled
     body = client.get(f"/api/players/{JOKIC}").json()
     assert body["record"]["team_abbr"] == "DEN" and body["overrides"]["eligibility_source"] == "sleeper"
@@ -101,6 +104,7 @@ def test_player_detail_with_valuation_and_history(pulled):
 
 
 def test_only_notes_are_editable_eligibility_and_injury_come_from_sleeper(pulled):
+    """Only notes are editable eligibility and injury come from sleeper."""
     client, state, *_ = pulled
     r = client.patch(f"/api/players/{BUTLER}/overrides", json={"notes": "watch his knee"})
     assert r.status_code == 200 and r.json()["notes"] == "watch his knee"
@@ -112,9 +116,8 @@ def test_only_notes_are_editable_eligibility_and_injury_come_from_sleeper(pulled
     assert client.patch("/api/players/1/overrides", json={"notes": "x"}).status_code == 404
 
 
-# ------------------------------------------------------------------ leagues
-
 def test_create_list_get_delete_league(pulled):
+    """Create list get delete league."""
     client, *_ = pulled
     doc = league(client, "tmp", "Temp")
     assert doc["schema_version"] == 1 and len(doc["managers"]) == 12 and doc["draft"]["status"] == "setup"
@@ -129,6 +132,7 @@ def test_create_list_get_delete_league(pulled):
 
 
 def test_settings_put_recomputes_valuations_and_validates(pulled):
+    """Settings put recomputes valuations and validates."""
     client, state, *_ = pulled
     league(client, "lg-settings", "Settings")
     before = client.get(f"/api/players/{JOKIC}", params={"league_id": "lg-settings", "include_history": "false"}).json()["valuation"]["avg_fpts"]
@@ -149,6 +153,7 @@ def test_settings_put_recomputes_valuations_and_validates(pulled):
 
 
 def test_managers_endpoints(pulled):
+    """Managers endpoints."""
     client, *_ = pulled
     league(client, "lg-managers", "Managers")
     r = client.patch("/api/leagues/lg-managers/managers/m2", json={"name": "Early Eddie", "behavior": {"spend_pace": "early", "aggression": 1.2}})
@@ -166,6 +171,7 @@ def test_managers_endpoints(pulled):
 
 
 def test_keeper_evaluate_endpoint(pulled):
+    """Keeper evaluate endpoint."""
     client, *_ = pulled
     league(client, "lg-keep", "Keeper check")
     r = client.post("/api/leagues/lg-keep/keepers/evaluate", json={"candidates": [
@@ -187,6 +193,7 @@ def test_keeper_evaluate_endpoint(pulled):
 
 
 def test_keeper_history_put_validates_max_per_manager(pulled):
+    """Keeper history put validates max per manager."""
     client, *_ = pulled
     league(client, "lg-keepers", "Keepers")
     rec = {"season": "2025-26", "manager_id": "m1", "player_id": JOKIC, "player_name": "Nikola Jokić", "cost": {"type": "auction", "amount": 55}}
@@ -198,6 +205,7 @@ def test_keeper_history_put_validates_max_per_manager(pulled):
 
 
 def test_sleeper_preview_and_apply(pulled):
+    """Sleeper preview and apply."""
     client, state, *_ = pulled
     league(client, "lg-sleeper", "Sleeper Test")
     r = client.post("/api/leagues/lg-sleeper/sleeper/preview", json={"sleeper_league_id": PROVISIONAL_LEAGUE})
@@ -218,9 +226,8 @@ def test_sleeper_preview_and_apply(pulled):
     assert client.post("/api/leagues/lg-sleeper/season/sync").json()["renamed"] is None   # unchanged: nothing to do
 
 
-# ------------------------------------------------------------------ draft
-
 def test_full_draft_flow_over_the_api(pulled):
+    """Full draft flow over the api."""
     client, state, *_ = pulled
     league(client, "lg-draft", "Draft")
     top = client.get("/api/leagues/lg-draft/rankings", params={"limit": 3}).json()
@@ -358,13 +365,13 @@ def test_settings_managers_keepers_and_scoring_are_editable_mid_draft(pulled):
     assert client.get("/api/leagues/lg-mid/draft").json()["status"] == "live"
 
 
-# ------------------------------------------------------------------ gate: export round trip
-
 def _comparable(doc: DraftExport) -> dict:
+    """A league document as a dict without its generation time, for equality checks."""
     return doc.model_dump(mode="json", exclude={"generated_at"})
 
 
 def test_gate_export_round_trips_with_no_data_loss(pulled):
+    """Gate export round trips with no data loss."""
     client, state, store, _ = pulled
     league(client, "lg-export", "Export League")
     client.patch(f"/api/players/{S_CURRY}/overrides", json={"notes": "watch minutes"})
@@ -411,6 +418,7 @@ def test_gate_export_round_trips_with_no_data_loss(pulled):
 
 
 def test_player_detail_has_his_team_with_teammates_and_ranks(pulled):
+    """Player detail has his team with teammates and ranks."""
     client, *_ = pulled
     league(client, "lg-team", "Team League")
     team = client.get(f"/api/players/{JOKIC}?league_id=lg-team&include_history=false").json()["team"]
@@ -427,6 +435,7 @@ def test_player_detail_has_his_team_with_teammates_and_ranks(pulled):
 
 
 def test_nba_teams_and_room_strength(pulled):
+    """Nba teams and room strength."""
     client, *_ = pulled
     league(client, "lg-nba", "NBA League")
     teams = client.get("/api/leagues/lg-nba/nba-teams").json()

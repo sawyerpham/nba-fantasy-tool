@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 
-// Fix "who drafted whom": move a recorded pick to another manager, change its price or slot, or remove it.
+/** Modal to fix "who drafted whom": move a recorded pick to another manager, change its price or slot, or remove it (which makes the player available again). Escape closes it. */
 export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClose, onSaved }) {
   const managers = view?.managers || [];
   const [managerId, setManagerId] = useState(pick.manager_id);
@@ -10,7 +10,7 @@ export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClo
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Max this manager could pay for this pick: their cap, plus this pick's own money when it is already theirs.
+  /** The most manager `m` could pay for this pick: their cap, plus this pick's own money when it is already theirs. */
   const maxFor = (m) => (m.manager_id === pick.manager_id
     ? m.budget.remaining + pick.price - minBid * m.budget.open_mandatory
     : m.budget.max_bid);
@@ -22,14 +22,17 @@ export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClo
     if (manager.manager_id === pick.manager_id && !open.includes(pick.slot)) open.unshift(pick.slot);
     return open;
   }, [manager, pick]);
+  /** Clamp a typed price to the whole-dollar range this manager can pay for this pick. */
   const clamp = (v) => Math.max(minBid, Math.min(Number(v) || minBid, maxBid));
 
   useEffect(() => {
+    /** Escape closes the dialog. */
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /** Save the edited pick (manager, price, optional slot) and hand the updated draft view to `onSaved`. */
   const save = async (e) => {
     e?.preventDefault();
     setError(""); setBusy(true);
@@ -43,6 +46,7 @@ export default function EditPickDialog({ leagueId, view, pick, minBid = 1, onClo
       setBusy(false);
     }
   };
+  /** Delete the pick after confirmation and hand the updated draft view to `onSaved`. */
   const remove = async () => {
     if (!window.confirm(`Remove pick #${pick.pick_number} (${pick.player_name})? The player becomes available again.`)) return;
     setError(""); setBusy(true);

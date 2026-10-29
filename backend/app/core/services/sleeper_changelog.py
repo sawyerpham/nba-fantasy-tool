@@ -24,10 +24,12 @@ MAX_TX_WEEKS = 26
 
 
 def changelog_rel(sleeper_league_id: str) -> str:
+    """Relative path of a Sleeper league's changelog file."""
     return f"sleeper_changelog_{sleeper_league_id}.json"
 
 
 def load_changelog(store: JsonStore, sleeper_league_id: str | None) -> list[dict]:
+    """A league's changelog entries, newest first (empty when none)."""
     if not sleeper_league_id or not store.exists(changelog_rel(sleeper_league_id)):
         return []
     return store.read_json(changelog_rel(sleeper_league_id))["entries"]
@@ -38,6 +40,7 @@ def player_namer(store: JsonStore) -> Callable[[str], str]:
     cache: dict[str, Any] = {}
 
     def name(sid: str) -> str:
+        """A player's display name by Sleeper id (the players cache is read once)."""
         if "p" not in cache:
             cache["p"] = store.read_json(PLAYERS_CACHE_REL).get("payload", {}) if store.exists(PLAYERS_CACHE_REL) else {}
         p = cache["p"].get(str(sid)) or {}
@@ -47,16 +50,19 @@ def player_namer(store: JsonStore) -> Callable[[str], str]:
 
 
 def _iso(ms: int | float | None) -> str | None:
+    """A millisecond epoch as an ISO UTC string, or None."""
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat() if ms else None
 
 
 def _owners(season: dict) -> tuple[dict[int, str | None], dict[str, str]]:
+    """(roster id -> owner id, user id -> display name) for a season document."""
     users = {u["user_id"]: u.get("display_name") or u["user_id"] for u in season.get("users", [])}
     owners = {r["roster_id"]: r.get("owner_id") for r in season.get("rosters", [])}
     return owners, users
 
 
 def fetch_transactions(platform: Any, league_id: str) -> list[dict]:
+    """Fetch the league's transactions week by week up to the current week."""
     week = 1
     if hasattr(platform, "fetch_platform_state"):
         try:
@@ -71,6 +77,7 @@ def fetch_transactions(platform: Any, league_id: str) -> list[dict]:
 
 
 def transaction_entries(txs: list[dict], season: dict, name: Callable[[str], str]) -> list[dict]:
+    """Turn completed Sleeper transactions (adds, drops, waivers with FAAB, trades, commissioner moves) into exact changelog entries."""
     owners, users = _owners(season)
     who = lambda rid: users.get(owners.get(rid) or "", f"roster {rid}")
     entries = []
@@ -106,6 +113,7 @@ def transaction_entries(txs: list[dict], season: dict, name: Callable[[str], str
 
 
 def _scoring_changes(old: dict, new: dict) -> list[str]:
+    """Describe changed scoring values as "key old → new"."""
     keys = sorted(set(old) | set(new))
     return [f"{k} {old.get(k, 0):g} → {new.get(k, 0):g}" for k in keys if old.get(k, 0) != new.get(k, 0)]
 
@@ -115,6 +123,7 @@ def noticed_entries(old: dict, new: dict, name: Callable[[str], str], since: str
     out: list[dict] = []
 
     def add(kind: str, text: str, who: str | None = None) -> None:
+        """Append a noticed entry with a stable id from its time, kind, who and text."""
         key = hashlib.sha1(f"{at}|{kind}|{who}|{text}".encode()).hexdigest()[:12]
         out.append({"id": f"seen-{key}", "at": at, "since": since, "exact": False, "who": who, "kind": kind, "text": text})
 

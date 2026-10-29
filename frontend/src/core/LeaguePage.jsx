@@ -6,6 +6,10 @@ import useSaveShortcut from "../useSaveShortcut.js";
 
 const PACES = ["early", "even", "late"];
 
+/**
+ * Editable table of the league's managers (name, budget, spend pace, which one is you).
+ * Saves one row or all at once (Ctrl+S); during setup it replaces the whole list, afterwards it patches each manager. Also bulk-apply names, budgets and pace, and resize the league.
+ */
 function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   const [rows, setRows] = useState(managers);
   const [msg, setMsg] = useState("");
@@ -16,10 +20,13 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   useEffect(() => setRows(managers), [managers]);
 
   const dirty = useMemo(() => JSON.stringify(rows) !== JSON.stringify(managers), [rows, managers]);
+  /** Patch row `i` of the editable manager list. */
   const update = (i, patch) => setRows((rs) => rs.map((m, j) => (j === i ? { ...m, ...patch } : m)));
 
+  /** The fields of a manager that the PATCH endpoint accepts. */
   const patchBody = (m) => ({ name: m.name, is_user: m.is_user, budget_total: Number(m.budget_total), behavior: m.behavior });
 
+  /** Save a single manager and report the result in the message line. */
   const saveRow = async (m) => {
     setMsg("");
     try {
@@ -31,6 +38,7 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
     }
   };
 
+  /** Save every edited manager: replace the list while the draft is in setup, otherwise patch each one. No-op when nothing changed or a save is running. */
   const saveAll = useCallback(async () => {
     if (!dirty || busy) return;
     setMsg(""); setBusy(true);
@@ -50,12 +58,14 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   }, [dirty, busy, draftStatus, leagueId, rows, reload]);
   useSaveShortcut(saveAll);
 
+  /** Assign pasted names (one per line, or comma / semicolon separated) to the managers in order. */
   const applyNames = () => {
     const list = names.split(/\r?\n|,|;/).map((s) => s.trim()).filter(Boolean);
     if (!list.length) return;
     setRows((rs) => rs.map((m, i) => (list[i] ? { ...m, name: list[i] } : m)));
     setNames("");
   };
+  /** Apply the bulk budget and spend pace to every manager (blank fields leave the value alone). */
   const applyAll = () => {
     setRows((rs) => rs.map((m) => ({
       ...m,
@@ -64,6 +74,7 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
     })));
   };
 
+  /** Resize the league to `n` managers, keeping existing rows, adding default ones, and making sure someone is marked as you. */
   const setCount = async (n) => {
     setMsg("");
     const budget = rows[0]?.budget_total ?? 200;
@@ -135,16 +146,22 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   );
 }
 
+/** Editable table of past seasons' keeper records (season, manager, player, cost) that feed the keeper-price projections. */
 function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
   const [rows, setRows] = useState(history);
   const [msg, setMsg] = useState("");
   const [season, setSeason] = useState("2025-26");
   useEffect(() => setRows(history), [history]);
   const dirty = JSON.stringify(rows) !== JSON.stringify(history);
+  /** Patch row `i` of the keeper history. */
   const update = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  /** A blank keeper record for a manager in the selected season (auction cost of $1). */
   const blank = (managerId) => ({ season, manager_id: managerId, player_id: 0, player_name: "", cost: { type: "auction", amount: 1, round: null, pick: null } });
+  /** Append a blank record for the first manager. */
   const add = () => setRows([...rows, blank("m1")]);
+  /** Append a blank record for every manager who has none yet this season. */
   const addAllManagers = () => setRows([...rows, ...managers.filter((m) => !rows.some((r) => r.season === season && r.manager_id === m.manager_id)).map((m) => blank(m.manager_id))]);
+  /** Save the keeper history; rows without a player are dropped. */
   const save = async () => {
     setMsg("");
     try {
@@ -155,6 +172,7 @@ function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
       setMsg(e.message);
     }
   };
+  /** A manager's display name from its id (falls back to the id). */
   const managerName = (id) => managers.find((m) => m.manager_id === id)?.name || id;
   return (
     <details className="panel panel-toggle" data-testid="keepers-toggle">
@@ -201,15 +219,18 @@ function KeeperHistoryEditor({ leagueId, history, managers, reload }) {
   );
 }
 
+/** League picker and manager: list, create, select and delete leagues (including bulk-deleting mock drafts), with the selected league's managers and keeper history editors. */
 export default function LeaguePage({ leagueId, setLeagueId }) {
   const [leagues, setLeagues] = useState([]);
   const [doc, setDoc] = useState(null);
   const [newId, setNewId] = useState("");
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
-  const [picked, setPicked] = useState(() => new Set());   // leagues ticked for "Delete selected"
+  const [picked, setPicked] = useState(() => new Set());
 
+  /** Reload the list of leagues. */
   const loadList = useCallback(() => api.get("/leagues").then(setLeagues).catch((e) => setError(e.message)), []);
+  /** Reload the selected league's document (null when none is selected). */
   const loadDoc = useCallback(() => {
     if (!leagueId) return setDoc(null);
     return api.get(`/leagues/${leagueId}`).then(setDoc).catch((e) => { setError(e.message); setDoc(null); });
@@ -218,6 +239,7 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
   useEffect(() => { loadList(); }, [loadList]);
   useEffect(() => { loadDoc(); }, [loadDoc]);
 
+  /** Create a league from the id and name fields, reload the list and select it. */
   const create = async () => {
     setError("");
     try {
@@ -230,6 +252,7 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
     }
   };
 
+  /** Delete one league after confirmation; clears the selection when it was the open one. */
   const remove = async (id) => {
     if (!window.confirm(`Delete league ${id}?`)) return;
     await api.del(`/leagues/${id}`);
@@ -237,8 +260,10 @@ export default function LeaguePage({ leagueId, setLeagueId }) {
     loadList();
   };
 
+  /** Tick or untick a league for bulk deletion. */
   const toggle = (id) => setPicked((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const mocks = leagues.filter((l) => l.league_id.startsWith("mock-")).map((l) => l.league_id);
+  /** Delete every ticked league after confirmation, reporting failures per league. */
   const removeMany = async () => {
     const ids = [...picked];
     if (!ids.length || !window.confirm(`Delete ${ids.length} league${ids.length > 1 ? "s" : ""}?\n\n${ids.join("\n")}`)) return;

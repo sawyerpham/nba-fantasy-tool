@@ -1,4 +1,3 @@
-"""Spending guide: money picture, inflation, slot plan, and how far to go on a player."""
 
 import pytest
 
@@ -10,6 +9,7 @@ from tests.factories import NOW, default_world, fresh_draft, managers, small_lea
 
 
 def setup(keepers=None):
+    """The default world with a small league and engine (optional keepers)."""
     players, overrides, valuations = default_world()
     lg = small_league()
     mgrs = managers(3, 50)
@@ -19,6 +19,7 @@ def setup(keepers=None):
 
 
 def guide(lg, mgrs, e, players, overrides, valuations, me="m1", focus=None):
+    """The spending guide for a manager in the test world."""
     pv = pool_values(players, overrides, valuations, lg.ranking)
     opening_rows = rank_players(lg, players, overrides, valuations, [], list(players))
     opening = market_rate(lg, mgrs, [], (r.value for r in opening_rows), pv).dollars_per_var
@@ -28,15 +29,18 @@ def guide(lg, mgrs, e, players, overrides, valuations, me="m1", focus=None):
 
 
 def pick(e, pid, mgr, price):
+    """Nominate a player and record his pick."""
     e.nominate(pid)
     e.pick(pid, mgr, price)
 
 
 def test_ordinal():
+    """Ordinal."""
     assert [ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 101)] == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "101st"]
 
 
 def test_opening_picture_at_draft_start():
+    """Opening picture at draft start."""
     world = setup()
     g = guide(*world)
     me = g.me
@@ -54,6 +58,7 @@ def test_opening_picture_at_draft_start():
 
 
 def test_plan_covers_each_open_starter_slot_without_reusing_a_player():
+    """Plan covers each open starter slot without reusing a player."""
     g = guide(*setup())
     assert [e.slot for e in g.plan] == ["PG", "SG", "C", "UTIL"]
     assert g.plan[0].best_name == "Bo Guard" and g.plan[2].best_name == "Ace Center" and g.plan[3].best_name == "Cy Wing"
@@ -71,6 +76,7 @@ def test_plan_covers_each_open_starter_slot_without_reusing_a_player():
 
 
 def test_targets_are_affordable_and_ranked_by_value():
+    """Targets are affordable and ranked by value."""
     g = guide(*setup())
     assert [t.name for t in g.targets] == ["Ace Center", "Bo Guard", "Cy Wing", "Dee Point", "Ed Two"]
     assert all(1 <= t.suggested <= 45 for t in g.targets)
@@ -81,6 +87,7 @@ def test_targets_are_affordable_and_ranked_by_value():
 
 
 def test_everyone_equal_at_the_start_a_star_is_star_only_and_a_mid_player_is_a_buy():
+    """Everyone equal at the start a star is star only and a mid player is a buy."""
     g = guide(*setup(), focus=1)
     f = g.focus
     # $50 - $2 bench - 3 other starters × 0.8 × $12 = $19 stretch; × 0.5 = $30 walk-away
@@ -95,6 +102,7 @@ def test_everyone_equal_at_the_start_a_star_is_star_only_and_a_mid_player_is_a_b
 
 
 def test_buy_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
+    """Buy with an overpay ceiling when rich and a bidding war is likely."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m2", 30)   # rivals blow $30 each on spares: $20 left, max bid $16
     pick(e, 11, "m3", 30)
@@ -109,6 +117,7 @@ def test_buy_with_an_overpay_ceiling_when_rich_and_a_bidding_war_is_likely():
 
 
 def test_no_overpay_when_few_rivals_can_reach_the_market_price():
+    """No overpay when few rivals can reach the market price."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m2", 40)   # m2: $10 left, max bid $6 -> cannot reach the market max; m3 still can
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
@@ -119,6 +128,7 @@ def test_no_overpay_when_few_rivals_can_reach_the_market_price():
 
 
 def test_fair_only_when_nobody_else_can_pay_fair_value():
+    """Fair only when nobody else can pay fair value."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m2", 45)   # $5 left with 5 open slots: max bid $1
     pick(e, 11, "m3", 45)
@@ -130,6 +140,7 @@ def test_fair_only_when_nobody_else_can_pay_fair_value():
 
 
 def test_too_pricey_when_the_market_price_would_gut_the_other_starter_slots():
+    """Too pricey when the market price would gut the other starter slots."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 3, "m1", 20)   # I paid $20 for Cy Wing: $30 left, 3 starter slots + 2 bench
     g = guide(lg, mgrs, e, players, overrides, valuations, focus=1)
@@ -140,6 +151,7 @@ def test_too_pricey_when_the_market_price_would_gut_the_other_starter_slots():
 
 
 def test_bench_slot_is_capped_at_the_market_price():
+    """Bench slot is capped at the market price."""
     lg, mgrs, e, players, overrides, valuations = setup()
     for pid, price in ((2, 5), (5, 5), (1, 5), (3, 5)):  # PG, SG, C, UTIL filled: only bench left
         pick(e, pid, "m1", price)
@@ -151,6 +163,7 @@ def test_bench_slot_is_capped_at_the_market_price():
 
 
 def test_cheap_keeper_inflates_prices():
+    """Cheap keeper inflates prices."""
     lg, mgrs, e, players, overrides, valuations = setup([KeeperAssignment("m2", 1, 1)])  # Ace Center kept for $1
     g = guide(lg, mgrs, e, players, overrides, valuations)
     assert g.inflation > 1.05 and g.current_dollars_per_var > g.opening_dollars_per_var
@@ -158,6 +171,7 @@ def test_cheap_keeper_inflates_prices():
 
 
 def test_can_outbid_lists_richer_managers_by_max_bid():
+    """Can outbid lists richer managers by max bid."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 1, "m1", 30)   # I spend $30 on Ace: $20 left, 5 slots, max bid $16
     g = guide(lg, mgrs, e, players, overrides, valuations)
@@ -168,6 +182,7 @@ def test_can_outbid_lists_richer_managers_by_max_bid():
 
 
 def test_roster_full():
+    """Roster full."""
     lg, mgrs, e, players, overrides, valuations = setup()
     for pid in (2, 5, 1, 3, 7, 8):  # PG, SG, C, UTIL, BN, BN at $1 each
         pick(e, pid, "m1", 1)
@@ -178,6 +193,7 @@ def test_roster_full():
 
 
 def test_drain_nominations_name_the_rivals_they_drain():
+    """Drain nominations name the rivals they drain."""
     lg, mgrs, e, players, overrides, valuations = setup()
     pick(e, 10, "m1", 40)   # I spend big: the stars are now above my cap
     g = guide(lg, mgrs, e, players, overrides, valuations)

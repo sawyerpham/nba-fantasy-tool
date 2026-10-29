@@ -1,4 +1,3 @@
-"""Sleeper projections blended into FP/G, and auction money spread over starters + priced bench only."""
 
 import pytest
 
@@ -10,10 +9,12 @@ from tests.factories import managers, override, record, small_league, valuation
 
 
 def proj_record(pid, pts):
+    """A test record carrying a Sleeper projection of `pts` points."""
     return record(pid, f"Test Player{pid}").model_copy(update={"projection": {"pts": pts}})
 
 
 def test_projection_blends_with_last_season_and_scales_ceiling():
+    """Projection blends with last season and scales ceiling."""
     scoring = ScoringSettings()
     rec = proj_record(1, pts=40.0)
     proj = 40.0 * scoring.base.pts
@@ -28,12 +29,14 @@ def test_projection_blends_with_last_season_and_scales_ceiling():
 
 
 def test_projection_without_history_counts_at_full_confidence():
+    """Projection without history counts at full confidence."""
     scoring = ScoringSettings()
     value, blended, conf, *_ = player_value(proj_record(2, pts=30.0), override(2, ["SF"]), None, RankingSettings(), scoring)
     assert conf == 1.0 and value > 0
 
 
 def test_fewer_priced_bench_slots_raise_the_price_of_value():
+    """Fewer priced bench slots raise the price of value."""
     league = small_league()
     ms = managers(3, budget=league.budget_per_manager)
     values = [100.0 - i for i in range(80)]
@@ -47,6 +50,7 @@ def test_fewer_priced_bench_slots_raise_the_price_of_value():
 
 
 def test_tiers_break_on_a_relative_drop_from_the_tier_top():
+    """Tiers break on a relative drop from the tier top."""
     from app.core.engine.ranking import tiers
 
     t = tiers({1: 100.0, 2: 96.0, 3: 93.0, 4: 90.0, 5: 50.0})
@@ -54,6 +58,7 @@ def test_tiers_break_on_a_relative_drop_from_the_tier_top():
 
 
 def test_age_penalty_only_hits_the_last_season_share_when_projected():
+    """Age penalty only hits the last season share when projected."""
     scoring = ScoringSettings()
     old = record(3, "Old Player", age=41.0).model_copy(update={"projection": {"pts": 40.0}})
     v = valuation(3, avg=10.0, best=20.0, gp=65)

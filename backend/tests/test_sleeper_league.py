@@ -1,15 +1,16 @@
-"""Sleeper league details cache and the league changelog."""
 
 from app.core.services.sleeper_changelog import noticed_entries, transaction_entries
 from app.core.services.sleeper_league import details_rel
 
 
 def test_details_cache_does_not_share_a_file_with_the_providers_raw_league_cache():
+    """Details cache does not share a file with the providers raw league cache."""
     # SleeperProvider.fetch_league writes cache/sleeper_league_<id>.json; sharing it wiped rosters and keepers.
     assert details_rel("123") != "cache/sleeper_league_123.json"
 
 
 def season(owners, keepers=None, roster_positions=("PG", "BN"), max_keepers=1, start_time=None):
+    """A Sleeper season document with the given owners, keepers and roster settings."""
     users = [{"user_id": u, "display_name": u.upper()} for u in owners.values() if u]
     rosters = [{"roster_id": rid, "owner_id": u, "keepers": (keepers or {}).get(rid)} for rid, u in owners.items()]
     return {"league": {"league_id": "L", "name": "lg", "roster_positions": list(roster_positions),
@@ -18,6 +19,7 @@ def season(owners, keepers=None, roster_positions=("PG", "BN"), max_keepers=1, s
 
 
 def test_noticed_entries_cover_members_keepers_rules_and_draft_time():
+    """Noticed entries cover members keepers rules and draft time."""
     old = season({1: "a", 2: "b"})
     new = season({1: "a", 2: "c"}, keepers={1: ["99"]}, roster_positions=("PG", "PG", "BN"), max_keepers=3, start_time=1_800_000_000_000)
     texts = {(e["who"], e["kind"], e["text"]) for e in noticed_entries(old, new, lambda s: f"P{s}", "t0", "t1")}
@@ -30,6 +32,7 @@ def test_noticed_entries_cover_members_keepers_rules_and_draft_time():
 
 
 def test_transactions_name_the_manager_and_skip_failed_waivers():
+    """Transactions name the manager and skip failed waivers."""
     s = season({1: "a", 2: "b"})
     txs = [
         {"transaction_id": "1", "status": "complete", "type": "waiver", "roster_ids": [1], "adds": {"7": 1}, "drops": {"8": 1},
@@ -45,6 +48,7 @@ def test_transactions_name_the_manager_and_skip_failed_waivers():
 
 
 def test_mock_draft_picks_are_matched_by_seat():
+    """Mock draft picks are matched by seat."""
     from types import SimpleNamespace
 
     from app.core.services.sleeper_league import sync_picks

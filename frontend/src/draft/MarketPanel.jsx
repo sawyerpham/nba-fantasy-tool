@@ -5,8 +5,10 @@ import { Term, priceTone } from "../core/Terms.jsx";
 
 const STATUS = { scarce: ["bad", "scarce"], tight: ["even", "tight"], plenty: ["good", "plenty"] };
 
-// Under the spending guide: per position, demand vs supply, the tier cliff and which rivals are chasing it;
-// then the room trend (recent sales vs their Worth at the time). See backend engine/market.py.
+/**
+ * Position market under the spending guide: per position, demand vs supply, the tier cliff and which rivals are chasing it, then the room trend (recent sales vs their Worth at the time).
+ * Data from the backend's engine/market.py.
+ */
 export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
   const [m, setM] = useState(null);
   const [allSales, setAllSales] = useState(false);

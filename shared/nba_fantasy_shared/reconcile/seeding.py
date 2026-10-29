@@ -21,11 +21,13 @@ DEFAULT_SLEEPER_INJURY_MAP: dict[str, InjuryStatus] = {
 
 
 def injury_note_from(body_part: str | None, notes: str | None) -> str:
+    """Join Sleeper's injury body part and notes into one note ("Knee — soreness")."""
     parts = [p.strip() for p in (body_part, notes) if p and p.strip()]
     return " — ".join(parts)
 
 
 def map_injury(raw: str | None, injury_map: Mapping[str, InjuryStatus]) -> InjuryStatus:
+    """Map a Sleeper injury tag to an injury status: None is healthy, an unmapped tag is day-to-day."""
     if raw is None:
         return "healthy"
     return injury_map.get(raw, "day_to_day")
@@ -36,6 +38,7 @@ POSITION_ORDER = ("PG", "SG", "SF", "PF", "C")   # how positions read everywhere
 
 
 def ordered_positions(positions) -> list:
+    """Sort positions in the app's order (PG SG SF PF C)."""
     return sorted(positions, key=lambda p: POSITION_ORDER.index(p) if p in POSITION_ORDER else len(POSITION_ORDER))
 
 

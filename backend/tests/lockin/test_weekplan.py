@@ -1,4 +1,3 @@
-"""Week plan: lock-now vs wait values, optimal seating, and which slot a lock goes into."""
 
 import pytest
 
@@ -8,14 +7,17 @@ SLOTS = {"PG": 2, "SG": 2}
 
 
 def pp(sid, elig, slot, games, **kw):
+    """A PlanPlayer with the given eligibility, slot and games."""
     return PlanPlayer(sid=sid, name=sid, eligibility=elig, slot=slot, games=games, **kw)
 
 
 def future(*projs):
+    """One future game per projection, on consecutive days."""
     return [Game(date=f"2026-10-2{i + 2}", proj=p) for i, p in enumerate(projs)]
 
 
 def test_expected_max_and_wait_value_math():
+    """Expected max and wait value math."""
     assert expected_max(0, 1, 0) == pytest.approx(0.3989, abs=1e-4)
     assert expected_max(10, 0, 12) == 12
     assert wait_value(future(20), 0.3, "healthy") == pytest.approx(0.97 * 20)          # last game: just its projection
@@ -26,6 +28,7 @@ def test_expected_max_and_wait_value_math():
 
 
 def test_pg_sg_locks_in_the_sg_slot_so_both_great_pgs_still_fit():
+    """Pg sg locks in the sg slot so both great pgs still fit."""
     pg1 = pp("pg1", ["PG"], "BN", future(20, 20))
     pg2 = pp("pg2", ["PG"], "BN", future(20, 20))
     combo = pp("combo", ["PG", "SG"], "PG", [Game("2026-10-21", 15, fp=19.0, started=True)])   # done for the week
@@ -38,12 +41,14 @@ def test_pg_sg_locks_in_the_sg_slot_so_both_great_pgs_still_fit():
 
 
 def test_great_player_bad_game_passes_and_keeps_his_value_from_later_games():
+    """Great player bad game passes and keeps his value from later games."""
     star = pp("star", ["PG"], "PG", [Game("2026-10-21", 20, fp=9.0, started=True)] + future(20, 20))
     plan_week([star], SLOTS)
     assert star.x == 9.0 and star.action == "PASS" and star.value == star.w > 20
 
 
 def test_bench_players_cant_lock_and_the_window_closes_at_his_next_tip():
+    """Bench players cant lock and the window closes at his next tip."""
     bench = pp("bn", ["PG"], "BN", [Game("2026-10-21", 15, fp=30.0, started=True)] + future(15))
     closed = pp("closed", ["SG"], "SG", [Game("2026-10-21", 15, fp=30.0, started=True), Game("2026-10-22", 15, started=True)] + future(15))
     plan_week([bench, closed], SLOTS)
@@ -51,6 +56,7 @@ def test_bench_players_cant_lock_and_the_window_closes_at_his_next_tip():
 
 
 def test_locked_players_keep_their_slot_and_others_fill_around_them():
+    """Locked players keep their slot and others fill around them."""
     locked = pp("locked", ["PG", "SG"], "PG", [], locked=25.0)
     a = pp("a", ["PG"], "BN", future(18, 18))
     b = pp("b", ["PG"], "BN", future(10))
@@ -61,12 +67,14 @@ def test_locked_players_keep_their_slot_and_others_fill_around_them():
 
 
 def test_swing_comes_from_his_own_games():
+    """Swing comes from his own games."""
     assert swing_of([10.0] * 20) == 0.12                                  # perfectly steady: the floor
     assert swing_of([5.0, 25.0] * 10) == 0.6                              # wild: the ceiling
     assert swing_of([10.0] * 5) == 0.3                                    # too few games: the default
 
 
 def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
+    """Today starts whoever plays today and keeps lock candidates."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -86,6 +94,7 @@ def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
 
 
 def test_today_never_moves_a_player_mid_game_and_flags_swaps_and_gtd():
+    """Today never moves a player mid game and flags swaps and gtd."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -104,6 +113,7 @@ def test_today_never_moves_a_player_mid_game_and_flags_swaps_and_gtd():
 
 
 def test_live_estimate_projects_the_rest_of_his_game():
+    """Live estimate projects the rest of his game."""
     from app.lockin.weekplan import live_estimate
 
     half = Game("2026-10-21", 16.0, fp=10.0, started=True, live=True, min=17.0, proj_min=34.0, period=3, clock=720.0)
@@ -116,6 +126,7 @@ def test_live_estimate_projects_the_rest_of_his_game():
 
 
 def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap():
+    """Six pm player starts over a 645 one and the live game decides the swap."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -139,6 +150,7 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
 
 
 def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one_with_weaker_later_games():
+    """The starter headed lowest tonight sits for the later player not the one with weaker later games."""
     from app.lockin.weekplan import plan_today
 
     # Wiggins: 4.1 with 6 min left in Q4 but good later games; Grant: 6.0 late in Q3, weak later games.
@@ -165,6 +177,7 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
 
 
 def test_a_day_without_games_seats_by_next_tip():
+    """A day without games seats by next tip."""
     from app.lockin.weekplan import plan_today
 
     a = pp("a", ["C"], "C", [Game("2026-10-21", 10, tip="2026-10-21T23:00:00Z")])   # no game on the 20th
@@ -179,6 +192,7 @@ def test_a_day_without_games_seats_by_next_tip():
 
 
 def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_check():
+    """Tips within 15 minutes start the bigger projection and get no swap check."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -195,10 +209,12 @@ def test_tips_within_15_minutes_start_the_bigger_projection_and_get_no_swap_chec
 
 
 def test_lock_or_wait_by_the_chance_to_win_your_scenario():
+    """Lock or wait by the chance to win your scenario."""
     from app.lockin.weekplan import decide_by_win_chance
 
     # everyone else locked at 100; the great player's unlocked game is 15; his last game is projected 20
     def team():
+        """A team with a locked player, a star with one played and one future game, and fillers for the swap tests."""
         done = pp("done", ["PG"], "PG", [], locked=100.0)
         star = pp("star", ["SG"], "SG", [Game("2026-10-24", 18, fp=15.0, started=True), Game("2026-10-25", 20)])
         plan_week([done, star], SLOTS)
@@ -215,6 +231,7 @@ def test_lock_or_wait_by_the_chance_to_win_your_scenario():
 
 
 def test_late_scratch_alarms_now_and_close_projections_go_to_the_earlier_tip():
+    """Late scratch alarms now and close projections go to the earlier tip."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -234,6 +251,7 @@ def test_late_scratch_alarms_now_and_close_projections_go_to_the_earlier_tip():
 
 
 def test_an_idle_starter_who_already_played_keeps_his_slot_for_the_lock():
+    """An idle starter who already played keeps his slot for the lock."""
     from app.lockin.weekplan import plan_today
 
     s = pp("s", ["PG"], "PG", [Game("2026-10-20", 15, tip="2026-10-21T01:30:00Z"), Game("2026-10-22", 15, tip="2026-10-23T01:30:00Z")])
@@ -245,6 +263,7 @@ def test_an_idle_starter_who_already_played_keeps_his_slot_for_the_lock():
 
 
 def test_beat_chance_is_one_minus_every_game_missing():
+    """Beat chance is one minus every game missing."""
     from app.lockin.weekplan import beat_chance
     assert beat_chance(17.5, [], 0.3, "healthy") == 0                            # no games left: can't beat it
     one = beat_chance(14.6, future(14.6), 0.3, "healthy")
@@ -255,6 +274,7 @@ def test_beat_chance_is_one_minus_every_game_missing():
 
 
 def test_safe_locks_every_game_risky_waits_on_every_later_one():
+    """Safe locks every game risky waits on every later one."""
     from app.lockin.weekplan import scenario_total
 
     a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
@@ -265,6 +285,7 @@ def test_safe_locks_every_game_risky_waits_on_every_later_one():
 
 
 def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
+    """An open slot counts spare bench players games not just his own."""
     from app.lockin.weekplan import open_slot
 
     # Jaquez can lock 9.7; his own later game is only ~7. A spare forward on the bench plays a 12-proj game Friday:
@@ -278,6 +299,7 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
 
 
 def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
+    """A back to backs second night is worth less to wait on."""
     # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
     rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
     fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
@@ -285,6 +307,7 @@ def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
 
 
 def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
+    """Lock a pf c player at pf when the centers need the c slots."""
     from app.lockin.weekplan import lock_slots
 
     # Sabonis can lock at PF or C; two C-only players need both C slots, while a forward could take the PF slot
@@ -300,6 +323,7 @@ def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
 
 
 def test_a_game_still_in_progress_gets_no_lock_call():
+    """A game still in progress gets no lock call."""
     # a big night that isn't over yet: nothing to lock until it's final
     live = pp("a", ["PG"], "PG", [Game("2026-10-23", 10.0, fp=25.0, started=True, live=True, period=3, clock=300),
                                     Game("2026-10-25", 10.0)])
@@ -311,6 +335,7 @@ def test_a_game_still_in_progress_gets_no_lock_call():
 
 
 def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_far():
+    """A starters game in progress counts where its headed not his points so far."""
     today = "2026-10-24"
     tipped = pp("harden", ["PG"], "PG", [Game(today, 10.7, started=True, live=True)])            # just tipped, no stats yet
     cold = pp("wiggins", ["PF"], "PF", [Game(today, 8.1, fp=3.0, started=True, live=True, min=20, proj_min=32,
@@ -324,6 +349,7 @@ def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_f
 
 
 def test_win_chance_counts_a_live_game_at_its_projected_finish():
+    """Win chance counts a live game at its projected finish."""
     from app.lockin.weekplan import slot_spread
 
     today = "2026-10-24"

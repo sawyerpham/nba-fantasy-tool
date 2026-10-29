@@ -16,6 +16,7 @@ from nba_fantasy_shared.models.league import LeagueSettings, Manager
 
 @dataclass(frozen=True)
 class ManagerBudget:
+    """One manager's auction money: budget, spent, remaining, open slots, the dollars reserved for other slots and the largest legal bid right now."""
     manager_id: str
     budget_total: int
     spent: int
@@ -35,14 +36,17 @@ def max_bid(remaining: int, open_mandatory: int, min_bid: int) -> int:
 
 
 def reserved_for_others(open_mandatory: int, min_bid: int) -> int:
+    """Dollars that must stay untouched for the other open mandatory slots: min_bid for each one except the slot being bid on."""
     return max(0, min_bid * (open_mandatory - 1))
 
 
 def discretionary_dollars(remaining: int, open_mandatory: int, min_bid: int) -> int:
+    """Money above the bare minimum for every open mandatory slot (never negative)."""
     return max(0, remaining - min_bid * max(0, open_mandatory))
 
 
 def manager_budget(league: LeagueSettings, manager: Manager, picks: Iterable[Pick]) -> ManagerBudget:
+    """A manager's budget position given every pick: spent, remaining, open mandatory slots and their max legal bid (remaining minus the reservation for the other slots)."""
     own = [p for p in picks if p.manager_id == manager.manager_id]
     spent = sum(p.price for p in own)
     remaining = manager.budget_total - spent

@@ -21,26 +21,31 @@ LATER = datetime(2026, 9, 3, tzinfo=timezone.utc)
     ],
 )
 def test_normalize_name_pairs(a, b):
+    """Normalize name pairs."""
     assert normalize_name(a) == normalize_name(b)
 
 
 def test_normalize_name_empty():
+    """Normalize name empty."""
     assert normalize_name(None) == ""
     assert normalize_name("") == ""
 
 
 def bio(pid: str = "1", source: str = "nba_api") -> PlayerBio:
+    """A minimal PlayerBio."""
     return PlayerBio(source=source, source_id=pid, full_name="Test Player", first_name="Test", last_name="Player",
                      normalized_name="test player", fetched_at=NOW)
 
 
 def record(player_id: int, fantasy: FantasyAttributes | None) -> PlayerRecord:
+    """A PlayerRecord with the given Sleeper attributes."""
     return PlayerRecord(player_id=player_id, sleeper_id=fantasy.sleeper_id if fantasy else None, full_name="Test Player",
                         first_name="Test", last_name="Player", normalized_name="test player", bio=bio(),
                         fantasy=fantasy, match_method="name_team" if fantasy else "nba_only")
 
 
 def test_seed_sets_eligibility_and_injury_from_sleeper_with_source_tracking():
+    """Seed sets eligibility and injury from sleeper with source tracking."""
     fa = FantasyAttributes(sleeper_id="9", fantasy_positions=["PG", "SG"], injury_status_raw="Out",
                            injury_body_part="Knee", injury_notes="Surgery")
     out = seed_overrides([record(1, fa)], {}, now=NOW)
@@ -52,12 +57,14 @@ def test_seed_sets_eligibility_and_injury_from_sleeper_with_source_tracking():
 
 
 def test_seed_maps_dtd_ir_and_none():
+    """Seed maps dtd ir and none."""
     for raw, expected in [("DTD", "day_to_day"), ("IR", "out_long_term"), (None, "healthy")]:
         fa = FantasyAttributes(sleeper_id="9", fantasy_positions=["C"], injury_status_raw=raw)
         assert seed_overrides([record(1, fa)], {}, now=NOW)[1].injury_status == expected
 
 
 def test_seed_always_takes_sleeper_and_keeps_the_users_notes():
+    """Seed always takes sleeper and keeps the users notes."""
     existing = {
         1: PlayerOverrides(player_id=1, eligibility=["C"], eligibility_source="manual",
                            injury_status="healthy", injury_source="sleeper", updated_at=NOW, notes="keep me"),
@@ -76,6 +83,7 @@ def test_seed_always_takes_sleeper_and_keeps_the_users_notes():
 
 
 def test_seed_leaves_players_without_sleeper_data_untouched():
+    """Seed leaves players without sleeper data untouched."""
     existing = {3: PlayerOverrides(player_id=3, eligibility=["SF"], eligibility_source="manual", updated_at=NOW)}
     out = seed_overrides([record(3, None), record(4, None)], existing, now=LATER)
     assert out[3].eligibility == ["SF"] and out[3].updated_at == NOW
@@ -83,21 +91,25 @@ def test_seed_leaves_players_without_sleeper_data_untouched():
 
 
 def test_seed_keeps_overrides_for_players_missing_from_the_pool():
+    """Seed keeps overrides for players missing from the pool."""
     existing = {99: PlayerOverrides(player_id=99, eligibility=["C"], eligibility_source="manual", updated_at=NOW)}
     out = seed_overrides([record(1, None)], existing, now=LATER)
     assert 99 in out and out[99].eligibility == ["C"]
 
 
 def test_seed_custom_injury_map():
+    """Seed custom injury map."""
     fa = FantasyAttributes(sleeper_id="9", fantasy_positions=["C"], injury_status_raw="Out")
     out = seed_overrides([record(1, fa)], {}, injury_map={"Out": "out_long_term"}, now=NOW)
     assert out[1].injury_status == "out_long_term"
 
 
 def test_preseason_short_term_tags_and_rest_seed_as_healthy_but_out_still_counts():
+    """Preseason short term tags and rest seed as healthy but out still counts."""
     from nba_fantasy_shared.models.players import FantasyAttributes
 
     def fa(raw, part=None):
+        """FantasyAttributes with a raw injury tag and body part."""
         return FantasyAttributes(sleeper_id="1", fantasy_positions=["PG"], injury_status_raw=raw, injury_body_part=part)
 
     pre = lambda f: seed_overrides([record(1, f)], {}, now=NOW, ignore_short_term=True)[1]
@@ -110,6 +122,7 @@ def test_preseason_short_term_tags_and_rest_seed_as_healthy_but_out_still_counts
 
 
 def test_json_store_retries_a_briefly_locked_target(tmp_path, monkeypatch):
+    """Json store retries a briefly locked target."""
     import os
 
     from nba_fantasy_shared.storage import json_store
@@ -117,6 +130,7 @@ def test_json_store_retries_a_briefly_locked_target(tmp_path, monkeypatch):
     real, calls = os.replace, []
 
     def flaky(src, dst):
+        """A replace function that fails twice before succeeding."""
         calls.append(1)
         if len(calls) < 3:
             raise PermissionError("Access is denied")

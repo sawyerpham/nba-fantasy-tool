@@ -1,4 +1,3 @@
-"""End-to-end pull through PullService using the captured fixtures (no network)."""
 
 import json
 
@@ -15,11 +14,13 @@ WALKER, DEROZAN, BITTLE, ODURO, HALIBURTON = 1629022, 201942, 1642927, -2871, 16
 
 @pytest.fixture
 def service(tmp_path, fixtures_dir):
+    """A PullService over fixture providers and a temp store."""
     store = JsonStore(tmp_path)
     return PullService(store, FixtureStatsProvider(fixtures_dir), FixturePlatformProvider(fixtures_dir))
 
 
 def test_full_pull_from_fixtures(service):
+    """Full pull from fixtures."""
     status = service.run()
     assert status.state == "done", status.error
     assert service.roster_season == "2026-27" and service.stats_season == "2025-26"  # derived from Sleeper state
@@ -72,6 +73,7 @@ def test_full_pull_from_fixtures(service):
 
 
 def test_second_pull_reseeds_from_sleeper_and_keeps_notes(service):
+    """Second pull reseeds from sleeper and keeps notes."""
     assert service.run().state == "done"
     overrides = load_overrides(service.store)
     jokic = overrides[JOKIC]
@@ -86,6 +88,7 @@ def test_second_pull_reseeds_from_sleeper_and_keeps_notes(service):
     assert after[ADAMS].injury_status == "healthy" and after[ADAMS].injury_source == "sleeper"  # refreshed (off-season DTD)
 
 def test_pull_without_sleeper_source_yields_nba_only_records(service):
+    """Pull without sleeper source yields nba only records."""
     status = service.run(sources=["nba_api"], skip_game_logs=True)
     assert status.state == "done"
     assert status.reconcile.counts == {"nba_only": 20}
@@ -94,5 +97,6 @@ def test_pull_without_sleeper_source_yields_nba_only_records(service):
 
 
 def test_status_as_dict_is_json_serializable(service):
+    """Status as dict is json serializable."""
     status = service.run(skip_game_logs=True)
     json.dumps(status.as_dict())

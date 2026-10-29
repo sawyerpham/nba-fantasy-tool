@@ -9,6 +9,7 @@ const VERDICT = {
   bad: { label: "BAD keep", cls: "bad" },
 };
 
+/** Keep / let-go badge for one keeper: his price against his draft-start worth, rank, and whether he's affordable under the cap. */
 function Verdict({ ev }) {
   if (!ev) return null;
   const v = VERDICT[ev.verdict] || VERDICT.even;
@@ -20,10 +21,13 @@ function Verdict({ ev }) {
   );
 }
 
+/** A blank keeper row for a manager. */
 const emptyRow = (managerId) => ({ manager_id: managerId, player_id: null, player_name: "", last_price: "", cost: "", costTouched: false, ev: null });
 
-// One row per manager (× keeper limit) is pre-filled: pick the player, type LAST year's price, done.
-// This year's price follows the league escalation rule (editable) and gets a keep / let-go verdict.
+/**
+ * Dialog to enter keepers and start the draft. One row per manager (times the keeper limit) is pre-filled: pick the player and type last year's price.
+ * This year's price follows the league escalation rule (editable) and gets a keep / let-go verdict from the backend (debounced 250 ms). Keepers already set in Sleeper pre-fill their rows.
+ */
 export default function StartDraftDialog({ leagueId, view, keeperSettings, onClose, onStarted }) {
   const managers = view?.managers || [];
   const perManager = Math.max(1, keeperSettings?.max_per_manager ?? 1);
@@ -35,9 +39,12 @@ export default function StartDraftDialog({ leagueId, view, keeperSettings, onClo
   const ruleText = esc && esc.enabled ? `+$${esc.increase_per_step} per full $${esc.step_dollars} of last year's price` : "no escalation";
   const entered = rows.filter((r) => r.player_id).length;
 
+  /** Patch row `i` of the keeper rows. */
   const update = (i, patch) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  /** Focus an element by its data-testid on the next tick. */
   const focus = (testId) => setTimeout(() => document.querySelector(`[data-testid="${testId}"]`)?.focus(), 0);
 
+  /** Ask the backend to price and judge every filled-in keeper row, then merge the verdicts and default prices back into the rows. */
   const evaluate = useCallback(async (current) => {
     const candidates = current
       .map((r, i) => ({ i, r }))
@@ -85,11 +92,13 @@ export default function StartDraftDialog({ leagueId, view, keeperSettings, onClo
   }, [leagueId]);
 
   useEffect(() => {
+    /** Escape closes the dialog. */
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /** Start the draft with the entered keepers and hand the new view to `onStarted`. */
   const start = async () => {
     setError(""); setBusy(true);
     try {

@@ -1,4 +1,3 @@
-"""Roster slots, greedy assignment, eligibility, and same-team stacking."""
 
 from datetime import datetime, timezone
 
@@ -11,10 +10,12 @@ NOW = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
 
 def pick(n, slot, player_id=None, manager="m1", price=1):
+    """A Pick of a player into a slot."""
     return Pick(pick_number=n, player_id=player_id or 100 + n, manager_id=manager, price=price, slot=slot, timestamp=NOW)
 
 
 def test_candidate_slots_most_specific_first():
+    """Candidate slots most specific first."""
     assert roster.candidate_slots(["PG", "SG"]) == ["PG", "SG", "G", "UTIL", "BN"]
     assert roster.candidate_slots(["C"]) == ["C", "UTIL", "BN"]
     assert roster.candidate_slots(["SF", "PF"]) == ["SF", "PF", "F", "UTIL", "BN"]
@@ -22,6 +23,7 @@ def test_candidate_slots_most_specific_first():
 
 
 def test_default_league_capacity_is_17_slots_15_mandatory():
+    """Default league capacity is 17 slots 15 mandatory."""
     lg = LeagueSettings(league_id="L", name="L")
     caps = roster.slot_capacity(lg)
     assert caps == {"PG": 1, "SG": 1, "SF": 1, "PF": 1, "C": 1, "UTIL": 2, "BN": 8, "IR": 2}
@@ -30,6 +32,7 @@ def test_default_league_capacity_is_17_slots_15_mandatory():
 
 
 def test_greedy_assignment_fills_position_then_util_then_bench_never_ir():
+    """Greedy assignment fills position then util then bench never ir."""
     lg = LeagueSettings(league_id="L", name="L")
     picks: list[Pick] = []
     expected = ["PG", "SG", "UTIL", "UTIL"] + ["BN"] * 8
@@ -44,6 +47,7 @@ def test_greedy_assignment_fills_position_then_util_then_bench_never_ir():
 
 
 def test_is_rosterable_false_when_only_non_fitting_position_slots_remain():
+    """Is rosterable false when only non fitting position slots remain."""
     lg = small_league()  # PG SG C UTIL BN BN
     picks = [pick(1, "PG"), pick(2, "SG"), pick(3, "UTIL"), pick(4, "BN"), pick(5, "BN")]
     assert roster.open_slots(lg, picks) == {"PG": 0, "SG": 0, "C": 1, "UTIL": 0, "BN": 0, "IR": 1}
@@ -53,6 +57,7 @@ def test_is_rosterable_false_when_only_non_fitting_position_slots_remain():
 
 
 def test_validate_slot_messages():
+    """Validate slot messages."""
     lg = small_league()
     assert "cannot be drafted into" in roster.validate_slot(lg, [], ["C"], "IR")
     assert "league has no" in roster.validate_slot(lg, [], ["PG"], "G")
@@ -63,6 +68,7 @@ def test_validate_slot_messages():
 
 
 def test_flex_slots_accept_the_right_positions():
+    """Flex slots accept the right positions."""
     lg = LeagueSettings(league_id="L", name="L", roster_slots=[RosterSlotSpec(slot="G", count=1), RosterSlotSpec(slot="F", count=1),
                                                              RosterSlotSpec(slot="BN", count=1)], budget_per_manager=10)
     assert roster.assign_slot(lg, [], ["PG"]) == "G"
@@ -71,6 +77,7 @@ def test_flex_slots_accept_the_right_positions():
 
 
 def test_team_stack_and_stack_if_added():
+    """Team stack and stack if added."""
     players, _, _ = default_world()
     picks = [pick(1, "C", player_id=1), pick(2, "PG", player_id=2), pick(3, "UTIL", player_id=3)]  # DEN, DEN, LAL
     stack = roster.team_stack(players, picks)
@@ -82,5 +89,6 @@ def test_team_stack_and_stack_if_added():
 
 
 def test_stack_ignores_picks_for_unknown_players():
+    """Stack ignores picks for unknown players."""
     players, _, _ = default_world()
     assert roster.team_stack(players, [pick(1, "BN", player_id=999)]) == {}

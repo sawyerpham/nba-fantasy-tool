@@ -4,6 +4,7 @@ import React, { createContext, useContext } from "react";
 // context; anywhere else (the Draft tab's profiles) the name stays plain text.
 export const TeamLinkContext = createContext(null);
 
+/** An NBA team's name or abbreviation that opens its Team card when a TeamLinkContext provider is present; otherwise plain text. */
 export default function TeamLink({ abbr, children }) {
   const open = useContext(TeamLinkContext);
   const text = children ?? abbr;

@@ -33,6 +33,7 @@ DEFAULT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://loc
 
 
 def build_default_state(data_dir=None) -> AppState:
+    """Build the application state with the real providers (nba_api and Sleeper) and a JSON store in `data_dir` (default: the configured data directory)."""
     store = JsonStore(data_dir or config.DEFAULT_DATA_DIR)
     policy = RetryPolicy()
     stats = NbaApiProvider(CallRunner(policy))
@@ -41,8 +42,10 @@ def build_default_state(data_dir=None) -> AppState:
 
 
 def create_app(state: AppState | None = None) -> FastAPI:
+    """Build the FastAPI app: CORS for the dev servers, the data / players / leagues / draft / season routers under /api, a health check, and error handlers (draft errors 400, unknown league 404, pull already running 409)."""
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        """Create the real application state on startup when none was injected (tests inject one)."""
         if getattr(app.state, "app_state", None) is None:
             app.state.app_state = build_default_state()
             log.info("AppState initialised from %s", app.state.app_state.store.root)
@@ -61,19 +64,23 @@ def create_app(state: AppState | None = None) -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict:
+        """Health check: API version and the number of players loaded."""
         st = app.state.app_state
         return {"ok": True, "version": API_VERSION, "players": len(st.players) if st else 0}
 
     @app.exception_handler(DraftError)
     async def draft_error(_: Request, exc: DraftError) -> JSONResponse:
+        """Turn a DraftError into a 400 response."""
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.exception_handler(LeagueNotFound)
     async def league_not_found(_: Request, exc: LeagueNotFound) -> JSONResponse:
+        """Turn an unknown league into a 404 response."""
         return JSONResponse(status_code=404, content={"detail": f"unknown league {exc}"})
 
     @app.exception_handler(PullAlreadyRunning)
     async def pull_running(_: Request, exc: PullAlreadyRunning) -> JSONResponse:
+        """Turn a second concurrent pull into a 409 response."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     return app

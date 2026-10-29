@@ -6,18 +6,24 @@ import InjuryTag from "../core/InjuryTag.jsx";
 // The in-season player profile's tabs (backend season_player): Summary, Game log and History; the Team tab (depth
 // chart) is drawn by PlayerSidebar, which already has his team card.
 
+/** One-decimal number, or an em dash for null. */
 const f1 = (x) => (x == null ? "—" : Number(x).toFixed(1));
-const f2 = (x) => (x == null ? "—" : Number(x).toFixed(2));   // fantasy points: 2 decimals, like Sleeper
-const mmdd = (d) => d.slice(5).replace("-", "/");   // "2026-10-23" -> "10/23"
-const longDate = (ms) => fmt(ms, { month: "short", day: "numeric", year: "numeric" }).replace(",", "");   // "Oct 15 2026"
-// "3:14 - 1st" -> "Q1 3:14" (ESPN's live status in quarters)
+/** Fantasy points to two decimals (like Sleeper), or an em dash for null. */
+const f2 = (x) => (x == null ? "—" : Number(x).toFixed(2));
+/** "2026-10-23" -> "10/23". */
+const mmdd = (d) => d.slice(5).replace("-", "/");
+/** A timestamp as "Oct 15 2026" in the league's time zone. */
+const longDate = (ms) => fmt(ms, { month: "short", day: "numeric", year: "numeric" }).replace(",", "");
+/** ESPN's live game status in quarters: "3:14 - 1st" -> "Q1 3:14", "5:00 - 2OT" -> "2OT 5:00". */
 const quarters = (d) => (d || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1").replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
 
-// Summary: his live / last game (both teams, score, quarter + clock, his FP and line), season averages, then ranks,
-// ownership and FP per game; owner and injury status under them.
-// onOpenGame(game): the live / last game box opens that game's card (GamePanel) on the right.
+/**
+ * Summary tab: his live or last game (both teams, score, quarter and clock, his FP and line), season averages, then ranks, ownership and FP per game, with owner and injury status under them.
+ * `onOpenGame(game)` opens that game's card (GamePanel) on the right when the game box is clicked.
+ */
 export function SeasonSummary({ sea, onOpenGame }) {
   const g = sea.last_game, a = sea.averages, live = g?.state === "in";
+  /** One labelled number in the summary grid. */
   const stat = (label, value) => <div className="sp-stat"><span>{label}</span><strong>{value}</strong></div>;
   const openable = g?.event && onOpenGame;
   return (
@@ -66,20 +72,19 @@ export function SeasonSummary({ sea, onOpenGame }) {
   );
 }
 
-// Game log: every game his team plays this season; his line where he played (blank for games to come / he missed).
 // [header, shown value, raw key]
 const LOG_COLS = [["FPTS", (r) => f2(r.fp), "fp"], ["MIN", (r) => r.min, "min"], ["PTS", (r) => r.pts, "pts"], ["REB", (r) => r.reb, "reb"],
   ["AST", (r) => r.ast, "ast"], ["STL", (r) => r.stl, "stl"], ["BLK", (r) => r.blk, "blk"], ["TO", (r) => r.to, "to"], ["PF", (r) => r.pf, "pf"],
   ["+/-", (r) => (r.pm > 0 ? `+${r.pm}` : r.pm), "pm"]];
-// Each game's stat against his own season average: green above it, yellow about it (within 8 %), red below it
-// (the share of the average); turnovers and fouls the other way round; +/- by its sign (within 1 is yellow).
 const LESS_IS_BETTER = new Set(["to", "pf"]);
+/** Colour band for one game stat against his own season average: "up" at 8% or more above it, "even" within 8%, "down" below (turnovers and fouls the other way round; +/- by its sign, within 1 is even). null when he didn't play. */
 function logTone(k, v, avg) {
   if (v == null) return null;
   let rel = k === "pm" ? v / 10 : (v - avg) / Math.max(avg, 1);
   if (LESS_IS_BETTER.has(k)) rel = -rel;
   return rel >= 0.08 ? "up" : rel > -0.08 ? "even" : "down";
 }
+/** Game-log tab: every game his team plays this season, with his line where he played (blank for games to come or missed), each stat toned against his season average. */
 export function SeasonLog({ sea }) {
   const played = sea.season_log.filter((r) => r.fp != null);
   const avg = Object.fromEntries(LOG_COLS.map(([, , k]) => [k, played.reduce((t, r) => t + (r[k] || 0), 0) / (played.length || 1)]));
@@ -100,10 +105,10 @@ export function SeasonLog({ sea }) {
   );
 }
 
-// History: how he changed hands (draft, keeper, claims, pickups, trades, drops), oldest first; a keeper also shows
-// last season's draft. Type | what happened | Month Day Year, in a table without lines.
 const KIND = { drafted: "Drafted", keeper: "Keeper", claimed: "Claimed", "picked up": "Added", "traded to": "Trade", dropped: "Dropped", added: "Added" };
+/** History tab: how he changed hands (draft, keeper, claims, pickups, trades, drops), newest first, as Type | what happened | date. A keeper also shows last season's draft. */
 export function SeasonHistory({ sea }) {
+  /** The sentence for one transaction ("kept by X for $5", "traded to Y", ...). */
   const what = (a) => {
     const by = a.team || "?", price = a.price != null ? ` for $${a.price}` : "";
     return a.kind === "keeper" ? `kept by ${by}${price}` : a.kind === "drafted" ? `drafted by ${by}${price}${a.season ? ` (${a.season})` : ""}`

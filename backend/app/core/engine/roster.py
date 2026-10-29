@@ -21,6 +21,7 @@ DRAFTABLE_SLOTS: tuple[str, ...] = POSITION_SLOTS + FLEX_SLOTS + GENERIC_SLOTS  
 
 
 def slot_capacity(league: LeagueSettings) -> dict[str, int]:
+    """How many of each slot type the league has (IR included)."""
     caps: Counter[str] = Counter()
     for spec in league.roster_slots:
         caps[spec.slot] += spec.count
@@ -28,6 +29,7 @@ def slot_capacity(league: LeagueSettings) -> dict[str, int]:
 
 
 def used_slots(picks: Iterable[Pick]) -> Counter[str]:
+    """How many of each slot type the picks fill."""
     return Counter(p.slot for p in picks)
 
 
@@ -38,10 +40,12 @@ def open_slots(league: LeagueSettings, picks: Iterable[Pick]) -> dict[str, int]:
 
 
 def open_mandatory_count(league: LeagueSettings, picks: Iterable[Pick]) -> int:
+    """How many mandatory (non-IR) slots are still open."""
     return sum(n for slot, n in open_slots(league, picks).items() if slot != "IR")
 
 
 def slot_accepts(slot: str, eligibility: Iterable[str]) -> bool:
+    """Whether a slot can hold a player with this eligibility (UTIL and BN take anyone)."""
     accepted = SLOT_ACCEPTS.get(slot)
     if accepted is None:
         return False
@@ -77,6 +81,7 @@ def make_room(league: LeagueSettings, picks: list[Pick], eligibility: Iterable[s
     seen: set[str] = set()
 
     def path(slots: list[str]) -> list | None:   # [slot, occupant, slot, occupant, ..., open slot]
+        """Find a chain of players sliding between slots that frees a slot for the newcomer, or None."""
         for slot in slots:
             if slot == "IR" or slot in seen:
                 continue
@@ -98,6 +103,7 @@ def make_room(league: LeagueSettings, picks: list[Pick], eligibility: Iterable[s
 
 
 def is_rosterable(league: LeagueSettings, picks: Iterable[Pick], eligibility: Iterable[str]) -> bool:
+    """Whether the player can still be fitted into some open slot."""
     return assign_slot(league, picks, eligibility) is not None
 
 
@@ -114,9 +120,6 @@ def validate_slot(league: LeagueSettings, picks: Iterable[Pick], eligibility: It
     return None
 
 
-# ----------------------------------------------------------------------------- stacking
-
-
 def team_stack(players: Mapping[int, PlayerRecord], picks: Iterable[Pick]) -> Counter[str]:
     """Count of rostered players per NBA team for one manager's picks."""
     counts: Counter[str] = Counter()
@@ -128,6 +131,7 @@ def team_stack(players: Mapping[int, PlayerRecord], picks: Iterable[Pick]) -> Co
 
 
 def stack_if_added(stack: Mapping[str, int], team_abbr: str | None) -> int:
+    """How many players of one NBA team a manager would have after adding another (0 without a team)."""
     if not team_abbr:
         return 0
     return stack.get(team_abbr, 0) + 1

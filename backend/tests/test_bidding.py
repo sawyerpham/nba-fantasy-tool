@@ -1,4 +1,3 @@
-"""Bid recommendation: fair value, competition pressure, and the reservation cap."""
 
 import pytest
 
@@ -10,6 +9,7 @@ from tests.factories import NOW, default_world, fresh_draft, managers, small_lea
 
 
 def setup(num_managers=3, budget=50, behaviors=None, **league_kw):
+    """The default world with a small league, engine and managers (optional bidding behaviours)."""
     players, overrides, valuations = default_world()
     lg = small_league(num_managers=num_managers, budget=budget, **league_kw)
     mgrs = managers(num_managers, budget, behaviors=behaviors)
@@ -19,6 +19,7 @@ def setup(num_managers=3, budget=50, behaviors=None, **league_kw):
 
 
 def recommend(lg, mgrs, e, players, overrides, valuations, pid, me="m1"):
+    """Recommend a bid for one player from the manager's rankings."""
     available = [p for p in players if e.is_available(p)]
     rows = rank_players(lg, players, overrides, valuations, e.picks_for(me), available)
     target = next(r for r in rows if r.player_id == pid)
@@ -26,6 +27,7 @@ def recommend(lg, mgrs, e, players, overrides, valuations, pid, me="m1"):
 
 
 def test_replacement_value_is_the_nth_best():
+    """Replacement value is the nth best."""
     assert replacement_value([10, 50, 30, 20], 2) == 30
     assert replacement_value([10, 50, 30, 20], 4) == 10
     assert replacement_value([10, 50], 5) == 0.0   # fewer players than slots
@@ -35,11 +37,13 @@ def test_replacement_value_is_the_nth_best():
 @pytest.mark.parametrize("pace, progress, expected", [("early", 0.1, 1.3), ("early", 0.6, 0.8), ("late", 0.1, 0.8),
                                                       ("late", 0.6, 1.3), ("even", 0.1, 1.0)])
 def test_competitor_weight_by_pace_and_progress(pace, progress, expected):
+    """Competitor weight by pace and progress."""
     assert competitor_weight(ManagerBehavior(spend_pace=pace), progress) == pytest.approx(expected)
     assert competitor_weight(ManagerBehavior(spend_pace=pace, aggression=1.5), progress) == pytest.approx(expected * 1.5)
 
 
 def test_fair_value_hand_computed_at_draft_start():
+    """Fair value hand computed at draft start."""
     lg, mgrs, e, players, overrides, valuations = setup()
     values = pool_values(players, overrides, valuations, lg.ranking)
     ordered = sorted(values.values(), reverse=True)
@@ -58,6 +62,7 @@ def test_fair_value_hand_computed_at_draft_start():
 
 
 def test_pressure_is_normalized_by_number_of_other_managers():
+    """Pressure is normalized by number of other managers."""
     few = setup(num_managers=3)
     many = setup(num_managers=12, budget=200)
     rec_few = recommend(*few, pid=1)
@@ -69,6 +74,7 @@ def test_pressure_is_normalized_by_number_of_other_managers():
 
 
 def test_recommendation_never_exceeds_max_bid_reservation():
+    """Recommendation never exceeds max bid reservation."""
     lg, mgrs, e, players, overrides, valuations = setup()
     # m1 spends heavily: $43 on player 3 -> $7 left, 5 slots open -> max bid 3
     e.pick(3, "m1", 43)
@@ -80,6 +86,7 @@ def test_recommendation_never_exceeds_max_bid_reservation():
 
 
 def test_recommendation_is_at_least_min_bid_for_below_replacement_players():
+    """Recommendation is at least min bid for below replacement players."""
     lg, mgrs, e, players, overrides, valuations = setup(num_managers=2)
     # 2 managers × 6 slots = 12 rosterable = whole pool: the lowest-valued player IS replacement level
     values = pool_values(players, overrides, valuations, lg.ranking)
@@ -90,6 +97,7 @@ def test_recommendation_is_at_least_min_bid_for_below_replacement_players():
 
 
 def test_fair_value_is_capped_at_the_largest_legal_bid_in_the_room():
+    """Fair value is capped at the largest legal bid in the room."""
     lg, mgrs, e, players, overrides, valuations = setup()
     for pid in range(3, 11):
         e.pick(pid, "m1" if pid % 2 else "m2", 1)  # few players left, lots of money: uncapped fair value explodes
@@ -100,6 +108,7 @@ def test_fair_value_is_capped_at_the_largest_legal_bid_in_the_room():
 
 
 def test_cannot_bid_without_a_fitting_slot_or_money():
+    """Cannot bid without a fitting slot or money."""
     lg, mgrs, e, players, overrides, valuations = setup()
     for pid, slot in [(2, "PG"), (5, "SG"), (3, "UTIL"), (7, "BN"), (8, "BN")]:
         e.pick(pid, "m1", 1, slot=slot)
@@ -110,6 +119,7 @@ def test_cannot_bid_without_a_fitting_slot_or_money():
 
 
 def test_competitors_exclude_managers_who_cannot_afford_or_fit():
+    """Competitors exclude managers who cannot afford or fit."""
     lg, mgrs, e, players, overrides, valuations = setup()
     e.pick(3, "m2", 44)  # m2: $6 left, 5 open -> max bid 2
     for pid, slot in [(2, "PG"), (5, "SG"), (7, "UTIL"), (8, "BN"), (11, "BN")]:
@@ -123,6 +133,7 @@ def test_competitors_exclude_managers_who_cannot_afford_or_fit():
 
 
 def test_early_spenders_add_more_pressure_early_and_less_late():
+    """Early spenders add more pressure early and less late."""
     behaviors = {1: ManagerBehavior(spend_pace="early"), 2: ManagerBehavior(spend_pace="late")}
     lg, mgrs, e, players, overrides, valuations = setup(behaviors=behaviors)
     early = recommend(lg, mgrs, e, players, overrides, valuations, pid=1)
@@ -137,6 +148,7 @@ def test_early_spenders_add_more_pressure_early_and_less_late():
 
 
 def test_more_free_dollars_means_higher_fair_value():
+    """More free dollars means higher fair value."""
     poor = setup(budget=20)
     rich = setup(budget=200)
     assert recommend(*rich, pid=1).fair_value > recommend(*poor, pid=1).fair_value
@@ -144,6 +156,7 @@ def test_more_free_dollars_means_higher_fair_value():
 
 
 def test_user_manager_cannot_be_own_competitor():
+    """User manager cannot be own competitor."""
     lg, mgrs, e, players, overrides, valuations = setup()
     rec = recommend(lg, mgrs, e, players, overrides, valuations, pid=1, me="m2")
     assert "m2" not in {c.manager_id for c in rec.competitors} and len(rec.competitors) == 2

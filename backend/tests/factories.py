@@ -1,4 +1,3 @@
-"""Small synthetic worlds for engine tests."""
 
 from __future__ import annotations
 
@@ -13,18 +12,21 @@ NOW = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def bio(pid: int, name: str, team: str | None, age: float | None = 27.0) -> PlayerBio:
+    """A nba_api PlayerBio for a test player."""
     first, last = name.split(" ", 1)
     return PlayerBio(source="nba_api", source_id=str(pid), full_name=name, first_name=first, last_name=last,
                      normalized_name=normalize_name(name), team_abbr=team, age=age, fetched_at=NOW)
 
 
 def record(pid: int, name: str, team: str | None = "DEN", age: float | None = 27.0, has_stats: bool = True) -> PlayerRecord:
+    """A PlayerRecord (reconciled by name and team) for a test player."""
     first, last = name.split(" ", 1)
     return PlayerRecord(player_id=pid, full_name=name, first_name=first, last_name=last, normalized_name=normalize_name(name),
                         team_abbr=team, bio=bio(pid, name, team, age), match_method="name_team", has_stats=has_stats)
 
 
 def override(pid: int, eligibility: list[str], injury: str = "healthy", source: str = "sleeper") -> PlayerOverrides:
+    """A PlayerOverrides with the given eligibility and injury status."""
     return PlayerOverrides(player_id=pid, eligibility=eligibility, eligibility_source=source,  # type: ignore[arg-type]
                            injury_status=injury, injury_source=source, updated_at=NOW)  # type: ignore[arg-type]
 
@@ -49,6 +51,7 @@ def small_league(num_managers: int = 3, budget: int = 50, **kw) -> LeagueSetting
 
 
 def managers(n: int = 3, budget: int = 50, user_index: int = 0, behaviors: dict[int, ManagerBehavior] | None = None) -> list[Manager]:
+    """`n` managers m1..mn with the same budget; one is you and `behaviors` sets some bidding styles."""
     return [
         Manager(manager_id=f"m{i + 1}", name=f"Manager {i + 1}", is_user=(i == user_index), budget_total=budget,
                 behavior=(behaviors or {}).get(i, ManagerBehavior()))
@@ -61,6 +64,7 @@ PlayerSpec = tuple[int, str, str, list[str], float, float, int, float, str]
 
 
 def world(specs: list[PlayerSpec]):
+    """Build players, overrides and valuations from PlayerSpec tuples."""
     players = {s[0]: record(s[0], s[1], s[2], age=s[7]) for s in specs}
     overrides = {s[0]: override(s[0], s[3], injury=s[8]) for s in specs}
     valuations = {s[0]: valuation(s[0], s[4], s[5], gp=s[6]) for s in specs}
@@ -87,10 +91,12 @@ def default_world() -> tuple[dict, dict, dict]:
 
 
 def fresh_draft() -> DraftState:
+    """A draft in setup with no picks."""
     return DraftState()
 
 
 def no_history() -> KeeperHistory:
+    """An empty keeper history."""
     return KeeperHistory()
 
 
