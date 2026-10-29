@@ -10,11 +10,12 @@ import { TipLayer } from "./core/Terms.jsx";
 
 const TABS = [
   ["season", "Season"],      // these are SeasonPage's views (Settings is the cogwheel at the top right)
-  ["news", "News"],
   ["standings", "League"],
+  ["news", "News"],
   ["waivers", "Waivers"],
+  ["draft", "Draft"],
 ];
-const TAB_COLORS = { season: "#3b82f6", news: "#f59e0b", standings: "#10b981", waivers: "#ec4899" };   // each tab's own hue (see header.top nav button in styles.css)
+const TAB_COLORS = { season: "#3b82f6", news: "#f59e0b", standings: "#10b981", waivers: "#ec4899", draft: "#a855f7" };   // each tab's own hue (see header.top nav button in styles.css)
 const SEASON_VIEWS = { season: "week", news: "news", standings: "league", waivers: "waivers" };
 
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
