@@ -768,11 +768,11 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const me = differs && view === "sleeper" ? bestLineup(shown, atMs, data.roster_positions, true, gamesOf) : best;   // as-is rows, arrows still to the best
   const seg = me.seg;
   const gridRef = React.useRef(null);
+  const narrow = useNarrow(), gutter = narrow ? 60 : ARROW_GUTTER;
   useEffect(() => {
     if (isMine) { setOther(null); return; }
     const rid = data.matchups[idx]?.[0]?.roster_id;
     api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
-  const narrow = useNarrow(), gutter = narrow ? 60 : ARROW_GUTTER;
   }, [idx, isMine, leagueId, data.week, data.matchups]);
   // Both teams' chip lanes share one width (the narrowest) and one time axis; each column has its own left edge.
   // Measured from the cards on screen.
@@ -852,8 +852,8 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
       {/* starters + bench fill the window; IR rows sit below the fold (scroll down), at the same row height */}
       <div className="mu-scroll">
       <div className="mu-grid with-arrows" ref={gridRef} style={{ gridTemplateRows: tracks.join(" "), ...(irRows && { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` }) }}>
-        <SwapArrows pairs={me.pairs} side="left" names={(sid) => data.players[sid]?.name || sid} />
-        <SwapArrows pairs={them.pairs} side="right" names={(sid) => data.players[sid]?.name || sid} />
+        <SwapArrows pairs={me.pairs} side="left" gutter={gutter} names={(sid) => data.players[sid]?.name || sid} />
+        <SwapArrows pairs={them.pairs} side="right" gutter={gutter} names={(sid) => data.players[sid]?.name || sid} />
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
           <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
@@ -1053,10 +1053,11 @@ const LEAGUE_NEWS = 80;   // newest league-wide notes shown (after filtering)
 function TeamsReport({ leagueId, open, refreshKey }) {
   const [r, setR] = useState(null);
   const openTeam = useContext(TeamLinkContext);
+  const order = (ps) => [...ps].sort((a, b) => (a.role?.rank ?? 99) - (b.role?.rank ?? 99));   // by "#N option"; stable, so ties keep starter order
   useEffect(() => { api.get(`/leagues/${leagueId}/season/injuries`).then(setR).catch(() => setR({ teams: [], names: {} })); }, [leagueId, refreshKey]);
   return (
     <div className="panel news-teams" data-testid="teams-report">
-      <h3>Teams report <span className="small muted">most starters out first</span></h3>
+      <h3>Teams Report <span className="small muted">most starters out first</span></h3>
       {!r ? <div className="muted">Loading injuries…</div> : r.teams.map((t, i) => (
         <div key={t.abbr} className="tr-team clickable" onClick={() => openTeam?.(t.abbr)} data-testid={`report-${t.abbr}`}>
           <span className="muted tr-rank">{i + 1}</span>
@@ -1067,10 +1068,14 @@ function TeamsReport({ leagueId, open, refreshKey }) {
                 {t.starters_out > 0 && <span className="health-out">{t.starters_out} starter{t.starters_out > 1 ? "s" : ""} out</span>}
                 {t.starters_q > 0 && <span className="health-q">{t.starters_q} starter{t.starters_q > 1 ? "s" : ""} ?</span>}
               </span></div>
-            <div className="small tr-names">{t.players.map((h, j) => (
-              <span key={h.sid}>{j ? ", " : ""}<span className={`health-${h.group} ${h.starter ? "tr-starter" : ""} ${h.player_id ? "clickable" : ""}`} title={h.starter ? "starter" : undefined}
-                onClick={h.player_id ? (e) => { e.stopPropagation(); open(h.player_id); } : undefined}>{h.name}</span></span>))}
-              <span className="muted"> · {[t.out && `${t.out} out`, t.q && `${t.q} questionable`].filter(Boolean).join(", ")}</span></div>
+            <div className="tr-names">{order(t.players).map((h) => (
+              <div key={h.sid} className={`tr-player ${h.player_id ? "clickable" : ""}`}
+                onClick={h.player_id ? (e) => { e.stopPropagation(); open(h.player_id); } : undefined}>
+                <Headshot sleeperId={h.sid} name={h.name} size={24} />
+                <span className={`health-${h.group} ${h.starter ? "tr-starter" : ""}`}>{h.name}</span>
+                {h.role && <span className={`role-tag ${h.role.star ? "star" : ""}`}
+                  data-tip={h.role.shared_with ? `Shares the #1 option with ${h.role.shared_with.name} (${h.role.shared_with.fpg} projected FP/G)` : undefined}>{h.role.label}</span>}
+                <span className="muted small">{h.status}</span></div>))}</div>
           </div>
         </div>
       ))}

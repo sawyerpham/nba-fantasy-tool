@@ -73,14 +73,15 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
           {season && data.team?.role && (
-            <span className="profile-ranks"><span className={`role-tag ${data.team.role.star ? "star" : ""}`} data-testid="team-role">{data.team.role.star ? "★ " : ""}{data.team.role.label}</span></span>
+            <span className="profile-ranks"><span className={`role-tag ${data.team.role.star ? "star" : ""}`} data-testid="team-role"
+              data-tip={data.team.role.shared_with ? `Shares the #1 option with ${data.team.role.shared_with.name} (${data.team.role.shared_with.fpg} projected FP/G)` : undefined}>{data.team.role.star ? "★ " : ""}{data.team.role.label}</span></span>
           )}
           {!season && (row?.pos_rank || row?.tier != null || data.team?.role) && (
             <span className="profile-ranks">
               {data.team?.role && (() => {
                 const r = data.team.role;
                 return <span className={`role-tag ${r.star ? "star" : ""}`} data-testid="team-role"
-                  data-tip={`#${r.rank} on ${data.team.abbr} at ${r.fpg} projected FP/G, ${Math.round(r.share * 100)}% of the top 8's production${r.vs ? `; ${r.star ? "next best" : "the #1 is"} ${r.vs.name} at ${r.vs.fpg}` : ""}. From Sleeper's projection (usage and minutes).`}>
+                  data-tip={`#${r.rank} on ${data.team.abbr} at ${r.fpg} projected FP/G, ${Math.round(r.share * 100)}% of the top 8's production${r.vs ? `; ${r.shared_with ? "shared with" : r.star ? "next best" : "the #1 is"} ${r.vs.name} at ${r.vs.fpg}` : ""}. From Sleeper's projection (usage and minutes).`}>
                   {r.star ? "★ " : ""}{r.label}</span>;
               })()}
               {row?.pos_rank && <span className={`pos-c ${posClass(row.pos_rank)}`} data-tip={TERMS.pos_rank[1]}>{row.pos_rank}</span>}

@@ -13,6 +13,7 @@ from .service import (_cache, game_detail, http_fetch, injury_report, read_locks
                       team_news, team_plan, team_player_stats, team_ranks, team_schedule, team_stat_rows, trending, waivers,
                       week_view, write_lock, SLEEPER, DAY_TTL)
 from ..core.api.deps import _session, get_state
+from ..core.api.players import _team_role, team_rosters
 
 router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
 
@@ -87,7 +88,17 @@ def injuries(league_id: str, state: AppState = Depends(get_state)) -> dict:
     """The News tab's teams report: every NBA team with injured players, most first, with names."""
     session = _session(state, league_id)
     by_sid = {r.sleeper_id: pid for pid, r in session.players.items() if r.sleeper_id}
-    hurt = {sid: {**h, "player_id": by_sid.get(sid)} for sid, h in sleeper_injuries(_fetch(state)).items()}
+    by_team = team_rosters(session)[0]
+    rosters = {t: sorted(r, reverse=True) for t, r in by_team.items()}
+    hurt = {}
+    for sid, h in sleeper_injuries(_fetch(state)).items():
+        pid = by_sid.get(sid)
+        role = _team_role(session, rosters.get(h["team"], []), pid) if pid else None   # same "#2 option" the player card shows
+        fantasy = session.players[pid].fantasy if pid else None
+        # starter = first on the depth chart, read from the same pulled data as the depth grid so the two agree
+        hurt[sid] = {**h, "player_id": pid, "role": role and {"label": role["label"], "star": role["star"], "rank": role["rank"],
+                                                  "shared_with": role["shared_with"]},
+                     "starter": fantasy.depth_chart_order == 1 if fantasy else h["starter"]}
     return {"teams": injury_report(hurt), "names": _team_names(state)}
 
 
