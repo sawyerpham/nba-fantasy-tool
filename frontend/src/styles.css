@@ -214,6 +214,7 @@ tr:hover .row-actions, tr.selected .row-actions, .row-actions:focus-within { opa
 .dropdown { position: absolute; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; box-shadow: var(--shadow); z-index: 25; max-height: 280px; overflow: auto; min-width: 320px; padding: 4px; margin-top: 4px; }
 .dropdown div { padding: 6px 10px; cursor: pointer; border-radius: 7px; }
 .dropdown div:hover { background: var(--hover); }
+.dropdown div:has(> .headshot) { display: flex; align-items: center; gap: 8px; }
 .search-wrap { position: relative; }
 
 /* ---------- money tiles ---------- */
