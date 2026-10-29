@@ -761,7 +761,11 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const atMs = Math.max(at ?? nowMs, nowMs);
   const gap = data.sleeper_gap;
   const gamesOf = React.useMemo(() => Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games])), [data.players]);
-  const me = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
+  const best = bestLineup(shown, atMs, data.roster_positions, !isMine, gamesOf), them = bestLineup(shown?.opponent, atMs, data.roster_positions, true, gamesOf);
+  // Your side can show the best lineup (default) or the one you have in Sleeper now; the toggle is live only when they differ.
+  const [view, setView] = useState("best");
+  const differs = isMine && best.rows.some((r, i) => r.slot !== shown.players[i].slot);
+  const me = differs && view === "sleeper" ? bestLineup(shown, atMs, data.roster_positions, true, gamesOf) : best;   // as-is rows, arrows still to the best
   const seg = me.seg;
   const gridRef = React.useRef(null);
   useEffect(() => {
@@ -824,7 +828,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   const benchAt = L.lines.length + 2, irAt = benchAt + nBench + (nBench ? 1 : 0);
   return (
     <div className="panel matchup" data-testid="my-week" style={{ "--gut": `${gutter}px` }}>
-      {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} />}
+      {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} view={differs ? view : "best"} setView={setView} differs={differs} />}
       {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: the arrows start from that lineup (the one Sleeper carries into the next day), so skip any move you've already made there.</div>}
       <div className="mu-head">
         <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
@@ -960,7 +964,7 @@ function SwapArrows({ pairs, side, names, gutter = ARROW_GUTTER }) {
 // The past is shaded and the dot can't go there (no lineup to set for it).
 const STEP_MS = 15 * 60000;
 
-function Timeline({ tl, nowMs, atMs, setAt }) {
+function Timeline({ tl, nowMs, atMs, setAt, view, setView, differs }) {
   const start = Date.parse(tl.start), end = Date.parse(tl.end);
   const frac = (ms) => Math.min(1, Math.max(0, (ms - start) / (end - start)));
   const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;   // where the 16px dot's centre sits for that time
@@ -972,6 +976,11 @@ function Timeline({ tl, nowMs, atMs, setAt }) {
   const until = d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
   return (
     <div className="timeline" data-testid="timeline">
+      <button className="tl-next" onClick={() => setView(view === "best" ? "sleeper" : "best")} disabled={!differs} data-testid="lineup-toggle"
+        data-tip={differs ? "Switch between the best lineup and the lineup you have in Sleeper now." : "Your Sleeper lineup is already the best one."}>
+        <span className="tl-next-head"><span className="tl-next-label">Current lineup</span></span>
+        <strong>{view === "best" ? "Best" : "In Sleeper"}</strong>
+      </button>
       <div className="tl-main">
         <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
         <div className="tl-bar">
