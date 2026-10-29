@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useNBAMatches, findMatch, watchUrl } from "./streams.jsx";
 import { createPortal } from "react-dom";
 import { api, qs } from "../api.js";
@@ -22,6 +22,12 @@ const md = (d) => d.slice(5).replace("-", "/");   // "2026-10-20" -> "10/20"
 const fp = (x) => (x == null ? "" : x.toFixed(2));   // fantasy points: 2 decimals, like Sleeper
 // Player nicknames the managers set on Sleeper: shown unless switched off (Settings > General, this browser only).
 const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off"; } catch { return true; } };
+// A narrow window (keep in step with the 1599px @media block in styles.css): the chips become a small bar graph per
+// game and lose the hourly timeline (laneXs), and the swap-arrow lanes slim down. 4K / wide windows are untouched.
+const NARROW = "(max-width: 1599px)";
+const useNarrow = () => useSyncExternalStore(
+  (cb) => { const m = window.matchMedia(NARROW); m.addEventListener("change", cb); return () => m.removeEventListener("change", cb); },
+  () => window.matchMedia(NARROW).matches);
 
 // A fantasy team: its Sleeper avatar, its team name, and under it the manager's username (when that differs) and
 // W-L record, with a green up / red down arrow for the latest result.
@@ -577,6 +583,9 @@ function RosterAlerts({ roster }) {
 // The stream (streamed.pk) of a game that's on or about to start: a ▶ in the same corner (a final game has none).
 function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen, onLock }) {
   const { list: matches } = useNBAMatches();
+  const graph = useNarrow();
+  // graph bars share one scale per player: his best projection / score this week
+  const peak = Math.max(1, ...games.map((x) => Math.max(x.fp ?? 0, x.pace ?? 0, x.proj ?? 0)));
   // each chip's stream: a scan of every listed stream, so once per list / games, not on every render (the slider re-renders)
   const watches = React.useMemo(() => games.map((g) => (g.state !== "post" ? watchUrl(findMatch(matches, g, team)) : null)), [matches, games, team]);
   if (!games.length) return lane ? <span className="chips-lane"><span className="muted small">no games</span></span> : <span className="muted small">no games</span>;
@@ -589,8 +598,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const toggle = !onLock ? null : lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
         const lockClick = (e) => { e.stopPropagation(); onLock(toggle); };
         const watch = watches[i];   // any game not over
-        // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it)
+        const exp = live && g.pace != null ? g.pace : g.proj;
+        // the hover adds only what the card doesn't show (day, time, FP and expected FP are on it; the graph shows less)
         const tip = [
+          graph && [timeOf(g.tip), played && `${fp(g.fp)} FP`, exp != null && `proj ${fp(exp)}`].filter(Boolean).join(" · "),
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
           [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
           played && g.min != null && `${g.min} min${live ? " so far" : ""}`,
@@ -603,7 +614,7 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         return (
           <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { width: 100 * lane.scale }) } : undefined}
-            className={`game-chip ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
+            className={`game-chip ${graph ? "graph" : ""} ${played ? "played" : ""} ${live ? "live" : ""} ${g.date === today && upcoming ? "today" : ""} ${lockDate === g.date ? `locked ${lockGuess ? "guess" : ""}` : ""} ${day ? (g.date === day && upcoming ? "pick" : lockDate === g.date || live || (g.state === "post" && !dead) ? "" : "dim") : ""} ${dead ? "dead" : ""} ${onOpen && g.event ? "openable" : ""}`}
             data-tip={tip}>
             <span className="gch-day">{live ? shortQuarter(g.detail) : dayName(g.date)} <span className="gch-time">{live ? "LIVE"
               : lockDate === g.date && toggle !== "" ? <LockIcon />   /* the corner's unlock padlock says it otherwise */
@@ -611,7 +622,10 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
             {toggle && <button className="gch-lockbtn corner" onClick={lockClick} aria-label="Lock" data-testid="lock-game"><LockIcon open /></button>}
             {toggle === "" && <button className="gch-lockbtn corner unlock" onClick={lockClick} aria-label="Unlock" data-testid="unlock-game"><LockIcon /></button>}
             {watch && <a className="gch-lockbtn corner watch" href={watch} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Watch" data-testid="watch-game"><svg className="gch-play" viewBox="0 0 9 10" aria-hidden="true"><path d="M0 0L9 5L0 10Z" fill="currentColor" /></svg></a>}
-            <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(live && g.pace != null ? g.pace : g.proj)}</span></span>
+            {graph ? <>
+              <span className="gch-bar"><i className="exp" style={{ height: `${100 * (exp ?? 0) / peak}%` }} />{played && <i className="act" style={{ height: `${100 * g.fp / peak}%` }} />}</span>
+              <span className="gch-fp">{fp(played ? g.fp : exp)}</span>
+            </> : <span className="gch-fp">{played ? fp(g.fp) : "—"}<span className={`gch-exp ${live && g.pace != null && g.proj != null ? (g.pace >= g.proj ? "up" : "down") : ""}`}>{fp(exp)}</span></span>}
           </span>
         );
       });
@@ -754,6 +768,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
     if (isMine) { setOther(null); return; }
     const rid = data.matchups[idx]?.[0]?.roster_id;
     api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: rid })).then(setOther).catch(() => setOther(null));
+  const narrow = useNarrow(), gutter = narrow ? 60 : ARROW_GUTTER;
   }, [idx, isMine, leagueId, data.week, data.matchups]);
   // Both teams' chip lanes share one width (the narrowest) and one time axis; each column has its own left edge.
   // Measured from the cards on screen.
@@ -778,8 +793,8 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   });
   // the chips' x positions: the same object until the plan or the lane width changes, so the cards can skip re-rendering
   const games = (players) => players.flatMap((r) => (data.players[r.sid]?.games || []).map((g) => [tipMs(g), g.date]));
-  const xs = React.useMemo(() => laneXs([...games(shown?.players || []), ...games(shown?.opponent?.players || [])], lane?.w),
-    [shown, data.players, lane?.w]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const xs = React.useMemo(() => (narrow ? { xs: null } : laneXs([...games(shown?.players || []), ...games(shown?.opponent?.players || [])], lane?.w)),
+    [shown, data.players, lane?.w, narrow]);   // eslint-disable-line react-hooks/exhaustive-deps
   const n = data.matchups.length;
   const step = (d) => setIdx((i) => (i + d + n) % n);
   const nav = (
@@ -808,7 +823,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId }) {
   );
   const benchAt = L.lines.length + 2, irAt = benchAt + nBench + (nBench ? 1 : 0);
   return (
-    <div className="panel matchup" data-testid="my-week">
+    <div className="panel matchup" data-testid="my-week" style={{ "--gut": `${gutter}px` }}>
       {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} />}
       {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: the arrows start from that lineup (the one Sleeper carries into the next day), so skip any move you've already made there.</div>}
       <div className="mu-head">
@@ -880,7 +895,7 @@ function bestLineup(team, atMs, positions, asIs, games = {}) {
 // to make them and coloured by the starting slot it fills. Measured from the cards on screen; redrawn when the grid
 // changes size.
 const ARROW_GUTTER = 80;
-function SwapArrows({ pairs, side, names }) {
+function SwapArrows({ pairs, side, names, gutter = ARROW_GUTTER }) {
   const svgRef = React.useRef(null);
   const [lines, setLines] = useState([]);
   const key = pairs.map((p) => `${p.n}:${p.a}>${p.b}`).join(",");
@@ -906,15 +921,15 @@ function SwapArrows({ pairs, side, names }) {
     ro.observe(grid);
     return () => ro.disconnect();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const step = Math.min(13, (ARROW_GUTTER - 24) / Math.max(1, lines.length));
+  const step = Math.min(13, (gutter - 24) / Math.max(1, lines.length));
   // the steps whose order matters (sharing a player with another step: a chain), numbered 1, 2, ... in step order
   const label = {};
   for (const s of pairs) {
     if (pairs.some((o) => o.n !== s.n && [o.in, o.out].some((x) => x === s.in || x === s.out))) label[s.n] = Object.keys(label).length + 1;
   }
-  const end = ARROW_GUTTER - 6;   // just left of the cards
+  const end = gutter - 6;   // just left of the cards
   return (
-    <svg ref={svgRef} className={`swap-arrows ${side}`} width={ARROW_GUTTER} data-testid={`swap-arrows-${side}`}>
+    <svg ref={svgRef} className={`swap-arrows ${side}`} width={gutter} data-testid={`swap-arrows-${side}`}>
       {lines.map((l, i) => {
         const x = end - 12 - i * step, r = 6, dir = l.y2 < l.y1 ? -1 : 1;
         const color = `var(--pos-${(String(l.slot).match(/PG|SG|SF|PF|C/) || ["C"])[0]})`;
