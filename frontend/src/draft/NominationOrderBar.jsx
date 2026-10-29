@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import NeonArrow from "../core/NeonArrow.jsx";
 
 // Horizontal, drag-to-reorder nomination rotation. Arrows work too. Click a name to make that manager next.
 export default function NominationOrderBar({ managers, order, nextNominator, live, onReorder, onMakeNext }) {
@@ -42,11 +43,11 @@ export default function NominationOrderBar({ managers, order, nextNominator, liv
             data-testid={`order-chip-${id}`}
             title={full ? "roster full" : live ? "click to make this manager nominate next" : ""}
           >
-            <button className="small arrow" onClick={() => move(i, i - 1)} disabled={busy || i === 0} title="move left" data-testid={`order-left-${id}`}>◀</button>
+            <button className="small arrow neon-arrow" onClick={() => move(i, i - 1)} disabled={busy || i === 0} title="move left" aria-label="Move left" data-testid={`order-left-${id}`}><NeonArrow dir="left" /></button>
             <span className="chip-name" onClick={() => live && !full && id !== nextNominator && onMakeNext(id)} data-testid={`order-next-${id}`}>
               <span className="muted small">{i + 1}. </span>{m ? m.name : id}{id === nextNominator ? " ●" : ""}
             </span>
-            <button className="small arrow" onClick={() => move(i, i + 1)} disabled={busy || i === items.length - 1} title="move right" data-testid={`order-right-${id}`}>▶</button>
+            <button className="small arrow neon-arrow" onClick={() => move(i, i + 1)} disabled={busy || i === items.length - 1} title="move right" aria-label="Move right" data-testid={`order-right-${id}`}><NeonArrow dir="right" /></button>
           </div>
         );
       })}

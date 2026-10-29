@@ -7,6 +7,7 @@ import { PosList, PosTag } from "../core/Pos.jsx";
 import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
+import NeonArrow from "../core/NeonArrow.jsx";
 import InjuryTag, { isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
@@ -25,16 +26,19 @@ const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off
 // A narrow window (keep in step with the 1599px @media block in styles.css): the chips become a small bar graph per
 // game and lose the hourly timeline (laneXs), and the swap-arrow lanes slim down. 4K / wide windows are untouched.
 const NARROW = "(max-width: 1599px)";
-const useNarrow = () => useSyncExternalStore(
-  (cb) => { const m = window.matchMedia(NARROW); m.addEventListener("change", cb); return () => m.removeEventListener("change", cb); },
-  () => window.matchMedia(NARROW).matches);
+const useMedia = (q) => useSyncExternalStore(
+  (cb) => { const m = window.matchMedia(q); m.addEventListener("change", cb); return () => m.removeEventListener("change", cb); },
+  () => window.matchMedia(q).matches);
+const useNarrow = () => useMedia(NARROW);
+// A thin window (keep in step with the 999px block in styles.css): the matchup shows only the left team (yours), and scrolls sideways if even that doesn't fit.
+const useThin = () => useMedia("(max-width: 999px)");
 
 // A fantasy team: its Sleeper avatar, its team name, and under it the manager's username (when that differs) and
 // W-L record, with a green up / red down arrow for the latest result.
-function TeamName({ t, cls = "", size = 24, record = true }) {
+function TeamName({ t, cls = "", size = 24, record = true, mine = false }) {
   const rec = record && t.wins != null;
   return (
-    <span className="team-name-tag">
+    <span className={`team-name-tag ${mine ? "is-me" : ""}`}>
       {t.avatar && <img className="team-avatar" src={t.avatar} width={size} height={size} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
       <span className="team-name-lines">
         <span className={cls}>{t.name}</span>
@@ -140,14 +144,19 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     const m = mainRef.current, h = headerSlot?.closest("header");
     if (!m || !h) return;
     const place = () => {   // centred only when it clears the tabs and the search box; else inline after the tabs
-      const a = m.getBoundingClientRect(), c = a.left + a.width / 2, wk = weekRef.current;
+      // on the vertical axis of the lineup's position tags (PG SG ...); the whole column's middle until the lineup is up (or in the thin one-team layout)
+      const slot = m.querySelector(".matchup:not(.thin) .mu-slot")?.getBoundingClientRect(), a = m.getBoundingClientRect(), c = slot ? slot.left + slot.width / 2 : a.left + a.width / 2, wk = weekRef.current;
       const nav = h.querySelector("nav").getBoundingClientRect().right, right = h.querySelector(".season-search")?.getBoundingClientRect().left;
-      const w = wk ? wk.children[2].getBoundingClientRect().right - wk.children[0].getBoundingClientRect().left : 0, after = wk?.lastElementChild?.offsetWidth || 0;
+      const full = wk?.children.length > 1;   // [◀ Week ▶] + name; else just the league name (News / Waivers)
+      const w = !wk ? 0 : full ? wk.children[0].getBoundingClientRect().width : wk.getBoundingClientRect().width, after = full ? wk.lastElementChild.offsetWidth : 0;
       setWeekX(c - w / 2 >= nav + 24 && (right == null || c + w / 2 + 12 + after + 24 <= right) ? c - h.getBoundingClientRect().left : null);
     };
     const ro = new ResizeObserver(place);
     ro.observe(m); ro.observe(h);
-    return () => ro.disconnect();
+    let raf = 0;   // the lineup appears (and its scrollbar comes and goes) without m resizing: re-place when it changes
+    const mo = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(place); });
+    mo.observe(m, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); };
   }, [headerSlot, !!(data && plan), view]);
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
@@ -163,13 +172,15 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          {view !== "news" && view !== "waivers" && <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
-            <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
-            <strong className="season-week">Week {data.week}</strong>
-            <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
+          {view === "news" || view === "waivers" ? <span className="muted small season-league">{data.league_name}</span> : <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
+            <span className="season-wk">
+            <button className="mu-arrow neon-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} aria-label="Previous week"><NeonArrow dir="left" /></button>
+            {/* off the current week, the label itself is the way back */}
+            <strong className={`season-week ${week ? "clickable" : ""}`} {...(week && { role: "button", tabIndex: 0, onClick: () => setWeek(null), onKeyDown: (e) => e.key === "Enter" && setWeek(null) })}>WEEK {data.week}</strong>
+            <button className="mu-arrow neon-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} aria-label="Next week"><NeonArrow dir="right" /></button>
+            </span>
             <span className="season-weeknav-after">
               <span className="muted small">{data.league_name}</span>
-              {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
             </span>
           </span>}
           {error &&<span className="small warn-text">{error}</span>}
@@ -207,8 +218,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
       <aside className={`season-side ${cur ? "has-nav" : ""}`}>
         {cur && (
           <span className="side-nav">
-            <button onClick={() => setNav((n) => ({ ...n, i: n.i - 1 }))} disabled={!nav.i} title="Back" aria-label="Back" data-testid="side-back">‹</button>
-            <button onClick={() => setNav((n) => ({ ...n, i: n.i + 1 }))} disabled={nav.i === nav.stack.length - 1} title="Forward" aria-label="Forward" data-testid="side-forward">›</button>
+            <button className="neon-arrow" onClick={() => setNav((n) => ({ ...n, i: n.i - 1 }))} disabled={!nav.i} title="Back" aria-label="Back" data-testid="side-back"><NeonArrow dir="left" /></button>
+            <button className="neon-arrow" onClick={() => setNav((n) => ({ ...n, i: n.i + 1 }))} disabled={nav.i === nav.stack.length - 1} title="Forward" aria-label="Forward" data-testid="side-forward"><NeonArrow dir="right" /></button>
           </span>
         )}
         {selected
@@ -784,7 +795,7 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
   const me = differs && view === "sleeper" ? bestLineup(shown, atMs, data.roster_positions, true, gamesOf) : best;   // as-is rows, arrows still to the best
   const seg = me.seg;
   const gridRef = React.useRef(null);
-  const narrow = useNarrow(), gutter = narrow ? 60 : ARROW_GUTTER;
+  const narrow = useNarrow(), thin = useThin(), gutter = narrow ? 60 : ARROW_GUTTER;
   useEffect(() => {
     if (isMine) { setOther(null); return; }
     const rid = data.matchups[idx]?.[0]?.roster_id;
@@ -819,8 +830,8 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
   const step = (d) => setIdx((i) => (i + d + n) % n);
   const nav = (
     <>
-      <button className="mu-arrow left" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
-      <button className="mu-arrow right" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
+      <button className="mu-arrow neon-arrow left" onClick={() => step(-1)} data-tip="Previous matchup" aria-label="Previous matchup" data-testid="mu-prev"><NeonArrow dir="left" /></button>
+      <button className="mu-arrow neon-arrow right" onClick={() => step(1)} data-tip="Next matchup" aria-label="Next matchup" data-testid="mu-next"><NeonArrow dir="right" /></button>
     </>
   );
   if (!shown) return <div className="panel matchup"><div className="mu-head">{nav}<div className="muted">Loading matchup {idx + 1} of {n}…</div></div></div>;
@@ -832,25 +843,27 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
   // first: the first bench / IR row gets a gap above it: a 5px empty track (with the grid's gaps, 10px more than between rows),
   // so every player row keeps the same height
   const nBench = Math.max(L.bench.length, R.bench.length);
-  const tracks = [...Array(L.lines.length).fill("minmax(0, 1fr)"), ...(nBench ? ["5px", ...Array(nBench).fill("minmax(0, 1fr)")] : []),
-    ...(irRows ? ["5px", ...Array(irRows).fill("minmax(0, 1fr)")] : [])];
+  const rowT = `minmax(${ROW_MIN}px, 1fr)`;   // rows share the window's height but never go under ROW_MIN: a short window scrolls instead
+  const tracks = [...Array(L.lines.length).fill(rowT), ...(nBench ? ["5px", ...Array(nBench).fill(rowT)] : []),
+    ...(irRows ? ["5px", ...Array(irRows).fill(rowT)] : [])];
+  const minH = allRows * ROW_MIN + (tracks.length - allRows) * 5 + (tracks.length - 1) * 5;   // every row at ROW_MIN + the 5px spacers + the 5px row gaps
   const row = (l, r, key, slot, first, gr) => (
     <React.Fragment key={key}>
       <div className="mu-cell" style={{ gridRow: gr }}><PlayerCard data={data} r={l?.r} open={open} openGame={openGame} setLock={setLock} mine={isMine} side="left" day={seg?.date} lane={xs} /></div>
       <div className={`mu-slot ${first ? "first" : ""}`} style={{ gridRow: gr }}><PosTag text={slot} /></div>
-      <div className="mu-cell" style={{ gridRow: gr }}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>
+      {!thin && <div className="mu-cell" style={{ gridRow: gr }}><PlayerCard data={data} r={r?.r} open={open} openGame={openGame} setLock={setLock} side="right" day={them.seg?.date} lane={xs} /></div>}
     </React.Fragment>
   );
   const benchAt = L.lines.length + 2, irAt = benchAt + nBench + (nBench ? 1 : 0);
   return (
-    <div className="panel matchup" data-testid="my-week" style={{ "--gut": `${gutter}px` }}>
+    <div className={`panel matchup ${thin ? "thin" : ""}`} data-testid="my-week" style={{ "--gut": `${gutter}px` }}>
       {tl?.segments.length > 0 && <Timeline tl={tl} nowMs={nowMs} atMs={atMs} setAt={setAt} view={differs ? view : "best"} setView={setView} differs={differs} />}
       {gap && <div className="small muted mu-gap" data-testid="sleeper-gap">Sleeper still shows the day that just ended: the arrows start from that lineup (the one Sleeper carries into the next day), so skip any move you've already made there.</div>}
       <div className="mu-head">
-        <button className="mu-arrow" onClick={() => step(-1)} data-tip="Previous matchup" data-testid="mu-prev">◀</button>
+        <button className="mu-arrow neon-arrow" onClick={() => step(-1)} data-tip="Previous matchup" aria-label="Previous matchup" data-testid="mu-prev"><NeonArrow dir="left" /></button>
         {/* each side: name outside, score toward the centre, its expected final (small, grey) just outside the score */}
         <div className="mu-team">
-          <TeamName t={shown} cls="mc-name" size={34} />{isMine && <span className="badge info">YOU</span>}
+          <TeamName t={shown} cls="mc-name" size={34} mine={isMine} />
           <span className="small muted">{shown.games_left} left</span>
           <span className="mu-score"><span className="mu-exp-total" data-tip={EXP_TIP}>{shown.expected}</span><span className="mc-points">{fp(shown.points)}</span></span>
         </div>
@@ -858,18 +871,18 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
           <span className="small muted">{idx + 1}/{n}</span>
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
         </div>
-        <div className="mu-team right">
+        {!thin && <div className="mu-team right">
           {o && <span className="mu-score"><span className="mc-points">{fp(o.points)}</span><span className="mu-exp-total" data-tip={EXP_TIP}>{o.expected}</span></span>}
           {o && <span className="small muted">{o.games_left} left · {o.locked} locked</span>}
           {o ? <TeamName t={o} cls="mc-name" size={34} /> : <span className="mc-name">no opponent</span>}
-        </div>
-        <button className="mu-arrow" onClick={() => step(1)} data-tip="Next matchup" data-testid="mu-next">▶</button>
+        </div>}
+        <button className="mu-arrow neon-arrow" onClick={() => step(1)} data-tip="Next matchup" aria-label="Next matchup" data-testid="mu-next"><NeonArrow dir="right" /></button>
       </div>
       {/* starters + bench fill the window; IR rows sit below the fold (scroll down), at the same row height */}
       <div className="mu-scroll">
-      <div className="mu-grid with-arrows" ref={gridRef} style={{ gridTemplateRows: tracks.join(" "), ...(irRows && { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` }) }}>
+      <div className="mu-grid with-arrows" ref={gridRef} style={{ gridTemplateRows: tracks.join(" "), minHeight: minH, ...(irRows && { height: `calc(${allRows / (allRows - irRows)} * (100% + 5px) - 5px)` }) }}>
         <SwapArrows pairs={me.pairs} side="left" gutter={gutter} names={(sid) => data.players[sid]?.name || sid} />
-        <SwapArrows pairs={them.pairs} side="right" gutter={gutter} names={(sid) => data.players[sid]?.name || sid} />
+        {!thin && <SwapArrows pairs={them.pairs} side="right" gutter={gutter} names={(sid) => data.players[sid]?.name || sid} />}
         {tl && lane && xs.xs?.size > 0 && [["l", lane.l], ["r", lane.r]].filter(([, x]) => x != null).map(([k, x]) => (
           <div key={k} className="time-line" data-testid={`time-line-${k}`} style={{ left: x + laneAt(xs.xs, atMs, Date.parse(tl.start), Date.parse(tl.end), lane.w) - 1 }} />
         ))}
@@ -914,6 +927,7 @@ function bestLineup(team, atMs, positions, asIs, games = {}) {
 // per Sleeper swap (swapSteps), joining the two players who trade places (a head at both ends), numbered in the order
 // to make them and coloured by the starting slot it fills. Measured from the cards on screen; redrawn when the grid
 // changes size.
+const ROW_MIN = 54;   // the shortest a lineup row gets (px): headshot, two text lines and the chip fit
 const ARROW_GUTTER = 80;
 function SwapArrows({ pairs, side, names, gutter = ARROW_GUTTER }) {
   const svgRef = React.useRef(null);
@@ -1169,7 +1183,7 @@ function LeagueView({ data, leagueId, open }) {
                 return (
                   <div key={m.roster_id} className={`lm-row clickable ${t.is_user ? "me" : ""} ${other && (m.points || 0) > (other.points || 0) ? "lead" : ""}`}
                     onClick={() => show(m.roster_id)} data-tip="Show this team's roster and games">
-                    <TeamName t={t} size={22} /><strong>{fp(m.points || 0)}</strong>
+                    <TeamName t={t} size={22} mine={!!t.is_user} /><strong>{fp(m.points || 0)}</strong>
                   </div>
                 );
               })}
