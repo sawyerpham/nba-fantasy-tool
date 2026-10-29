@@ -17,7 +17,7 @@
 :root[data-theme="ocean"] { --primary: #0284c7; --accent2: #14b8a6; --info-t: #7dd3fc; }
 :root[data-theme="sunset"] { --primary: #ea580c; --accent2: #db2777; --info-t: #fdba74; }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
 body {
   margin: 0; color: var(--text); background: var(--bg);
   font: 16px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -216,6 +216,9 @@ tr:hover .row-actions, tr.selected .row-actions, .row-actions:focus-within { opa
 .dropdown div:hover { background: var(--hover); }
 .dropdown div:has(> .headshot) { display: flex; align-items: center; gap: 8px; }
 .search-wrap { position: relative; }
+.search-wrap input { padding-right: 28px; }
+.search-clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 2px 6px; background: transparent; border: 0; color: var(--muted); font-size: 14px; line-height: 1; }
+.search-clear:hover { background: transparent; color: var(--text); filter: none; }
 
 /* ---------- money tiles ---------- */
 .bid-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
@@ -600,7 +603,10 @@ body::before { content: ""; position: fixed; inset: 80px; z-index: -1; pointer-e
 
 /* ---------- Season tab ---------- */
 main:has(.season-grid) { max-width: none; }   /* season tab: full width like the draft page */
-.season-grid { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 16px; align-items: start; }
+/* the right side's width: 26% of the window, never over 500px (so 4K / wide windows are as before) nor under 300px;
+   News and Waivers inset by the same amount */
+:root { --side-w: clamp(300px, 26vw, 500px); }
+.season-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w); gap: 16px; align-items: start; }
 .season-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .season-side { position: sticky; top: 12px; max-height: calc(100vh - 90px); overflow: auto; }
 .season-bar { gap: 10px; flex-wrap: wrap; }
@@ -609,21 +615,22 @@ main:has(.season-grid) { max-width: none; }   /* season tab: full width like the
 .inj.ok { background: var(--good); color: var(--good-t); }
 button.tiny { font-size: 11.5px; padding: 1px 6px; }
 /* the News column scrolls as one (panels keep their natural height, so collapsed My team is a single bar) and is
-   inset on the left by the player profile's width (500px column + 12px gap), centering it between equal margins */
-.news-col { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; margin-left: 512px; }
+   inset on the left by the player profile's width (side column + 12px gap), centering it between equal margins */
+.news-col { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; margin-left: calc(var(--side-w) + 12px); }
 /* the News tab: the teams report in the left band, the news beside it */
 .news-wrap { flex: 1; min-height: 0; display: flex; gap: 12px; }
 .news-wrap > .news-col { margin-left: 0; }
-.news-teams { flex: none; width: 500px; min-height: 0; overflow: auto; margin-bottom: 0; }
+.news-teams { flex: none; width: var(--side-w); min-height: 0; overflow: auto; margin-bottom: 0; }
 .news-teams h3 { margin: 0 0 8px; }
 .tr-team { display: grid; grid-template-columns: 20px 24px 1fr; gap: 8px; align-items: start; padding: 7px 4px; border-radius: 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
 .tr-team:hover { background: var(--hover); }
 .tr-rank { text-align: right; padding-top: 2px; }
 .tr-top { display: flex; align-items: baseline; gap: 8px; } .tr-counts { margin-left: auto; display: flex; gap: 8px; font-size: 12.5px; font-weight: 700; }
-.tr-names { margin-top: 2px; line-height: 1.4; } .tr-starter { font-weight: 800; }
-@media (max-width: 1500px) { .news-wrap { flex-direction: column; } .news-teams { width: auto; max-height: 40vh; } }
-.waivers { margin-left: 512px; }   /* same inset as News */
-@media (max-width: 1500px) { .news-col, .waivers { margin-left: 0; } }
+.tr-names { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; } .tr-starter { font-weight: 800; }
+.tr-player { display: flex; align-items: center; gap: 7px; }
+@media (max-width: 1100px) { .news-wrap { flex-direction: column; } .news-teams { width: auto; max-height: 40vh; } }   /* only a really narrow window stacks it */
+.waivers { margin-left: calc(var(--side-w) + 12px); }   /* same inset as News */
+@media (max-width: 1399px) { .news-col, .waivers { margin-left: 0; } }   /* the claims table needs the room more than the centring */
 .wv-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; } .wv-head h3 { margin: 0 6px 0 0; }
 .wv-chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--badge); color: var(--badge-text); }
 .wv-faab { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
@@ -636,7 +643,7 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .wv-stats { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; font-size: 13px; color: var(--muted); }
 .wv-stats strong { color: var(--text); } .wv-fp { font-weight: 700; color: var(--info-t); }
 .wv-next { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--primary-soft); }
-.wv-up { display: flex; align-items: center; gap: 10px; } .wv-bar { width: 90px; } .wv-bar > span { display: block; height: 100%; background: var(--ok); }
+.wv-up { display: flex; align-items: center; gap: 10px; } .wv-bar { width: clamp(40px, 4.7vw, 90px); } .wv-bar > span { display: block; height: 100%; background: var(--ok); }
 .wv-bid { display: inline-block; min-width: 40px; text-align: center; padding: 3px 10px; border-radius: 999px; font-weight: 700; background: var(--primary-soft); color: var(--info-t); }
 /* week timeline: the week as a line with a dot; the dot's time rides under it; past shaded (the dot can't go
    there, so pushing it all the way left is "now"); ticks where the lineup changes */
@@ -787,7 +794,7 @@ header.top .meta { white-space: nowrap; flex-shrink: 0; }
 .matchup .mc-name { font-size: 16px; } .matchup .mc-points { font-size: 26px; line-height: 1; }
 .matchup .mu-mid { flex-direction: row; gap: 8px; }
 /* ...on the lineup grid's columns (80px arrow lanes = 70px + the 10px gap, 46px slots): each score's inner edge lines up with the cards below */
-.matchup .mu-head:has(.mu-mid) { display: grid; grid-template-columns: 70px minmax(0, 1fr) 46px minmax(0, 1fr) 70px; column-gap: 10px; }
+.matchup .mu-head:has(.mu-mid) { display: grid; grid-template-columns: calc(var(--gut, 80px) - 10px) minmax(0, 1fr) 46px minmax(0, 1fr) calc(var(--gut, 80px) - 10px); column-gap: 10px; }   /* --gut: the arrow lane's width, set by WeekView */
 .matchup .mu-head:has(.mu-mid) > .mu-arrow:last-child { justify-self: end; }
 .matchup .mu-head .mu-mid { flex-direction: column; gap: 2px; white-space: nowrap; }   /* "1/6" over "mine", in the 46px slot column */
 .mu-arrow { position: static; font-size: 15px; padding: 3px 10px; }
@@ -800,14 +807,14 @@ header.top .meta { white-space: nowrap; flex-shrink: 0; }
    with the window width, so no fixed calc) */
 #root:has(.season-grid) { height: 100vh; display: flex; flex-direction: column; }
 main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%; }
-.season-grid { height: 100%; grid-template-columns: minmax(0, 1fr) 500px; gap: 12px; }
+.season-grid { height: 100%; grid-template-columns: minmax(0, 1fr) var(--side-w); gap: 12px; }
 .season-main { min-height: 0; height: 100%; }
 .season-main > .matchup { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 14px; }
 .season-side { max-height: 100%; height: 100%; display: flex; flex-direction: column; }
 .season-side > .panel.scroll { flex: 1; min-height: 0; max-height: none; margin-bottom: 0; }   /* profile runs to the bottom of the screen */
 .matchup .mu-head { margin-bottom: 10px; }
-.matchup .mc-name { font-size: 20px; } .matchup .mc-points { font-size: 36px; }
-.matchup .mu-team .small { font-size: 14px; }
+.matchup .mc-name { font-size: clamp(15px, 1.05vw, 20px); } .matchup .mc-points { font-size: clamp(24px, 1.9vw, 36px); }
+.matchup .mu-team .small { font-size: clamp(11px, 0.73vw, 14px); }
 .mu-arrow { font-size: 18px; padding: 6px 14px; }
 .mu-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: thin; }
 .mu-grid { flex: 1 0 auto; min-height: 0; grid-auto-rows: minmax(0, 1fr); gap: 5px 10px; }
@@ -815,9 +822,10 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-slot.first { border-top: 1px dashed var(--border); }
 .mu-card { padding: 2px; align-items: stretch; }   /* the name block and chips fill the row, 2px in from its edge */
 .mu-top { gap: 10px; align-items: stretch; }
-.mu-id { width: 205px; gap: 8px; margin-left: 0; padding-left: 10px; }   /* a narrow name column: the chip lane gets the room */
-.mu-name { font-size: 16px; }
-.mu-who .small { font-size: 13px; }
+.mu-id { width: min(205px, 11vw); gap: 8px; margin-left: 0; padding-left: 10px; }   /* a narrow name column: the chip lane gets the room; shrinks with the window */
+.mu-id .headshot { width: clamp(26px, 1.8vw, 34px) !important; height: clamp(26px, 1.8vw, 34px) !important; }   /* !important: Headshot sets its size inline */
+.mu-name { font-size: clamp(13px, 0.85vw, 16px); }
+.mu-who .small { font-size: clamp(11px, 0.7vw, 13px); }
 .mu-call { min-width: 0; }   /* no reserve: the chip timeline gets the room (only a locked ✓ shows here) */
 .chips-row { gap: 8px; }
 .game-chip { min-width: 98px; padding: 7px 6px; border-radius: 9px; }
@@ -845,7 +853,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 
 /* lineup-change arrows: a lane left of your cards */
 .mu-grid { position: relative; }   /* holds the time lines */
-.mu-grid.with-arrows { padding-left: 80px; padding-right: 80px; }
+.mu-grid.with-arrows { padding-left: var(--gut, 80px); padding-right: var(--gut, 80px); }
 .swap-arrows { position: absolute; left: 0; top: 0; height: 100%; overflow: visible; pointer-events: none; }
 .swap-arrows.right { left: auto; right: 0; transform: scaleX(-1); }   /* the rival's arrows: the left lane mirrored */
 /* your game chips as a timeline (x from laneXs) and the time line through them; the line sits under the chips */
@@ -1019,3 +1027,20 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .home-features ul { margin: 0; padding-left: 20px; line-height: 1.7; } .home-top { margin-bottom: 6px !important; }
 .home-rest { color: var(--muted); }
 @media (max-width: 800px) { .home-cards, .home-features { grid-template-columns: 1fr; } .home-import { flex-direction: column; } }
+
+/* ---------- narrow windows (under 1600px; keep in step with NARROW in lockin/SeasonPage.jsx) ---------- */
+@media (max-width: 1599px) { .mu-sub .nick { display: none; } }
+/* a game as a small bar-graph column instead of a timeline chip (GameChips): the pale bar is his projection (live: where
+   he's headed), the solid one the points scored so far; the number under it is the points, or the projection before the game */
+.chips-row > .game-chip.graph { flex: 1 1 0; min-width: 0; max-width: 60px; margin: 2px 0; padding: 2px 1px; gap: 1px; }
+.game-chip.graph .gch-day { font-size: min(12px, 22cqw); }
+.game-chip.graph .gch-time { display: none; }
+.game-chip.graph .gch-fp { font-size: min(13px, 24cqw); line-height: 1.1; }
+.gch-bar { position: relative; flex: 1; min-height: 6px; width: 55%; }
+.gch-bar > i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 2px 2px 0 0; }
+.gch-bar > .exp { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.gch-bar > .act { background: var(--primary); }
+.game-chip.live .gch-bar > .act { background: var(--danger); }
+.game-chip.graph .gch-lockbtn.corner { width: 16px; height: 16px; top: -6px; right: -5px; border-width: 1px; }
+.game-chip.graph .gch-lockbtn.corner .gch-lock { width: 8px; height: 10px; }
+.game-chip.graph .gch-play { width: 7px; height: 8px; }
