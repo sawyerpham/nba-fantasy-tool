@@ -46,9 +46,10 @@ export function SeasonSummary({ sea, onOpenGame }) {
         {stat("FP/G", f2(a?.fp))}
       </div>
       <div className="small sp-meta">
-        <span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}{sea.owner.ir ? " (IR)" : ""}</strong> : <strong>Free agent</strong>}
-        <span className="muted"> · Status</span> {sea.retired ? <strong className="warn-text">retired</strong>
-          : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> {sea.injury_note}</span>}</> : <strong>healthy</strong>}
+        <div><span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}</strong> : <strong>Free agent</strong>}</div>
+        {sea.owner && <div><span className="muted">Slot</span> <strong>{sea.owner.slot}</strong></div>}
+        <div><span className="muted">Status</span> {sea.retired ? <strong className="warn-text">retired</strong>
+          : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> {sea.injury_note}</span>}</> : <strong>healthy</strong>}</div>
       </div>
       {sea.news.length > 0 && (
         <>
