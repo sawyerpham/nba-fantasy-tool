@@ -34,7 +34,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
             <div className="sp-score"><strong><TeamLink abbr={g.team} /></strong> {g.team_pts ?? "—"} <span className="muted">{g.home ? "vs" : "@"}</span> <strong><TeamLink abbr={g.opp} /></strong> {g.opp_pts ?? "—"}</div>
             <div className="sp-fp"><span>{f2(g.fp)}</span><small>FP</small></div>
           </div>
-          <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to</div>
+          <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to{g.fga != null && <> · {g.fgm}/{g.fga} FG · {g.ftm}/{g.fta} FT</>}</div>
         </div>
       )}
       <div className="bid-label sp-head">Season averages <span className="muted">· {sea.games_played} GP</span></div>
