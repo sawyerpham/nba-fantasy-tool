@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 
 // Sleeper's public headshot for a player (same ids as the Sleeper API). Fixed size so nothing shifts while it
-// loads; initials when there is no photo.
-export default function Headshot({ sleeperId, name = "", size = 32 }) {
+// loads; initials when there is no photo. large: Sleeper's bigger image, for sizes past a thumbnail.
+export default function Headshot({ sleeperId, name = "", size = 32, large = false }) {
   const [failed, setFailed] = useState(false);
   const initials = name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("");
   const style = { width: size, height: size, fontSize: Math.round(size * 0.38) };
@@ -10,7 +10,7 @@ export default function Headshot({ sleeperId, name = "", size = 32 }) {
   return (
     <img
       className="headshot" style={style} width={size} height={size} loading="lazy" alt=""
-      src={`https://sleepercdn.com/content/nba/players/thumb/${sleeperId}.jpg`} onError={() => setFailed(true)}
+      src={`https://sleepercdn.com/content/nba/players/${large ? "" : "thumb/"}${sleeperId}.jpg`} onError={() => setFailed(true)}
     />
   );
 }

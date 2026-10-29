@@ -68,7 +68,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
     <>
       {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
       <h3>
-        <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={64} />
+        <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={96} large />
         {rec_.full_name} <span className="muted">{rec_.fantasy?.number != null && `#${rec_.fantasy.number} `}{rec_.team_abbr ? <TeamLink abbr={rec_.team_abbr} /> : "FA"}</span>
         <span className="profile-tags">
           <span>{ov.eligibility.length ? <PosList list={ov.eligibility} /> : "no position"} · age {bio.age ?? "?"}</span>
