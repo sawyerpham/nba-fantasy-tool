@@ -222,5 +222,6 @@ def _team_role(session, roster: list[tuple[float, int]], player_id: int) -> dict
         label = "Clear #1 option" if lead >= 1.15 else "#1 option (shared)"
     else:
         label = {2: "#2 option", 3: "#3 option"}.get(rank, "Role player")
-    return {"rank": rank, "label": label, "star": rank == 1, "share": round(fpg / top8, 3), "fpg": round(fpg, 1),
-            "vs": {"name": session.players[other[1]].full_name, "fpg": round(other[0], 1)} if other[1] != player_id else None}
+    vs = {"name": session.players[other[1]].full_name, "fpg": round(other[0], 1)} if other[1] != player_id else None
+    return {"rank": rank, "label": label, "star": rank == 1, "share": round(fpg / top8, 3), "fpg": round(fpg, 1), "vs": vs,
+            "shared_with": vs if label == "#1 option (shared)" else None}
