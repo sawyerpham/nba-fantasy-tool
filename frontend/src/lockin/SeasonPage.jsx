@@ -7,7 +7,7 @@ import { PosList, PosTag } from "../core/Pos.jsx";
 import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
-import InjuryTag from "../core/InjuryTag.jsx";
+import InjuryTag, { isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
 import { reseat, swapSteps } from "./swaps.js";
@@ -148,7 +148,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     const ro = new ResizeObserver(place);
     ro.observe(m); ro.observe(h);
     return () => ro.disconnect();
-  }, [headerSlot, !!(data && plan)]);
+  }, [headerSlot, !!(data && plan), view]);
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
   const pidOf = (sid) => data.players[sid]?.player_id;
@@ -163,7 +163,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
+          {view !== "news" && view !== "waivers" && <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
             <button className="mu-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} data-tip="Previous week">◀</button>
             <strong className="season-week">Week {data.week}</strong>
             <button className="mu-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} data-tip="Next week">▶</button>
@@ -171,8 +171,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
               <span className="muted small">{data.league_name}</span>
               {week && <button className="small ghost" onClick={() => setWeek(null)}>this week</button>}
             </span>
-          </span>
-          {error && <span className="small warn-text">{error}</span>}
+          </span>}
+          {error &&<span className="small warn-text">{error}</span>}
           <span className="season-search" style={{ marginLeft: "auto" }}><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} onSelectTeam={openTeam} placeholder="Any player or team…" testId="season-search" /></span>
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
@@ -734,7 +734,7 @@ const PlayerCard = React.memo(function PlayerCard({ data, r, open, openGame, set
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={34} />
         <div className="mu-who">
-          <div className="mu-name">{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
+          <div className={`mu-name ${isOut(p.injury_tag) ? "out" : ""}`}>{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
             {p.nick && showNicks() && <span className="nick" data-tip="Nickname set on Sleeper"> · “{p.nick}”</span>}</div>
         </div>
@@ -1199,10 +1199,20 @@ function LeagueView({ data, leagueId, open }) {
 
 function WaiversView({ leagueId, onSelect }) {
   const [w, setW] = useState(null);
+  const [sort, setSort] = useState(null);   // {k, dir}: a header click cycles ascending, descending, off (the backend's order)
   useEffect(() => { api.get(`/leagues/${leagueId}/season/waivers`).then(setW).catch(() => setW(null)); }, [leagueId]);
   if (!w) return <div className="panel waivers">Loading free agents…</div>;
   if (w.error) return <div className="panel waivers warn-text" data-testid="waivers-error">{w.error}</div>;
   const faab = w.type === "FAAB";
+  const STATS = [["fp", "FP/G"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tpm", "3PM"], ["gp", "GP"]];   // his season so far, per game (finished games, league scoring)
+  const val = (c, k) => (k === "value" || k === "upgrade" || k === "bid" ? c[k] : k === "games" ? c.games_left * 100 + c.games_next : c.season?.[k]);
+  const claims = !sort ? w.claims : [...w.claims].sort((a, b) => {
+    const x = val(a, sort.k), y = val(b, sort.k);
+    return x == null || y == null ? (x == null) - (y == null) : sort.dir * (x - y);   // nothing to show (no games yet, no bid): always last
+  });
+  const th = (k, label, tip, cls = "num") => (
+    <th className={`${cls} clickable`} data-tip={tip} onClick={() => setSort(sort?.k !== k ? { k, dir: 1 } : sort.dir === 1 ? { k, dir: -1 } : null)} data-testid={`sort-${k}`}>
+      {label}{sort?.k === k && (sort.dir === 1 ? " ▲" : " ▼")}</th>);
   const top = Math.max(...w.claims.map((c) => c.upgrade), 0.01);   // upgrade bars scale to the best one
   // claims land at the next run (backend next_waiver_run): "Sun 2:00 AM · in 7h 20m"
   const mins = Math.max(0, Math.round((Date.parse(w.next_run) - Date.now()) / 60000));
@@ -1232,21 +1242,18 @@ function WaiversView({ leagueId, onSelect }) {
       )}
       {w.claims.length ? (
         <table className="wv-table">
-          <thead><tr><th>Player</th><th className="num" data-tip="Rest-of-season value: projection, Lock-In best game and availability.">Value</th>
-            <th data-tip="Value over your drop candidate.">Upgrade</th>
-            <th className="num" data-tip={`A claim lands at the next run (${runDay} ${timeOf(w.next_run)}): his games from then, the rest of this week and next week.`}>Games once he lands</th>
-            <th className="num" data-tip="A guide: your FAAB left paced over the weeks left, scaled by the upgrade and by how much more he scores than your drop (under 25 % more: min bid), never over a quarter of what's left. Other bids are hidden.">Bid</th></tr></thead>
-          <tbody>{w.claims.map((c) => (
+          <thead><tr><th>Player</th>
+            {STATS.map(([k, l]) => th(k, l))}
+            {th("value", "Value", "Rest-of-season value: projection, Lock-In best game and availability.")}
+            {th("upgrade", "Upgrade", "Value over your drop candidate.", "")}
+            {th("games", "Games once he lands", `A claim lands at the next run (${runDay} ${timeOf(w.next_run)}): his games from then, the rest of this week and next week.`)}
+            {th("bid", "Bid", "A guide: your FAAB left paced over the weeks left, scaled by the upgrade and by how much more he scores than your drop (under 25 % more: min bid), never over a quarter of what's left. Other bids are hidden.")}</tr></thead>
+          <tbody>{claims.map((c) => (
             <tr key={c.player_id} className="clickable" onClick={() => onSelect(c.player_id)}>
               <td><div className="wv-player"><Headshot sleeperId={c.sleeper_id} name={c.name} size={44} />
                 <div><strong>{c.name}</strong><InjuryTag tag={c.injury_tag} /><div className="small muted"><TeamLink abbr={c.team} /> · <PosList list={c.pos} /></div>
-                  {/* his season so far, per game (finished games, league scoring) */}
-                  <div className="wv-stats" data-testid="waiver-stats">{c.season ? <>
-                    <span className="wv-fp">{c.season.fp.toFixed(2)} FP/G</span>
-                    {[["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tpm", "3PM"]].map(([k, l]) => <span key={k}><strong>{c.season[k]}</strong> {l}</span>)}
-                    <span className="muted">{c.season.gp} GP</span>
-                  </> : <span className="muted">No games played yet</span>}</div>
                 </div></div></td>
+              {STATS.map(([k]) => <td key={k} className="num" data-testid={k === "fp" ? "waiver-stats" : undefined}>{c.season ? (k === "fp" ? c.season.fp.toFixed(2) : c.season[k]) : <span className="muted">-</span>}</td>)}
               <td className="num">{c.value.toFixed(2)}</td>
               <td><div className="wv-up"><span className="wv-bar"><span style={{ width: `${(c.upgrade / top) * 100}%` }} /></span><span className="ok">+{c.upgrade.toFixed(2)}</span></div></td>
               <td className="num"><strong>{c.games_left}</strong> <span className="muted">this wk</span> · <strong>{c.games_next}</strong> <span className="muted">next</span></td>

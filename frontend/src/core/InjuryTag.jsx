@@ -4,6 +4,7 @@ const INJ_TAG = {
   Doubtful: ["D", "out", "doubtful"], DTD: ["DTD", "", "day-to-day"], GTD: ["GTD", "", "game-time decision"],
   Questionable: ["Q", "", "questionable"], Probable: ["P", "ok", "probable"],
 };
+export const isOut = (tag) => INJ_TAG[tag]?.[1] === "out";   // the red tags
 export default function InjuryTag({ tag, note }) {
   if (!tag) return null;
   const [abbr, cls, meaning] = INJ_TAG[tag] || [tag, "", tag];
