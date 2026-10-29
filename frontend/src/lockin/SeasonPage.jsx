@@ -95,6 +95,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
   // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
   const [alerts, setAlerts] = useState([]);
+  const [showNotifs, setShowNotifs] = useState(false);   // the badge's floating panel
   const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
   const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
   const arm = () => {
@@ -125,6 +126,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
           : line.decision === "SWAP" ? `SWAP: bench ${line.name}, start ${line.backup}` : `${line.decision}: ${line.backup} check`;
         alarmSound();
         setAlerts((a) => [{ key: `${w.sid}-${w.kind}-${Date.now()}`, title, text: line.text, decision: line.decision, kind: line.kind }, ...a]);
+        setShowNotifs(true);
         try { if (Notification.permission === "granted") new Notification(title, { body: line.text }); } catch { /* ignore */ }
       }, ms);
     }).filter(Boolean);
@@ -155,6 +157,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   const setLock = (sid, gameDate) => api.post(`/leagues/${leagueId}/season/locks`, { week: data.week, sleeper_id: sid, game_date: gameDate })
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
+  const rosterNotes = (plan.roster?.illegal.length ? 1 : 0) + (plan.roster?.ir_candidates.length ? 1 : 0);
+  const count = alerts.length + rosterNotes;
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
@@ -172,8 +176,11 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
-          <button className={`small primary bell ${armed ? "" : "off"}`} onClick={arm} data-testid="arm-alarms" aria-label={armed ? "Alarms on" : "Turn on alarms"}
-            data-tip={`${armed ? "Alarms on. " : "Alarms off: click to turn on. "}Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.`}>🔔</button>
+          <span className="bell-wrap">
+            <button className={`small primary bell ${armed ? "" : "off"}`} onClick={arm} data-testid="arm-alarms" aria-label={armed ? "Alarms on" : "Turn on alarms"}
+              data-tip={`${armed ? "Alarms on. " : "Alarms off: click to turn on. "}Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.`}>🔔</button>
+            {count > 0 && <button className="notif-badge" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-badge" aria-label={`${count} notifications`}>{count}</button>}
+          </span>
         </div>
   );
   return (
@@ -181,12 +188,16 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     <div className="season-grid">
       <section className="season-main" ref={mainRef}>
         {headerSlot ? createPortal(bar, headerSlot) : bar}
-        {alerts.map((a) => (
-          <div key={a.key} className={`panel roster-alert ${["gtd", "out"].includes(a.kind) || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
-            <strong>⏰ {a.title}</strong> {a.text}
-            <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
-          </div>
-        ))}
+        {showNotifs && count > 0 && createPortal(
+          <div className="notif-pop" data-testid="notif-pop">
+            {alerts.map((a) => (
+              <div key={a.key} className={`panel roster-alert ${["gtd", "out"].includes(a.kind) || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
+                <strong>⏰ {a.title}</strong> {a.text}
+                <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
+              </div>
+            ))}
+            <RosterAlerts roster={plan.roster} />
+          </div>, document.body)}
         {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
         {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
@@ -447,7 +458,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
   const banked = (o?.players || []).filter((r) => r.locked != null).sort((a, b) => b.locked - a.locked);
   const odds = out ? [["Lock all now", out.safe], ["Leave all open", out.risky], ["Plan mix", p.win_chance]] : [];
   const top = Math.max(...odds.map(([, v]) => v ?? 0));
-  const signed = (x) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}`;
+  const signed = (x) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}%`;
   // a guessed lock (?) can be answered here: ✓ locked / ✕ not locked (saved like your own lock answers)
   const chip = (r, value, guess) => (
     <span key={r.sid} className="guide-chip"><span className="clickable guide-who" onClick={() => open(r.sid)}><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)}</span> <strong>{value}{guess ? "?" : ""}</strong>
@@ -467,7 +478,6 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
   return (
     <div className="panel scroll guide" data-testid="lockin-guide">
       {head}
-      {mine && <RosterAlerts roster={plan.roster} />}
       {o && (
         <section className="guide-card">
           <div className="hub-win"><span className="bid-label">Win probability</span><strong>{pct(p.win_chance)}</strong></div>
@@ -520,7 +530,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open }) {
                 {tip && <div className="small muted">Next tip {when(tip)}</div>}
               </div>
               <div className="guide-lock-side"><span className="guide-lock-x">{fp(r.x)}</span>
-                {r.win_lock != null && <span className={`hub-edge ${e >= 0 ? "up" : "down"}`} data-tip="Win probability locked minus open, in points">{signed(e)}</span>}</div>
+                {r.win_lock != null && <span className={`hub-edge ${e >= 0 ? "up" : "down"}`} data-tip="Win probability added (WPA): win % locked minus win % open">{signed(e)}</span>}</div>
             </div>
           );
         })}
@@ -604,13 +614,13 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           graph && [timeOf(g.tip), played && `${fp(g.fp)} FP`, exp != null && `proj ${fp(exp)}`].filter(Boolean).join(" · "),
           // "MIA 81 vs MIN 104" (his team first; no scores before the tip)
           [team, g.score, g.home ? "vs" : "@", g.opp, g.opp_score].filter((x) => x != null && x !== "").join(" "),
-          played && g.min != null && `${g.min} min${live ? " so far" : ""}`,
+          played && g.min != null && !g.box && `${Math.round(g.min)} MIN`,
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,   // locked too: was it the right call
           lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
           toggle === "" ? "padlock: unlock" : toggle && "padlock: lock",
           watch && "▶: watch",
-        ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box)}` : "");
+        ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box, g.min)}` : "");
         return (
           <span key={g.date} onClick={onOpen && g.event ? (e) => { e.stopPropagation(); onOpen(g); } : undefined}
             style={lane?.xs ? { left: lane.xs.get(tipMs(g)) ?? 0, ...(lane.scale < 1 && { width: 100 * lane.scale }) } : undefined}
@@ -640,7 +650,7 @@ const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)
 const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").replace("Start of ", "Start ").replace("Halftime", "Half") || "—";
 
 // His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF"
-const boxLine = (b) => `${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
+const boxLine = (b, min) => `${min != null ? `${Math.round(min)} MIN, ` : ""}${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
 
 // a small padlock: a locked game with no unlock button shows it where "final" would be; open (shackle lifted) on the lock button
 const LockIcon = ({ open }) => (
