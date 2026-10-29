@@ -92,9 +92,12 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
   const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
   const arm = () => {
-    alarmSound();   // the click also unlocks sound for later
-    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
-    setArmed(true); try { localStorage.setItem("da.season.alarms", "1"); } catch { /* ignore */ }
+    const on = !armed;   // the effect below clears the pending timers when this turns off
+    if (on) {
+      alarmSound();   // the click also unlocks sound for later
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    }
+    setArmed(on); try { localStorage.setItem("da.season.alarms", on ? "1" : "0"); } catch { /* ignore */ }
   };
   useEffect(() => {
     if (!armed || !plan?.today) return undefined;
@@ -163,9 +166,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
           <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync"
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
-          <button className={`small ${armed ? "ghost" : "primary"}`} onClick={arm} data-testid="arm-alarms"
-            data-tip="Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.">
-            {armed ? "🔔 Alarms on" : "🔕 Turn on alarms"}</button>
+          <button className={`small primary bell ${armed ? "" : "off"}`} onClick={arm} data-testid="arm-alarms" aria-label={armed ? "Alarms on" : "Turn on alarms"}
+            data-tip={`${armed ? "Alarms on. " : "Alarms off: click to turn on. "}Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.`}>🔔</button>
         </div>
   );
   return (

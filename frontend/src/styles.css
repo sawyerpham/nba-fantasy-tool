@@ -766,7 +766,12 @@ header.top { flex-wrap: wrap; row-gap: 10px; }   /* too narrow for the season ba
 .season-week { font-size: 18px; white-space: nowrap; }
 .header-slot .season-bar > .muted { white-space: nowrap; }
 .header-slot .season-bar > button { white-space: nowrap; flex-shrink: 0; }
-.header-slot .season-search { width: 240px; flex-shrink: 0; }
+.header-slot .season-search { width: 300px; flex-shrink: 0; margin-right: 8px; }
+.header-slot .season-bar > button[data-testid="sync"] { padding-left: 18px; padding-right: 18px; }
+/* alarms: just a bell; a red slash through it while they are off */
+.bell { position: relative; font-size: 17px; line-height: 1.2; padding: 3px 9px; }
+.bell.off::after { content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 24px; border-radius: 1px; background: #ef4444;
+  box-shadow: 0 0 0 1.5px #fff; transform: translate(-50%, -50%) rotate(-45deg); pointer-events: none; }
 /* ◀ Week ▶ centred on the matchup column (left set from SeasonPage); league name / "this week" hang off its right */
 .season-weeknav { position: relative; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .header-slot .season-weeknav[style] { position: absolute; transform: translateX(-50%); }
