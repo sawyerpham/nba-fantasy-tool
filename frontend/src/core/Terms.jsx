@@ -90,10 +90,14 @@ export function TipLayer() {
   useEffect(() => {
     /** Show the tooltip for the [data-tip] element under the pointer, or hide it when there is none. */
     const over = (e) => {
-      const el = e.target.closest?.("[data-tip]");
-      if (!el || !el.dataset.tip) return setTip(null);
+      let el = e.target.closest?.("[data-tip]"), text = el?.dataset.tip;
+      if (!text) {   // data-clip: the full text, shown only while the element is cut off with an ellipsis
+        const c = e.target.closest?.("[data-clip]");
+        if (c && c.scrollWidth > c.clientWidth) { el = c; text = c.dataset.clip; }
+      }
+      if (!text) return setTip(null);
       const r = el.getBoundingClientRect();
-      setTip({ text: el.dataset.tip, x: r.left + r.width / 2, below: r.bottom + 8, above: r.top - 8 });
+      setTip({ text, x: r.left + r.width / 2, below: r.bottom + 8, above: r.top - 8 });
     };
     /** Hide the tooltip. */
     const hide = () => setTip(null);

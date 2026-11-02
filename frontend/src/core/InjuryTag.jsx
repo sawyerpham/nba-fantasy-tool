@@ -6,6 +6,8 @@ const INJ_TAG = {
 };
 /** True for Sleeper injury tags that mean he won't (or likely won't) play: Out, IR, Suspended, Doubtful. */
 export const isOut = (tag) => INJ_TAG[tag]?.[1] === "out";
+/** True for the unsure Sleeper injury tags: DTD, GTD, Questionable. */
+export const isDoubt = (tag) => INJ_TAG[tag]?.[1] === "";
 /** Small badge for a player's Sleeper injury tag: abbreviation, colour class, and a hover with the meaning plus Sleeper's note. Renders nothing without a tag. */
 export default function InjuryTag({ tag, note }) {
   if (!tag) return null;
