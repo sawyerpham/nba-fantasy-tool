@@ -8,7 +8,7 @@ import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import NeonArrow from "../core/NeonArrow.jsx";
-import InjuryTag, { isOut } from "../core/InjuryTag.jsx";
+import InjuryTag, { isDoubt, isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
 import { reseat, swapSteps } from "./swaps.js";
@@ -383,7 +383,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
           {g.teams.map((t, i) => (
             <React.Fragment key={t.abbr}>
               {i === 1 && <div className="gp-status"><span className={g.state === "in" ? "gp-live" : ""}>{status}</span><span className="small muted">{when}</span></div>}
-              <div className={`gp-team ${i ? "home" : ""}`}>
+              <div className={`gp-team ${i ? "gp-home" : ""}`}>
                 {t.logo && <TeamLink abbr={t.abbr}><img src={t.logo} alt="" width={40} height={40} /></TeamLink>}
                 <div><div className="gp-abbr"><TeamLink abbr={t.abbr} /></div>
                   {g.state === "pre" ? <div className="gp-record">{t.record || "—"}</div> : <div className="gp-pts">{t.score ?? "—"}</div>}</div>
@@ -416,10 +416,10 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
             ))}</div>
           </section>
         )}
-        {g.teams.map((t) => {
+        {g.teams.map((t, i) => {
           const rows = [...t.players].sort((a, b) => b.starter - a.starter || b.min - a.min);
           return (
-            <section key={t.abbr} className="gp-section">
+            <section key={t.abbr} className={`gp-section gp-tint-${i % 2}`}>
               <h4><TeamLink abbr={t.abbr}>{t.name}</TeamLink></h4>
               {g.state === "pre" ? null : rows.length ? (
                 <table className="gp-box"><thead><tr><th>Player</th><th className="num">FP</th>{BOX_COLS.map(([h]) => <th key={h} className="num">{h}</th>)}</tr></thead>
@@ -744,9 +744,6 @@ function laneAt(xs, ms, start, end, width) {
   return width;
 }
 
-const EXP_TIP = "Expected final score: locked points plus what each slot is expected to add (each player's locked game, " +
-  "else the better of locking his last game and waiting for his later ones).";
-
 /** Shallow equality of two row objects, field by field (bestLineup hands back fresh objects each time). */
 const sameFields = (a, b) => a === b || (!!a && !!b && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]));
 /** React.memo comparator for PlayerCard: re-render a card only when what it shows changes (the slider re-renders the grid every step). */
@@ -758,14 +755,14 @@ const PlayerCard = React.memo(function PlayerCard({ data, r, open, openGame, set
   const starter = r.slot !== "BN" && r.slot !== "IR";
   const locked = r.lock_status === "locked" || r.lock_status === "guess";   // guess: Sleeper can't tell yet, the math says locked
   return (
-    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${locked ? "done" : ""}`} data-testid={`mu-${r.sid}`}>
+    <div className={`mu-card ${side} ${starter ? "" : "bench"} ${locked ? "done" : ""} ${isOut(p.injury_tag) ? "out" : isDoubt(p.injury_tag) ? "doubt" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
         <Headshot sleeperId={r.sid} name={r.name} size={34} />
         <div className="mu-who">
-          <div className={`mu-name ${isOut(p.injury_tag) ? "out" : ""}`}>{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
-          <div className="small muted mu-sub">{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
-            {p.nick && showNicks() && <span className="nick" data-tip="Nickname set on Sleeper"> · “{p.nick}”</span>}</div>
+          <div className="mu-name" data-clip={r.name}>{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
+          <div className="small muted mu-sub" data-clip={p.nick && showNicks() ? `“${p.nick}”` : undefined}>{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
+            {p.nick && showNicks() && <span className="nick"> · “{p.nick}”</span>}</div>
         </div>
         </div>
         <GameChips games={p.games} team={p.team} today={data.today} day={mine ? day || data.day : day} lockDate={locked ? r.lock_date : null} lockGuess={r.lock_status === "guess"} lockable={r.x != null} benched={r.slot === "BN" || r.slot === "IR"} lane={lane}
@@ -888,14 +885,14 @@ function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
         <div className="mu-team">
           <TeamName t={shown} cls="mc-name" size={34} mine={isMine} />
           <span className="small muted">{shown.games_left} left</span>
-          <span className="mu-score"><span className="mu-exp-total" data-tip={EXP_TIP}>{shown.expected}</span><span className="mc-points">{fp(shown.points)}</span></span>
+          <span className="mu-score"><span className="mu-exp-total">{shown.expected}</span><span className="mc-points">{fp(shown.points)}</span></span>
         </div>
         <div className="mu-mid">
           <span className="small muted">{idx + 1}/{n}</span>
           {!isMine && <button className="tiny" onClick={() => setIdx(mineIdx)}>mine</button>}
         </div>
         {!thin && <div className="mu-team right">
-          {o && <span className="mu-score"><span className="mc-points">{fp(o.points)}</span><span className="mu-exp-total" data-tip={EXP_TIP}>{o.expected}</span></span>}
+          {o && <span className="mu-score"><span className="mc-points">{fp(o.points)}</span><span className="mu-exp-total">{o.expected}</span></span>}
           {o && <span className="small muted">{o.games_left} left · {o.locked} locked</span>}
           {o ? <TeamName t={o} cls="mc-name" size={34} /> : <span className="mc-name">no opponent</span>}
         </div>}
