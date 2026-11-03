@@ -68,9 +68,10 @@ def test_locked_players_keep_their_slot_and_others_fill_around_them():
 
 def test_swing_comes_from_his_own_games():
     """Swing comes from his own games."""
-    assert swing_of([10.0] * 20) == 0.12                                  # perfectly steady: the floor
-    assert swing_of([5.0, 25.0] * 10) == 0.6                              # wild: the ceiling
-    assert swing_of([10.0] * 5) == 0.3                                    # too few games: the default
+    from app.lockin.weekplan import SWING_SCALE
+    assert swing_of([10.0] * 20) == pytest.approx(0.12 * SWING_SCALE)     # perfectly steady: the floor
+    assert swing_of([5.0, 25.0] * 10) == pytest.approx(0.6 * SWING_SCALE) # wild: the ceiling
+    assert swing_of([10.0] * 5) == pytest.approx(0.3 * SWING_SCALE)       # too few games: the default
 
 
 def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
@@ -176,6 +177,28 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
         g.live = False
     plan_week(players, pf)
     assert sorted(plan_today(players, pf, today, now="2026-10-22T02:15Z").seats["PF"]) == ["grant", "sabonis"]
+
+
+def test_a_finished_week_auto_locks_the_last_game_of_every_unlocked_starter():
+    """A finished week shows the lineup it had (Sleeper's matchup, not today's roster), and a starter nobody locked
+    counts his last game: 0 when he sat it out. Your own answer still wins."""
+    from app.lockin.service import _plan_players
+
+    g = lambda d, fp: {"date": d, "fp": fp, "proj": 10.0, "tip": None, "state": "post", "b2b": False}   # noqa: E731
+    view = {"dates": ["2026-10-26", "2026-11-01"], "today": "2026-11-02", "now": None, "roster_positions": ["PG", "C", "BN"],
+            "players": {s: {"player_id": None, "name": s, "pos": ["PG", "C"], "injury": "healthy", "games": gs}
+                        for s, gs in (("a", [g("2026-10-26", 20.0), g("2026-11-01", 8.0)]),
+                                      ("b", [g("2026-10-26", 12.0), g("2026-11-01", None)]),
+                                      ("c", [g("2026-10-26", 30.0)]))},
+            "matchups": [[{"roster_id": 1, "starters": ["a", "b"], "players": ["a", "b", "c"], "players_points": {}}]]}
+    team = {"roster_id": 1, "is_user": True, "starters": ["c", "a"], "players": ["a", "c"], "reserve": []}   # today's lineup
+    session = type("S", (), {"valuations": {}})()
+    players, locks, _ = _plan_players(session, view, team, {})
+    by = {p.sid: p for p in players}
+    assert (by["a"].slot, by["b"].slot, by["c"].slot) == ("PG", "C", "BN")   # the week's lineup, dropped b included
+    assert (by["a"].locked, by["b"].locked, by["c"].locked) == (8.0, 0.0, None)   # last games; b sat his out
+    players, _, _ = _plan_players(session, view, team, {"a": "2026-10-26"})
+    assert next(p for p in players if p.sid == "a").locked == 20.0           # your answer wins
 
 
 def test_an_out_starter_sitting_out_his_live_game_is_benched_now():
