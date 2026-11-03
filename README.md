@@ -46,6 +46,18 @@ A local helper for Sleeper NBA fantasy leagues.
 
 Needs Python 3.13 and Node 20+.
 
+### macOS / Linux
+
+```sh
+cd backend
+python3 -m venv venv
+./venv/bin/python -m pip install -r requirements.txt
+./venv/bin/python -m app.pull
+./venv/bin/python -m app.serve --port 8000
+```
+
+### Windows PowerShell
+
 ```powershell
 cd backend
 python -m venv venv
@@ -54,7 +66,9 @@ python -m venv venv
 .\venv\Scripts\python.exe -m app.serve --port 8000
 ```
 
-```powershell
+In another terminal, start the frontend:
+
+```sh
 cd frontend
 npm install
 npm run dev

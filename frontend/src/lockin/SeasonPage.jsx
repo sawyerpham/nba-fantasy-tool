@@ -573,16 +573,20 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
       </>}
       {swaps.length > 0 && <>
         <h4>Swap windows</h4>
-        {swaps.map((w) => (
-          <div key={w.backup_sid} className="guide-row">
-            <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
-            <div className="small">
-              <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
-              <div className="muted">{w.est != null ? `${lastName(w.name)} projected finish ~${fp(w.est)} · ${lastName(w.backup)} ~${fp(w.swap)}` : `${lastName(w.name)} not started · ${lastName(w.backup)} ~${fp(w.swap)}`}</div>
-              {w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
+        {/* every starter each later bench player could replace (w.options), the plan's pick (w.name) first */}
+        {swaps.flatMap((w) => (w.options?.length ? [...w.options].sort((a, b) => (b.name === w.name) - (a.name === w.name)) : [w]).map((o) => {
+          const pick = o.name === w.name, sid = o.sid ?? (pick ? w.sid : null);
+          return (
+            <div key={`${w.backup_sid}-${o.name}`} className="guide-row">
+              <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
+              <div className="small">
+                <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className={sid ? "clickable" : undefined} onClick={() => sid && open(sid)}>{o.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
+                <div className="muted">{o.est != null ? `${lastName(o.name)} projected finish ~${fp(o.est)} · ${lastName(w.backup)} ~${fp(o.swap)}` : `${lastName(o.name)} not started · ${lastName(w.backup)} ~${fp(o.swap)}`}</div>
+                {pick && w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        }))}
       </>}
       {injuries.length > 0 && <>
         <h4>Injury watch</h4>
@@ -1028,8 +1032,9 @@ function Timeline({ tl, nowMs, atMs, setAt, view, setView, differs }) {
     <div className="timeline" data-testid="timeline">
       <button className="tl-next" onClick={() => setView(view === "best" ? "sleeper" : "best")} disabled={!differs} data-testid="lineup-toggle"
         data-tip={differs ? "Switch between the best lineup and the lineup in Sleeper now." : "The Sleeper lineup is already the best one."}>
-        <span className="tl-next-head"><span className="tl-next-label">Current lineup</span></span>
-        <strong>{view === "best" ? "Best" : "In Sleeper"}</strong>
+        <span className="tl-next-head"><span className="tl-next-label">LINEUP</span></span>
+        {/* both words stacked in one cell, the other one hidden, so the box is always as wide as the longer word */}
+        <strong className="tl-toggle-val"><span className={view === "best" ? "" : "off"}>Best</span><span className={view === "best" ? "off" : ""}>Current</span></strong>
       </button>
       <div className="tl-main">
         <div className="tl-days">{days.map((d) => <span key={d}>{fmt(d, { weekday: "short" })} {fmt(d, { month: "2-digit", day: "2-digit" })}</span>)}</div>
