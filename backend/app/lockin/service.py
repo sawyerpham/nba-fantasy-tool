@@ -451,7 +451,6 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
 
 
 LOCK_REMINDER_MIN = 30   # a LOCK call still not locked: alarm this long before his next tip (the window closes there)
-CHECK_LEAD_MIN = 15      # timeline check-ins sit this long before the tip they're for (on the quarter hour)
 GAME_MINUTES = 135       # ponytail: a game runs ~2 h 15 m; overtime runs longer, use ESPN's final status if that bites
 
 
@@ -467,7 +466,7 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
     moves in at the 8:45 check for the 9:00 games). A game counts as in progress for GAME_MINUTES after its tip,
     so a player still playing is never swapped out. Each check plans the games still to come (plan_today for the
     next game's day) from the previous lineup, so the moves chain; locked players never move."""
-    from .weekplan import plan_today
+    from .weekplan import CHECK_LEAD_MIN, plan_today
 
     tz = ZoneInfo(view.get("tz") or "America/Chicago")
     first = date.fromisoformat(view["dates"][0])
@@ -492,7 +491,7 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
         return g.date if g else None
     saved = {id(g): (g.started, g.live) for p in players for g in p.games}
     slots = {p.sid: p.slot for p in players}
-    seats = today_seats if today_seats is not None else plan_today(players, counts, next_day() or view["day"]).seats
+    seats = today_seats if today_seats is not None else plan_today(players, counts, next_day() or view["day"], view.get("now")).seats
     segments = [{"date": view["day"], "seats": seats}]
     lead, length = timedelta(minutes=CHECK_LEAD_MIN), timedelta(minutes=GAME_MINUTES)
     for t in tips:
@@ -506,7 +505,7 @@ def week_timeline(players, counts: dict[str, int], view: dict, today_seats: dict
         d = next_day()
         if d is None:
             break
-        nxt = plan_today(players, counts, d).seats
+        nxt = plan_today(players, counts, d, check.isoformat()).seats
         tipping = {p.sid for p in active for g in p.games if g.tip and at(g.tip) == t}
         if (starters(nxt) - starters(seats)) & tipping:   # someone moves in for this tip: check in now, every swap at once
             segments[-1]["to"] = check.astimezone(tz).isoformat()
@@ -569,7 +568,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                 for o in q.lock_at:
                     o["win"] = round(win_chance((mean + q.x - (q.lock_at[0]["team"] - o["team"]), var), theirs), 3)
     today = view.get("day", view["today"])
-    t = plan_today(players, counts, today) if today in view["dates"] else None
+    t = plan_today(players, counts, today, view.get("now")) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
         swings = {q.name: q.swing for q in players}
         for w in t.watch:
@@ -590,7 +589,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                                   "text": f"Lock {q.name} ({q.x:.1f}) in the {q.seat} slot before his next tip: {q.why}."})
     timeline = week_timeline(players, counts, view, t.seats if t else None) if view["dates"] else None
     if opp:   # their best lineup over the week too: the matchup draws their swap arrows, mirrored on the right
-        ot = plan_today(oplayers, counts, today) if today in view["dates"] else None
+        ot = plan_today(oplayers, counts, today, view.get("now")) if today in view["dates"] else None
         opp["today"] = {"date": today, "seats": ot.seats} if ot else None
         opp["timeline"] = week_timeline(oplayers, counts, view, ot.seats if ot else None) if view["dates"] else None
     out_now = ("out_short_term", "out_long_term")   # what the league lets you put on IR (Sleeper: Out / IR)

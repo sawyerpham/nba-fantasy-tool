@@ -163,10 +163,12 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
     sab = pp("sabonis", ["PF", "C"], "BN", [Game(today, 13.7, tip="2026-10-22T02:30Z", proj_min=34)] + future(14.0))
     players, pf = [wig, grant, sab], {"PF": 2}
     plan_week(players, pf)
-    t = plan_today(players, pf, today)
+    t = plan_today(players, pf, today, now="2026-10-22T00:30Z")
     w = next(x for x in t.watch if x["kind"] == "swap")
     assert (w["decision"], w["name"], w["backup"]) == ("SWAP", "wiggins", "sabonis")
-    # the lineup makes the swap while Wiggins is still playing (Sabonis tips before his game ends), not after
+    assert t.moves == []   # hours before Sabonis's tip: the call can still turn, so the lineup waits for the check-in
+    # at the check-in, the lineup makes the swap while Wiggins is still playing (Sabonis tips before his game ends)
+    t = plan_today(players, pf, today, now="2026-10-22T02:15Z")
     assert sorted(t.seats["PF"]) == ["grant", "sabonis"]
     assert {m["sid"]: (m["from"], m["to"]) for m in t.moves} == {"wiggins": ("PF", "BN"), "sabonis": ("BN", "PF")}
 
@@ -174,6 +176,21 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
         g.live = False
     plan_week(players, pf)
     assert sorted(plan_today(players, pf, today).seats["PF"]) == ["grant", "sabonis"]
+
+
+def test_an_out_starter_whose_game_tipped_is_swapped_and_gets_one_backup():
+    """An OUT starter whose game has tipped without him is headed for 0 (SWAP, not PENDING), and only the better of two backups takes his slot."""
+    from app.lockin.weekplan import plan_today
+
+    today = "2026-10-21"
+    wat = pp("watson", ["SF"], "SF", [Game(today, 8, started=True, live=True, tip="2026-10-21T23:00Z", period=1, clock=0)] + future(8))
+    wat.injury = "out_short_term"
+    wig = pp("wiggins", ["SF"], "BN", [Game(today, 8, tip="2026-10-22T02:00Z")])
+    gri = pp("grimes", ["SF"], "BN", [Game(today, 6, tip="2026-10-22T02:00Z")])
+    players, sf = [wat, wig, gri], {"SF": 1}
+    plan_week(players, sf)
+    swaps = [w for w in plan_today(players, sf, today).watch if w["kind"] == "swap"]
+    assert [(w["name"], w["backup"], w["decision"]) for w in swaps] == [("watson", "wiggins", "SWAP")]
 
 
 def test_a_day_without_games_seats_by_next_tip():
