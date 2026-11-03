@@ -175,11 +175,11 @@ def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one
     for g in wig.games[:1] + grant.games[:1]:   # the timeline's check after their games: free to move, same scores
         g.live = False
     plan_week(players, pf)
-    assert sorted(plan_today(players, pf, today).seats["PF"]) == ["grant", "sabonis"]
+    assert sorted(plan_today(players, pf, today, now="2026-10-22T02:15Z").seats["PF"]) == ["grant", "sabonis"]
 
 
-def test_an_out_starter_whose_game_tipped_is_swapped_and_gets_one_backup():
-    """An OUT starter whose game has tipped without him is headed for 0 (SWAP, not PENDING), and only the better of two backups takes his slot."""
+def test_an_out_starter_sitting_out_his_live_game_is_benched_now():
+    """An OUT starter whose game has tipped without him scores 0: he isn't pinned, he's benched now for the best later player."""
     from app.lockin.weekplan import plan_today
 
     today = "2026-10-21"
@@ -189,8 +189,28 @@ def test_an_out_starter_whose_game_tipped_is_swapped_and_gets_one_backup():
     gri = pp("grimes", ["SF"], "BN", [Game(today, 6, tip="2026-10-22T02:00Z")])
     players, sf = [wat, wig, gri], {"SF": 1}
     plan_week(players, sf)
-    swaps = [w for w in plan_today(players, sf, today).watch if w["kind"] == "swap"]
-    assert [(w["name"], w["backup"], w["decision"]) for w in swaps] == [("watson", "wiggins", "SWAP")]
+    t = plan_today(players, sf, today)
+    assert {m["sid"]: m["to"] for m in t.moves} == {"watson": "BN", "wiggins": "SF"}
+    assert [w["kind"] for w in t.watch] == ["out"]
+
+
+def test_every_later_bench_player_is_watched_and_targets_the_starter_the_swap_is_worth_most_against():
+    """No minimum gain: a later bench player is watched against every earlier starter he fits, each starter goes to one
+    backup, and before any live score the arrows (from the check-in) go to the starter the swap is worth most against."""
+    from app.lockin.weekplan import plan_today
+
+    today = "2026-10-21"
+    # a projects more tonight but has good games to come: benching him costs little. b's game tonight is his last.
+    a = pp("a", ["SG"], "SG", [Game(today, 12, tip="2026-10-21T23:00Z")] + future(12, 12))
+    b = pp("b", ["SG"], "SG", [Game(today, 9, tip="2026-10-21T23:00Z")])
+    g = pp("grimes", ["SG"], "BN", [Game(today, 6.5, tip="2026-10-22T02:00Z")])
+    players, sg = [a, b, g], {"SG": 2}
+    plan_week(players, sg)
+    t = plan_today(players, sg, today, now="2026-10-21T22:00Z")
+    w = next(x for x in t.watch if x["kind"] == "swap")
+    assert (w["backup"], w["name"], w["decision"]) == ("grimes", "a", "PENDING") and t.moves == []
+    t = plan_today(players, sg, today, now="2026-10-22T01:45Z")   # the check-in: the arrow goes to a
+    assert {m["sid"]: m["to"] for m in t.moves} == {"a": "BN", "grimes": "SG"}
 
 
 def test_a_day_without_games_seats_by_next_tip():
