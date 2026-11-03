@@ -48,7 +48,7 @@ function TeamName({ t, cls = "", size = 24, record = true, mine = false }) {
         <span className={cls}>{t.name}</span>
         {(rec || (t.user && t.user !== t.name)) && <span className="small muted team-sub">
           {t.user && t.user !== t.name && <span className="team-user">{t.user}</span>}
-          {rec && <span className="team-rec" data-testid="team-record"><strong className="good-text">{t.wins}</strong>-<strong className="warn-text">{t.losses}</strong>{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
+          {rec && <span className="team-rec" data-testid="team-record">{t.wins}-{t.losses}{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
         </span>}
       </span>
     </span>
