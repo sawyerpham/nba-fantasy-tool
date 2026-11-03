@@ -448,10 +448,14 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
             final = then["state"] == "post"
             status = "guess" if final and then["fp"] >= wait_value([g for g in games if not g.started], swing, p["injury"]) else "maybe"
         locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status in ("locked", "guess") else None
-        if over and slot not in ("BN", "IR") and manual.get(sid) is None and status != "locked":
-            # the week is over and nothing was locked: Sleeper counted his last game (a DNP counts 0), auto-locked
-            last = next((g for g in reversed(p["games"])), None)
-            status, when, locked = "locked", last["date"] if last else None, (last or {}).get("fp") or 0.0
+        if over and slot not in ("BN", "IR"):
+            # the week is over: Sleeper's final count wins over your answers; the game it matches (latest), else
+            # his last game (nothing locked, a DNP counts 0)
+            pts = counted.get(sid)
+            same = [g for g in p["games"] if pts is not None and g["fp"] is not None and abs(g["fp"] - pts) < 0.06]
+            last = (same or p["games"] or [None])[-1]
+            status, when = "locked", last["date"] if last else None
+            locked = pts if pts is not None else (last or {}).get("fp") or 0.0
         locks[sid] = (status, when)
         out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
                               swing=swing, injury=p["injury"]))
