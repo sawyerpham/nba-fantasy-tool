@@ -612,6 +612,9 @@ button.tiny { font-size: 11.5px; padding: 1px 6px; }
 .tl-next-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--info-t); }
 .tl-next-in { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--primary); color: #fff; }
 .tl-next strong { font-size: 15px; white-space: nowrap; }
+.tl-toggle-val { display: grid; }
+.tl-toggle-val > span { grid-area: 1 / 1; }
+.tl-toggle-val > .off { visibility: hidden; }
 .tl-main { flex: 1; min-width: 0; }
 .tl-days { display: grid; grid-template-columns: repeat(7, 1fr); font-size: 14px; font-weight: 600; color: var(--text); text-align: center; }
 .tl-bar { position: relative; height: 22px; }
@@ -798,8 +801,8 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .mu-cell { display: flex; min-height: 0; } .mu-cell > .mu-card { flex: 1; }
 .mu-slot.first { border-top: 1px dashed var(--border); }
 .mu-card { padding: 2px; align-items: stretch; }
-.mu-top { gap: 10px; align-items: stretch; }
-.mu-id { width: min(215px, 11.5vw); gap: 6px; margin-left: 0; padding-left: 3px; }
+.mu-top { gap: 8px; align-items: stretch; }
+.mu-id { width: min(215px, 11.5vw); gap: 6px; margin-left: 0; padding-left: 5px; }
 .mu-id .headshot { width: clamp(34px, 2.6vw, 46px) !important; height: clamp(34px, 2.6vw, 46px) !important; }   /* !important: Headshot sets its size inline */
 .mu-name { font-size: clamp(13px, 0.85vw, 16px); }
 .mu-who .small { font-size: clamp(11px, 0.7vw, 13px); }
@@ -822,7 +825,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .verdict.off { opacity: 0.6; font-weight: 600; }
 .day-pick { align-items: center; }
 .mu-score { display: inline-flex; align-items: center; gap: 8px; }
-.matchup .mu-team { padding: 2px 10px 2px 5px; border-radius: 10px; background: var(--primary-soft); border: 1px solid var(--primary); box-shadow: 0 0 6px var(--primary), 0 0 14px color-mix(in srgb, var(--primary) 55%, transparent), inset 0 0 6px color-mix(in srgb, var(--primary) 35%, transparent); }   /* a neon-bordered pill from the manager's name across to the expected FP; 5px = the player cards' 2px padding + 3px, so the avatars line up with the headshots below */
+.matchup .mu-team { padding: 2px 10px 2px 7px; border-radius: 10px; background: var(--primary-soft); border: 1px solid var(--primary); box-shadow: 0 0 6px var(--primary), 0 0 14px color-mix(in srgb, var(--primary) 55%, transparent), inset 0 0 6px color-mix(in srgb, var(--primary) 35%, transparent); }   /* a neon-bordered pill from the manager's name across to the expected FP; 7px = the player cards' 2px padding + 5px, so the avatars line up with the headshots below */
 .matchup .mu-team.right { padding: 2px 5px 2px 10px; }
 .matchup .mu-team .team-avatar { width: clamp(34px, 2.6vw, 46px) !important; height: clamp(34px, 2.6vw, 46px) !important; }   /* same size as the headshots; !important: TeamName sets width/height attributes */
 .mu-team:not(.right) .mu-score { margin-left: auto; } .mu-team.right .mu-score { margin-right: auto; }

@@ -580,7 +580,7 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
             claimed.add(s.sid)
         lines.append({"kind": "swap", "sid": s.sid, "name": s.name, "slot": slot, "backup": b.name, "backup_sid": b.sid,
                       "by": tip, "alarm": _minus_minutes(tip, ALARM_LEAD_MIN), "text": text, **call, "decision": decision,
-                      "options": [{"name": o[0].name, "slot": o[1], **o[2]} for o in opts]})
+                      "options": [{"sid": o[0].sid, "name": o[0].name, "slot": o[1], **o[2]} for o in opts]})
     return lines
 
 
