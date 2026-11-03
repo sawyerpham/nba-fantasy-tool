@@ -312,8 +312,9 @@ def _by_tip(ps: list[PlanPlayer], game) -> list[PlanPlayer]:
     return sorted(ps, key=cmp_to_key(first))
 
 
-def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: str) -> TodayLineup:
-    """Plan today's lineup: pin locked and in-progress players, then seat everyone who plays today (LOCK players first, then by projection), then players by next tip, with moves from the current Sleeper lineup."""
+def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: str, now: str | None = None) -> TodayLineup:
+    """Plan today's lineup: pin locked and in-progress players, then seat everyone who plays today (LOCK players first, then by projection), then players by next tip, with moves from the current Sleeper lineup.
+    A SWAP call joins the lineup only from its check-in (`now` ≥ the backup's tip - CHECK_LEAD_MIN): until then the starter's game can still turn."""
     live_today = {id(p) for p in players if _today(p, today) and _today(p, today).live}
     pinned = [p for p in players if p.slot in slot_counts and (p.locked is not None or id(p) in live_today)]
     free = [p for p in players if p not in pinned and id(p) not in live_today and p.slot != "IR" and p.locked is None]
@@ -342,12 +343,14 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     seats = seat_players(order, slot_counts, pinned)
     today_seat = {id(p): p.seat for p in players}
     watch = today_watch(players, today, today_seat)
-    # A SWAP call (a starter's game in progress headed below a later bench player's): the lineup makes it, so the
-    # arrows and the timeline show it, not just the swap window. The backup is pinned into the starter's slot, he sits.
+    # A SWAP call (a starter's game in progress headed below a later bench player's): the lineup makes it at its
+    # check-in, so the arrows and the timeline show it then, not just the swap window. The backup is pinned into the
+    # starter's slot, he sits.
     by_sid = {p.sid: p for p in players}
     swaps = {}   # starter sid -> (backup, slot); one backup per starter
     for w in watch:
-        if w["kind"] == "swap" and w["decision"] == "SWAP" and w["sid"] not in swaps:
+        if (w["kind"] == "swap" and w["decision"] == "SWAP" and w["sid"] not in swaps and now
+                and _minutes(now) >= _minutes(w["by"]) - CHECK_LEAD_MIN):
             swaps[w["sid"]] = (by_sid[w["backup_sid"]], w["slot"])
     if swaps:
         sat = {id(by_sid[s]) for s in swaps}
@@ -378,6 +381,7 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
 GAME_SECONDS, QUARTER_SECONDS, PRIOR_MINUTES = 48 * 60, 12 * 60, 10.0
 CLOSE_TIPS_MIN = 15  # tips this close count as the same time (bigger projection starts; no swap check between them)
 CLOSE_PROJ = 1.0     # ...unless the projections are this close: then the earlier tip
+CHECK_LEAD_MIN = 15  # check-ins sit this long before the tip they're for: a SWAP call is made then, not before
 OUT = ("out_short_term", "out_long_term", "out_season")
 
 
@@ -459,7 +463,10 @@ def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
     nxt = play_chance(gb, b.injury, True)
     mu_b = max(0.0, gb.proj or 0.0)
     swap = nxt * expected_max(mu_b, mu_b * b.swing, bar) + (1 - nxt) * bar
-    est = live_estimate(gs)
+    # a game the timeline's check treats as over but that isn't final yet: judge it at its projected finish
+    est = live_estimate(replace(gs, live=True) if gs.started and not gs.final and gs.period else gs)
+    if est is None and gs.started and s.injury in OUT:   # ruled out, his game under way without him: he scores 0
+        est = 0.0
     # keep_if: the finish S must be headed for to beat swapping (below his later-games bar, any finish loses to it)
     keep_if = round(swap, 1)
     if est is None:                                            # not started: judge it at the alarm
@@ -513,7 +520,13 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
     # One alarm per later player: at his tip - ALARM_LEAD_MIN, swap him in (if that's worth it) for the starter whose
     # game is headed lowest (his projected finish: benching him gives up only tonight's game, his later ones stay
     # usable), or keep everyone. PENDING until at least one of those starters' games has begun.
-    for b, opts in candidates.values():
+    # A starter goes to one backup: earliest tip first (his alarm rings first), then the bigger swap; a later backup
+    # whose every starter is taken gets no line.
+    claimed = set()
+    for b, opts in sorted(candidates.values(), key=lambda c: (_minutes(_today(c[0], today).tip), -max(o[2]["swap"] for o in c[1]))):
+        opts = [o for o in opts if o[0].sid not in claimed]
+        if not opts:
+            continue
         tip = _today(b, today).tip
         live = [o for o in opts if o[2]["decision"] != "PENDING"]
         best = min((o for o in live if o[2]["decision"] == "SWAP"), key=lambda o: o[2]["est"], default=None) \
@@ -533,6 +546,8 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
             text = (f"{ALARM_LEAD_MIN} min before {b.name}'s tip the site reads the games of the starters he could replace "
                     f"and swaps him in for whoever is furthest below his keep line ({lines_}).")
             decision = "PENDING"
+        if decision != "KEEP":
+            claimed.add(s.sid)
         lines.append({"kind": "swap", "sid": s.sid, "name": s.name, "slot": slot, "backup": b.name, "backup_sid": b.sid,
                       "by": tip, "alarm": _minus_minutes(tip, ALARM_LEAD_MIN), "text": text, **call, "decision": decision,
                       "options": [{"name": o[0].name, "slot": o[1], **o[2]} for o in opts]})
