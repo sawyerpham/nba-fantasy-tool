@@ -48,7 +48,7 @@ function TeamName({ t, cls = "", size = 24, record = true, mine = false }) {
         <span className={cls}>{t.name}</span>
         {(rec || (t.user && t.user !== t.name)) && <span className="small muted team-sub">
           {t.user && t.user !== t.name && <span className="team-user">{t.user}</span>}
-          {rec && <span className="team-rec" data-testid="team-record">{t.wins}-{t.losses}{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
+          {rec && <span className="team-rec" data-testid="team-record"><strong className="good-text">{t.wins}</strong>-<strong className="warn-text">{t.losses}</strong>{t.last === "W" && <span className="good-text"> ▲</span>}{t.last === "L" && <span className="warn-text"> ▼</span>}</span>}
         </span>}
       </span>
     </span>
@@ -573,20 +573,21 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
       </>}
       {swaps.length > 0 && <>
         <h4>Swap windows</h4>
-        {/* every starter each later bench player could replace (w.options), the plan's pick (w.name) first */}
-        {swaps.flatMap((w) => (w.options?.length ? [...w.options].sort((a, b) => (b.name === w.name) - (a.name === w.name)) : [w]).map((o) => {
-          const pick = o.name === w.name, sid = o.sid ?? (pick ? w.sid : null);
+        {/* one card per window: the plan's pick (w.name); the other starters he could replace (w.options) on one line */}
+        {swaps.map((w) => {
+          const others = (w.options || []).filter((o) => o.name !== w.name);
           return (
-            <div key={`${w.backup_sid}-${o.name}`} className="guide-row">
+            <div key={w.backup_sid} className="guide-row">
               <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
               <div className="small">
-                <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className={sid ? "clickable" : undefined} onClick={() => sid && open(sid)}>{o.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
-                <div className="muted">{o.est != null ? `${lastName(o.name)} projected finish ~${fp(o.est)} · ${lastName(w.backup)} ~${fp(o.swap)}` : `${lastName(o.name)} not started · ${lastName(w.backup)} ~${fp(o.swap)}`}</div>
-                {pick && w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
+                <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
+                <div className="muted">{w.est != null ? `${lastName(w.name)} projected finish ~${fp(w.est)} · ${lastName(w.backup)} ~${fp(w.swap)}` : `${lastName(w.name)} not started · ${lastName(w.backup)} ~${fp(w.swap)}`}</div>
+                {w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
+                {others.length > 0 && <div className="muted">also: {others.map((o, i) => <span key={o.name}>{i > 0 && " · "}<span className={o.sid ? "clickable" : undefined} onClick={() => o.sid && open(o.sid)}>{lastName(o.name)}</span> ~{fp(o.swap)}</span>)}</div>}
               </div>
             </div>
           );
-        }))}
+        })}
       </>}
       {injuries.length > 0 && <>
         <h4>Injury watch</h4>
