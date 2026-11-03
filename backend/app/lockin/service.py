@@ -211,11 +211,12 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
 
     pairs: dict[int, list[dict]] = {}
     for m in matchups:
-        side = {k: m.get(k) for k in ("roster_id", "points", "starters", "starters_points", "players_points")}
+        side = {k: m.get(k) for k in ("roster_id", "points", "starters", "starters_points", "players_points", "players")}
         pairs.setdefault(m.get("matchup_id") or -m["roster_id"], []).append(side)
 
     by_sleeper = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
-    rostered = {sid for t in teams for sid in t["players"]} | set(extra)
+    # + everyone on a team's roster that week (a past week shows the lineup it had, players dropped since included)
+    rostered = {sid for t in teams for sid in t["players"]} | set(extra) | {sid for m in matchups for sid in m.get("players") or []}
     from ..core.services.sleeper_league import _add_sleeper_only
     for sid in rostered - by_sleeper.keys():   # rostered but not in the pool (retired / FA at pull time): name, positions, status
         rec = _add_sleeper_only(getattr(fetch, "platform", None), session, sid)
@@ -417,20 +418,23 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
     from .weekplan import Game, PlanPlayer, swing_of, wait_value
 
     positions = view["roster_positions"]
-    slot_of = {sid: positions[i] for i, sid in enumerate(team["starters"]) if i < len(positions) and sid and sid != "0"}
     side = next((m for pair in view["matchups"] for m in pair if m["roster_id"] == team["roster_id"]), {}) or {}
+    # a finished week: the roster and lineup it had (Sleeper's matchup), not today's
+    over = bool(view["dates"]) and view["today"] > view["dates"][-1] and bool(side.get("players"))
+    starters, roster_ids, reserve = (side["starters"] or [], side["players"], []) if over else (team["starters"], team["players"], team["reserve"])
+    slot_of = {sid: positions[i] for i, sid in enumerate(starters) if i < len(positions) and sid and sid != "0"}
     counted = side.get("players_points") or {}
     now = datetime.fromisoformat(view["now"]) if view.get("now") else None
     def tipped(g: dict) -> bool:   # the clock says he has tipped off (ESPN's state can lag a minute or two)
         """Whether the clock says the game has tipped (ESPN's state can lag a minute or two)."""
         return bool(now and g["tip"] and datetime.fromisoformat(g["tip"].replace("Z", "+00:00")) <= now)
     out, locks = [], {}
-    for sid in team["players"]:
+    for sid in roster_ids:
         p = view["players"].get(sid)
         if p is None:
             continue
         val = session.valuations.get(p["player_id"]) if p["player_id"] else None
-        slot = "IR" if sid in team["reserve"] else slot_of.get(sid, "BN")
+        slot = "IR" if sid in reserve else slot_of.get(sid, "BN")
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
                       live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
                       proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False))
@@ -443,8 +447,12 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
             then = next(g for g in p["games"] if g["date"] == when)
             final = then["state"] == "post"
             status = "guess" if final and then["fp"] >= wait_value([g for g in games if not g.started], swing, p["injury"]) else "maybe"
-        locks[sid] = (status, when)
         locked = next((g["fp"] for g in p["games"] if g["date"] == when), None) if status in ("locked", "guess") else None
+        if over and slot not in ("BN", "IR") and manual.get(sid) is None and status != "locked":
+            # the week is over and nothing was locked: Sleeper counted his last game (a DNP counts 0), auto-locked
+            last = next((g for g in reversed(p["games"])), None)
+            status, when, locked = "locked", last["date"] if last else None, (last or {}).get("fp") or 0.0
+        locks[sid] = (status, when)
         out.append(PlanPlayer(sid=sid, name=p["name"], eligibility=p["pos"], games=games, slot=slot, locked=locked,
                               swing=swing, injury=p["injury"]))
     return out, locks, side

@@ -32,6 +32,10 @@ from dataclasses import dataclass, field, replace
 from ..core.engine import roster
 
 DEFAULT_SWING, MIN_SWING, MAX_SWING, MIN_GAMES_FOR_SWING = 0.3, 0.12, 0.6, 15
+# Last season's spread overstates one game's: it mixes in role changes, blowouts and injury-shortened nights, which a
+# game's own projection already knows about. Expected FP ran ~140 against real weeks of 105-122 at full swing.
+# ponytail: one flat factor, tune it from the week-start vs final backtest (PROPOSALS.md) once a few weeks are in.
+SWING_SCALE = 0.5
 # Chance he plays a game, by Sleeper injury status: next game / later games this week.
 # ponytail: flat guesses; tune from what actually happens once the season runs.
 PLAY_CHANCE = {"healthy": (0.97, 0.97), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
@@ -106,8 +110,8 @@ def swing_of(per_game_fpts: list[float]) -> float:
     games = [f for f in per_game_fpts if f is not None]
     m = sum(games) / len(games) if games else 0.0   # float math: statistics.mean/pstdev run exact fractions, ~400 calls a page
     if len(games) < MIN_GAMES_FOR_SWING or m <= 0:
-        return DEFAULT_SWING
-    return min(MAX_SWING, max(MIN_SWING, math.sqrt(sum((f - m) ** 2 for f in games) / len(games)) / m))
+        return DEFAULT_SWING * SWING_SCALE
+    return SWING_SCALE * min(MAX_SWING, max(MIN_SWING, math.sqrt(sum((f - m) ** 2 for f in games) / len(games)) / m))
 
 
 def _phi(z: float) -> float:
@@ -586,7 +590,8 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
 # Φ((my total − their total) / √(my spread² + their spread²)). Example: everyone else locked, you need 13 more:
 # locking 15 wins unless they beat their estimate by 2; waiting on a 20-proj game wins unless it lands under 13,
 # and the site shows both chances side by side.
-SPREAD = 0.8   # ponytail: a slot's spread ≈ one game's swing, shrunk a bit for the option of locking the best game
+# ponytail: a slot's spread ≈ one game's swing at full scale (0.8 / SWING_SCALE), shrunk a bit for the option of locking the best game
+SPREAD = 0.8 / SWING_SCALE
 
 
 def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
