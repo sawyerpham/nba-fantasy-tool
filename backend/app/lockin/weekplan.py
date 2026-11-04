@@ -507,7 +507,7 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
     lines, candidates = [], {}
     starters = [p for p in players if seat.get(id(p)) and p.locked is None and _today(p, today)]
     bench = [p for p in players if not seat.get(id(p)) and p.slot != "IR" and p.locked is None
-             and _today(p, today) and not _today(p, today).started]
+             and _today(p, today) and not _today(p, today).started and p.injury not in OUT]
     for p in players:   # in the lineup now, plays today, ruled OUT before tip: start someone else right away
         g = _today(p, today)
         if p.slot not in ("BN", "IR") and g and (not g.started or sits_out(p, g)) and p.injury in OUT:
