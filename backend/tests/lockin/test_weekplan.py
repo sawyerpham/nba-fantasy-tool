@@ -363,6 +363,20 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12
 
 
+def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_day():
+    """Sharpe at 6:30 then Kessler at 9:00 the same night: the slot can watch Sharpe's game and still go to Kessler's,
+    so leaving it open is worth more than Kessler's game alone (and close tips are one look)."""
+    from app.lockin.weekplan import open_slot
+
+    kes = pp("kessler", ["C"], "C", [Game("2026-11-04", 11.0, tip="2026-11-05T03:00Z")], seat="C")
+    sharpe = pp("sharpe", ["C"], "BN", [Game("2026-11-04", 7.0, tip="2026-11-05T00:30Z")])
+    alone, _ = open_slot(kes, [kes])
+    w, src = open_slot(kes, [kes, sharpe])
+    assert src == [("2026-11-04", "sharpe"), ("2026-11-04", "kessler")] and w > alone
+    sharpe.games[0].tip = "2026-11-05T02:50Z"                      # 10 min before his: no time to judge, one look
+    assert open_slot(kes, [kes, sharpe])[1] == [("2026-11-04", "kessler")]
+
+
 def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
     """A back to backs second night is worth less to wait on."""
     # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
