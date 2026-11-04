@@ -8,13 +8,18 @@ import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import NeonArrow from "../core/NeonArrow.jsx";
-import InjuryTag, { isDoubt, isOut } from "../core/InjuryTag.jsx";
+import InjuryTag, { injuryTip, isDoubt, isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { alarmSound } from "../core/sounds.js";
 import { reseat, swapSteps } from "./swaps.js";
 
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 
+/** Minutes from now as a countdown: "2d 5h", "19h 42m" or "7m". */
+const untilText = (mins) => {
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+};
 /** Short weekday name ("Mon") for a YYYY-MM-DD date. */
 const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 /** "2026-10-20" -> "10/20". */
@@ -114,7 +119,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
   const [alerts, setAlerts] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [focusRid, setFocusRid] = useState(null);   // the matchup on the Week tab: Week stats follows it
+  const [focusRid, setFocusRid] = useState(null);   // the matchup on the Week tab: Week Stats follows it
   const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
   const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
   /** Turn the alarms on or off and remember the choice. Turning them on plays a sound (which unlocks audio later) and asks for notification permission. */
@@ -193,14 +198,11 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          {view === "news" || view === "waivers" ? <span className="muted small season-league">{data.league_name}</span> : <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
+          {view === "news" || view === "waivers" ? null : <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
             <span className="season-wk">
             <button className="mu-arrow neon-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} aria-label="Previous week"><NeonArrow dir="left" /></button>
             <strong className={`season-week ${week ? "clickable" : ""}`} {...(week && { role: "button", tabIndex: 0, onClick: () => setWeek(null), onKeyDown: (e) => e.key === "Enter" && setWeek(null) })}>WEEK {data.week}</strong>
             <button className="mu-arrow neon-arrow" disabled={data.week >= Math.max(...data.weeks)} onClick={() => setWeek(data.week + 1)} aria-label="Next week"><NeonArrow dir="right" /></button>
-            </span>
-            <span className="season-weeknav-after">
-              <span className="muted small">{data.league_name}</span>
             </span>
           </span>}
           {error &&<span className="small warn-text">{error}</span>}
@@ -475,20 +477,27 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
         <option key={t.roster_id} value={t.roster_id}>{t.user || t.name}{t.is_user ? " (you)" : ""}</option>))}
     </select>
   );
-  const head = <div className="guide-head"><h3>Week stats</h3>{picker}</div>;
+  const head = <div className="guide-head"><h3>Week Stats</h3>{picker}</div>;
   if (!p) return <div className="panel scroll guide" data-testid="lockin-guide">{head}<div className="muted small">Loading…</div></div>;
 
   /** A timestamp as "Mon 7:30 PM". */
   const when = (t) => fmt(t, { weekday: "short", hour: "numeric", minute: "2-digit" });
-  /** The tip time of a player's next game that hasn't started or scored. */
-  const nextTip = (sid) => (data.players[sid]?.games || []).find((g) => g.state === "pre" && g.fp == null)?.tip;
   const watch = p.today?.watch || [];
+  const nowMs = data.now ? Date.parse(data.now) : Date.now();
+  /** A swap chip's name: up to 10 characters ("Washington"); longer ones keep 8 and end in "..". */
+  const clip = (n) => (n.length > 10 ? `${n.slice(0, 8)}..` : n);
   const o = p.opponent, out = p.outlook;
   /** A row's win-probability edge from locking: win % locked minus win % left open. */
   const edge = (r) => (r.win_lock ?? 0) - (r.win_wait ?? 0);
-  const lockable = p.players.filter((r) => r.seat && r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess")
+  // a lock that costs more than 5 points of win chance isn't worth a card
+  const lockable = p.players.filter((r) => r.seat && r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess"
+    && edge(r) >= -0.05)
     .sort((a, b) => edge(b) - edge(a));
   const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
+  // the Sleeper swaps to make right now: the same steps as the lineup grid's numbered arrows (bestLineup at the clock)
+  const games = Object.fromEntries(Object.entries(data.players).map(([sid, pl]) => [sid, pl.games]));
+  const nameOf = Object.fromEntries(p.players.map((r) => [r.sid, r.name]));
+  const nowSwaps = bestLineup(p, nowMs, data.roster_positions, false, games).pairs;
   const remaining = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 4);
   const banked = (o?.players || []).filter((r) => r.locked != null).sort((a, b) => b.locked - a.locked);
   const odds = out ? [["Lock all now", out.safe], ["Leave all open", out.risky], ["Plan mix", p.win_chance]] : [];
@@ -503,10 +512,11 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
         <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked">✕</button>
       </>}</span>
   );
-  /** One team's side of the Matchup card: name, projected final, banked points and games left. */
-  const side = (t) => (
-    <div className="hub-side">
-      <div className="hub-team"><TeamName t={t} cls="hub-name" size={26} /></div>
+  /** One team's side of the Matchup card: name, projected final, banked points and games left. `mirror`: the right-hand
+   * side, its avatar and name on the outer (right) edge. */
+  const side = (t, mirror) => (
+    <div className={`hub-side ${mirror ? "mirror" : ""}`}>
+      <div className="hub-team"><TeamName t={t} cls="hub-name" size={31} /></div>
       <div className="hub-stat"><span>Projected</span><strong>{fp(t.expected)}</strong></div>
       <div className="hub-stat"><span>Banked</span><strong>{fp(t.points)}</strong></div>
       <div className="hub-stat"><span>Games left</span><strong>{t.games_left}</strong></div>
@@ -519,7 +529,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
         <section className="guide-card">
           <div className="bid-label">Win probability</div>
           <div className="hub-win"><strong>{pct(p.win_chance)}</strong><strong>{pct(1 - (p.win_chance ?? 0))}</strong></div>
-          <div className="hub-sides">{side(p)}{side(o)}</div>
+          <div className="hub-sides">{side(p)}{side(o, true)}</div>
         </section>
       )}
       {out && (
@@ -536,67 +546,76 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
           {banked.length > 0 && <div className="guide-chips"><span className="bid-label">{o.user || o.name}: banked</span>{banked.map((r) => chip(r, fp(r.locked), r.lock_status === "guess"))}</div>}
         </section>
       )}
-      {lockable.length > 0 && <>
-        <h4>Lockable games</h4>
-        {lockable.map((r) => {
-          const e = edge(r), tip = nextTip(r.sid), nba = data.players[r.sid]?.team;
-          // the open slot: the best game it can still take each day, his or a spare bench player's (backend open_slot)
-          const from = (r.slot_from || []).map(([d, who]) => `${dayName(d)}${who === r.name ? "" : ` ${lastName(who)}`}`);
-          return (
-            <div key={r.sid} className={`guide-lock ${Math.abs(e) < 0.015 ? "even" : e > 0 ? "lock" : "pass"}`}>
-              <Headshot sleeperId={r.sid} name={r.name} size={38} />
-              <div className="guide-lock-main">
-                <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span>
-                  {nba && <span className="small muted"> · <TeamLink abbr={nba}><img src={teamLogo(nba)} alt="" width={16} height={16} style={{ verticalAlign: "-3px" }} /> {nba}</TeamLink></span>}</div>
-                <div className="small muted">Open slot ~{fp(r.slot_w ?? r.w)}{from.length ? ` · ${from.join(", ")}` : " · no games left"}</div>
-                {r.win_lock != null && (() => {
-                  const here = r.lock_at?.find((o) => o.slot === r.slot && o !== r.lock_at[0] && o.win != null);
-                  return <div className="small muted">Win % locked <span className="guide-hi">{pct(r.win_lock)}</span>{here ? ` at ${r.lock_at[0].slot}` : ""}
-                    {here && <> · <span className="warn-text">{pct(here.win)} at {here.slot}</span> where he sits</>}
-                    {" "}· open <span className="guide-hi">{pct(r.win_wait)}</span></div>;
-                })()}
-                {r.lock_at?.length > 0 && (() => {
-                  const [best, ...rest] = r.lock_at;
-                  const diff = rest.filter((o) => best.team - o.team >= 0.05);
-                  const detail = r.lock_at.map((o) => `${o.slot}: ${o.open} slot${o.open === 1 ? "" : "s"} left, ${o.others} others can play it`).join(" · ");
-                  return <div className="small muted" data-tip={detail}>Lock slot <span className="guide-hi">{best.slot}</span>
-                    {r.slot !== best.slot ? ` (now ${r.slot})` : ""}
-                    {diff.length ? ` · ${diff.map((o) => `${o.slot} −${fp(best.team - o.team)}`).join(", ")}` : rest.length ? ` · ${rest.map((o) => o.slot).join(", ")} the same` : " · only option"}</div>;
-                })()}
-                {tip && <div className="small muted">Next tip {when(tip)}</div>}
+      {lockable.length > 0 && (
+        <section className="guide-card">
+          <div className="bid-label">Lockable games</div>
+          {lockable.map((r) => {
+            const e = edge(r), nba = data.players[r.sid]?.team;
+            const [best, ...rest] = r.lock_at || [];
+            const diff = rest.filter((o) => best.team - o.team >= 0.05);
+            const here = r.lock_at?.find((o) => o.slot === r.slot && o !== best && o.win != null);
+            const detail = (r.lock_at || []).map((o) => `${o.slot}: ${o.open} slot${o.open === 1 ? "" : "s"} left, ${o.others} others can play it`).join(" · ");
+            return (
+              <div key={r.sid} className="guide-item">
+                <Headshot sleeperId={r.sid} name={r.name} size={34} />
+                <div className="guide-lock-main">
+                  <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
+                  {/* the open slot: what it can still get from his and spare bench players' games (backend open_slot) */}
+                  <div className="small muted guide-lock-top">{nba && <><TeamLink abbr={nba}><img src={teamLogo(nba)} alt="" width={14} height={14} style={{ verticalAlign: "-2px" }} /> {nba}</TeamLink> · </>}
+                    Open slot <span className="guide-hi">~{fp(r.slot_w ?? r.w)}</span></div>
+                  <div className="small muted">
+                    {best && <span data-tip={detail}>Lock <span className="guide-hi">{best.slot}</span>{r.slot !== best.slot ? ` (now ${r.slot})` : ""}
+                      {diff.length > 0 && ` (${diff.map((o) => `${o.slot} −${fp(best.team - o.team)}`).join(", ")})`}</span>}
+                    {r.win_lock != null && <> · win <span className="guide-hi">{pct(r.win_lock)}</span> vs <span className="guide-hi">{pct(r.win_wait)}</span> open
+                      {here && <> · <span className="warn-text">{pct(here.win)} at {here.slot}</span></>}</>}
+                  </div>
+                </div>
+                <div className="guide-lock-side"><span className="guide-lock-x">{fp(r.x)}</span>
+                  {r.win_lock != null && <span className={`hub-edge ${Math.abs(e) < 0.015 ? "even" : e > 0 ? "up" : "down"}`} data-tip="Win probability added (WPA): win % locked minus win % open">{signed(e)}</span>}</div>
               </div>
-              <div className="guide-lock-side"><span className="guide-lock-x">{fp(r.x)}</span>
-                {r.win_lock != null && <span className={`hub-edge ${e >= 0 ? "up" : "down"}`} data-tip="Win probability added (WPA): win % locked minus win % open">{signed(e)}</span>}</div>
-            </div>
-          );
-        })}
-      </>}
-      {swaps.length > 0 && <>
-        <h4>Swap windows</h4>
-        {/* one card per window: the plan's pick (w.name); the other starters he could replace (w.options) on one line */}
-        {swaps.map((w) => {
-          const others = (w.options || []).filter((o) => o.name !== w.name);
-          return (
-            <div key={w.backup_sid} className="guide-row">
-              <Headshot sleeperId={w.backup_sid} name={w.backup} size={30} />
-              <div className="small">
-                <div><strong className="clickable" onClick={() => open(w.backup_sid)}>{w.backup}</strong> <span className="muted">for</span> <strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· window {when(w.alarm)}</span></div>
-                <div className="muted">{w.est != null ? `${lastName(w.name)} projected finish ~${fp(w.est)} · ${lastName(w.backup)} ~${fp(w.swap)}` : `${lastName(w.name)} not started · ${lastName(w.backup)} ~${fp(w.swap)}`}</div>
-                {w.win_keep != null && <div className="muted">Win % keep <span className="guide-hi">{pct(w.win_keep)}</span> · swap <span className="guide-hi">{pct(w.win_swap)}</span></div>}
-                {others.length > 0 && <div className="muted">also: {others.map((o, i) => <span key={o.name}>{i > 0 && " · "}<span className={o.sid ? "clickable" : undefined} onClick={() => o.sid && open(o.sid)}>{lastName(o.name)}</span> ~{fp(o.swap)}</span>)}</div>}
+            );
+          })}
+        </section>
+      )}
+      {(nowSwaps.length > 0 || swaps.length > 0) && (
+        <section className="guide-card">
+          <div className="bid-label">Swaps</div>
+          {/* one line per swap: "Now swap [a] & [b]" for the moves due now (in arrow order), then
+              "Wed 6:55p (19h 42m) swap [backup] & [starter]" per window (the plan's pick, w.name); a line between times */}
+          <div className="guide-swaps">
+            {[...nowSwaps.map((s) => ({ key: `now-${s.n}`, group: "now", a: s.in, b: s.out })),
+              ...swaps.map((w) => ({ key: w.backup_sid, group: w.alarm, a: w.backup_sid, b: w.sid }))].map((r, i, rows) => (
+              <div key={r.key} className="guide-swap">
+                {i > 0 && r.group !== rows[i - 1].group && <span className="guide-swap-sep" />}
+                <span className="small">{r.group === "now" ? <strong className="warn-text">Now</strong> : <>
+                  <strong>{when(r.group).replace(/ ([AP])M$/, (_, x) => x.toLowerCase())}</strong>
+                  {Date.parse(r.group) > nowMs && <span className="muted"> ({untilText(Math.ceil((Date.parse(r.group) - nowMs) / 60000))})</span>}</>}</span>
+                <span className="small muted">swap</span>
+                {[r.a, null, r.b].map((sid, k) => sid == null ? <span key={k} className="small muted">&amp;</span> : (
+                  <span key={k} className="guide-chip clickable" onClick={() => open(sid)} data-tip={nameOf[sid]}>
+                    <Headshot sleeperId={sid} name={nameOf[sid] || ""} size={20} /><strong>{clip(lastName(nameOf[sid] || sid))}</strong></span>))}
               </div>
-            </div>
-          );
-        })}
-      </>}
-      {injuries.length > 0 && <>
-        <h4>Injury watch</h4>
-        {injuries.map((w) => (
-          <div key={`${w.kind}-${w.sid}`} className="guide-row"><Headshot sleeperId={w.sid} name={w.name} size={30} />
-            <div className="small"><strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <span className="muted">· {w.kind === "out" ? "out" : "questionable"}{w.slot ? ` · ${w.slot}` : ""}{w.by ? ` · tips ${when(w.by)}` : ""}</span>
-              {w.backup && <div className="muted">Bench option: {w.backup}</div>}</div></div>
-        ))}
-      </>}
+            ))}
+          </div>
+        </section>
+      )}
+      {injuries.length > 0 && (
+        <section className="guide-card">
+          <div className="bid-label">Injuries</div>
+          {/* one line each: headshot, name, his positions, · his Sleeper injury tag and reason */}
+          {injuries.map((w) => {
+            const pl = data.players[w.sid] || {};
+            // the note is "Out: Knee - Sprain" (backend week_view): the reason is what follows the tag
+            const note = pl.injury_note || "";
+            const reason = note === pl.injury_tag ? "" : note.replace(`${pl.injury_tag}: `, "");
+            return (
+              <div key={`${w.kind}-${w.sid}`} className="guide-item small"><Headshot sleeperId={w.sid} name={w.name} size={30} />
+                <span><strong className="clickable" onClick={() => open(w.sid)}>{w.name}</strong> <PosList list={pl.pos || []} />
+                  {pl.injury_tag && <> <span className="muted">·</span> <InjuryTag tag={pl.injury_tag} note={pl.injury_note} />{reason && <span className="muted"> {reason}</span>}</>}</span></div>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }
@@ -763,7 +782,7 @@ const PlayerCard = React.memo(function PlayerCard({ data, r, open, openGame, set
     <div className={`mu-card ${side} ${starter ? "" : "bench"} ${locked ? "done" : ""} ${isOut(p.injury_tag) ? "out" : isDoubt(p.injury_tag) ? "doubt" : ""}`} data-testid={`mu-${r.sid}`}>
       <div className="mu-top">
         <div className="mu-id clickable" onClick={() => open(r.sid)} data-testid={`open-${r.sid}`}>
-        <Headshot sleeperId={r.sid} name={r.name} size={34} />
+        <span data-tip={injuryTip(p.injury_tag, p.injury_note)}><Headshot sleeperId={r.sid} name={r.name} size={34} /></span>
         <div className="mu-who">
           <div className="mu-name" data-clip={r.name}>{r.name}<InjuryTag tag={p.injury_tag} note={p.injury_note} /></div>
           <div className="small muted mu-sub" data-clip={p.nick && showNicks() ? `“${p.nick}”` : undefined}>{p.team || (p.retired ? "Retired" : "FA")} <PosList list={r.pos} />
@@ -1026,9 +1045,7 @@ function Timeline({ tl, nowMs, atMs, setAt, view, setView, differs }) {
   const at = (ms) => `calc(${frac(ms)} * (100% - 16px) + 8px)`;
   const days = Array.from({ length: 7 }, (_, i) => start + i * 86400000 + 12 * 3600000);
   const next = tl.segments.slice(0, -1).map((s) => Date.parse(s.to)).find((ms) => ms > nowMs);
-  const mins = next ? Math.ceil((next - nowMs) / 60000) : 0;
-  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
-  const until = d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+  const until = untilText(next ? Math.ceil((next - nowMs) / 60000) : 0);
   return (
     <div className="timeline" data-testid="timeline">
       <button className="tl-next" onClick={() => setView(view === "best" ? "sleeper" : "best")} disabled={!differs} data-testid="lineup-toggle"
@@ -1259,8 +1276,7 @@ function WaiversView({ leagueId, onSelect }) {
     <th className={`${cls} clickable`} data-tip={tip} onClick={() => setSort(sort?.k !== k ? { k, dir: 1 } : sort.dir === 1 ? { k, dir: -1 } : null)} data-testid={`sort-${k}`}>
       {label}{sort?.k === k && (sort.dir === 1 ? " ▲" : " ▼")}</th>);
   const top = Math.max(...w.claims.map((c) => c.upgrade), 0.01);
-  const mins = Math.max(0, Math.round((Date.parse(w.next_run) - Date.now()) / 60000));
-  const until = mins >= 1440 ? `${Math.floor(mins / 1440)}d ${Math.floor((mins % 1440) / 60)}h` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  const until = untilText(Math.max(0, Math.round((Date.parse(w.next_run) - Date.now()) / 60000)));
   const runDay = fmt(w.next_run, { weekday: "short" });
   const hour = `${w.run_hour % 12 || 12} ${w.run_hour < 12 ? "AM" : "PM"}`;
   return (

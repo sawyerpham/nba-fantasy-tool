@@ -424,8 +424,8 @@ th.sorted { color: var(--primary); }
 .live-lot-limits .lim { display: inline-flex; align-items: baseline; gap: 6px; font-size: 16px; }
 .live-lot-tips div { margin-top: 2px; }
 .live-lot-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
-.live-card { padding: 8px 12px; border-radius: 10px; background: var(--panel-2); font-size: 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.live-card { border-top: 3px solid var(--card-c); }
+.live-card { padding: 8px 12px; border-radius: 12px; background: var(--panel-2); font-size: 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--border); border-top: 3px solid var(--card-c); }
 .live-card-title { font-size: 13.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.07em; color: var(--card-c); margin-bottom: 3px; }
 .live-card-title .term { color: inherit; }
 .live-card.win { --card-c: #34d399; } .live-card.pass { --card-c: #60a5fa; } .live-card.bids { --card-c: #fb923c; }
@@ -743,13 +743,7 @@ header.top { flex-wrap: wrap; row-gap: 10px; }   /* too narrow for the season ba
 .notif-pop .panel { margin: 0; box-shadow: var(--shadow); background: var(--panel-solid); }
 .season-weeknav { position: relative; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .header-slot .season-weeknav[style] { position: absolute; transform: translateX(-50%); }
-.season-weeknav-after { display: flex; align-items: center; gap: 10px; }
-.season-weeknav[style] .season-weeknav-after { position: absolute; left: 100%; margin-left: 12px; }
-/* News / Waivers: the league name on the header's centre line; too narrow to clear the tabs and the search box (the 1600px NARROW cutoff), it sits inline after the tabs */
-.season-league { white-space: nowrap; }
-.header-slot .season-bar .season-weeknav-after .muted, .season-league { background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; }
 .season-week { padding: 5px 14px; color: var(--info-t); text-shadow: 0 0 10px color-mix(in srgb, var(--primary) 70%, transparent), 0 0 22px color-mix(in srgb, var(--primary) 35%, transparent); }
-.header-slot .season-bar .season-weeknav-after .muted, .season-league { padding: 5px 12px; color: var(--info-t); letter-spacing: 0.04em; text-shadow: 0 0 8px color-mix(in srgb, var(--primary) 45%, transparent); }
 .season-week.clickable { cursor: pointer; } .season-week.clickable:hover, .season-week.clickable:focus-visible { text-decoration: underline; outline: none; }
 button.neon-arrow { display: grid; place-items: center; font-size: 15px; line-height: 1; padding: 5px 9px; background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; box-shadow: none; color: var(--info-t);
   transition: border-color .15s, color .15s; }
@@ -759,7 +753,6 @@ button.neon-arrow:hover:not(:disabled), button.neon-arrow:focus-visible { color:
 .neon-arrow:hover:not(:disabled) svg, .neon-arrow:focus-visible svg { filter: drop-shadow(0 0 5px var(--primary)) drop-shadow(0 0 12px color-mix(in srgb, var(--primary) 75%, transparent)); }
 button.neon-arrow:disabled { opacity: 0.3; } .neon-arrow:disabled svg { filter: none; }
 @media (prefers-reduced-motion: reduce) { button.neon-arrow, .neon-arrow svg { transition: none; } }
-@media (min-width: 1600px) { .header-slot .season-league { position: absolute; left: 50%; transform: translateX(-50%); } }
 header.top .meta { white-space: nowrap; flex-shrink: 0; }
 /* settings cogwheel: grayscale glyph at the far right, after the bell; margin-left:auto keeps it right when the slot is empty */
 header.top .cog { margin-left: auto; flex-shrink: 0; background: transparent; border: 0; box-shadow: none; color: var(--muted); font-size: 22px; line-height: 1; padding: 4px 6px; }
@@ -815,7 +808,7 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .gch-day { font-size: min(14px, 16.5cqw); } .gch-fp { font-size: min(18px, 21cqw); } .gch-fp .gch-exp { font-size: min(11.5px, 13.5cqw); margin-left: 3px; }
 .chips-lane > .chips-row { display: flex; flex-wrap: nowrap; width: 100%; min-width: 0; }
 .chips-lane > .chips-row > .game-chip { flex: 0 1 100px; min-width: 0; }
-.mu-slot .pos-tag, .mu-slot span { font-size: 15px; font-weight: 800; }
+.mu-slot .pos-tag, .mu-slot span { font-size: 18px; font-weight: 800; }
 .day-pick { display: inline-flex; gap: 3px; margin-left: 8px; }
 .day-pick button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .day-pick button.is-today { font-weight: 800; }
@@ -956,9 +949,14 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .sp-game.clickable { cursor: pointer; } .sp-game.clickable:hover { border-color: var(--primary); }
 .chip-btn { border: none; background: none; padding: 0 2px; font-size: 12px; line-height: 1; color: var(--muted); cursor: pointer; box-shadow: none; }
 .chip-btn:hover { color: var(--text); }
-.guide-lock { display: flex; align-items: center; gap: 10px; padding: 9px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--panel-2);
-  border-left: 3px solid var(--border); }
-.guide-lock.lock { border-left-color: var(--ok); } .guide-lock.even { border-left-color: var(--even-t); } .guide-lock.pass { border-left-color: var(--danger); }
+/* a row in a guide card (Lockable games): headshot, details, number on the right; thin dividers between rows */
+.guide-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+.guide-item + .guide-item { border-top: 1px solid var(--border); }
+.guide-item:last-child { padding-bottom: 2px; }
+/* Swap windows: one grid so the times and the player chips line up down the card */
+.guide-swaps { display: grid; grid-template-columns: repeat(5, max-content); align-items: center; gap: 8px 7px; }
+.guide-swap { display: contents; }
+.guide-swap-sep { grid-column: 1 / -1; border-top: 1px solid var(--border); }   /* between two times */
 .guide-lock-main { flex: 1; min-width: 0; line-height: 1.4; }
 .guide-lock-top { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .guide-lock-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
@@ -971,12 +969,17 @@ main:has(.season-grid) { padding: 12px 16px; flex: 1; min-height: 0; width: 100%
 .hub-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .hub-team { margin-bottom: 6px; min-width: 0; }
 .hub-team .team-name-tag { max-width: 100%; }
-.hub-name { font-weight: 800; font-size: 14px; }
-.hub-team .team-sub { font-size: 11px; flex-wrap: wrap; column-gap: 6px; }
+.hub-name { font-weight: 800; font-size: 17px; }
+.hub-team .team-sub { font-size: 13px; flex-wrap: wrap; column-gap: 6px; }
 .hub-stat { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); padding: 2px 0; }
 .hub-stat strong { color: var(--text); }
-.hub-edge { font-size: 12px; font-weight: 800; } .hub-edge.up { color: var(--ok); } .hub-edge.down { color: var(--even-t); }
-.guide-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--panel-2); line-height: 1.4; }
+/* the opponent's side mirrors yours in its name: avatar and name on the right edge (the stat rows read as yours) */
+.hub-side.mirror .team-name-tag, .hub-side.mirror .team-sub { flex-direction: row-reverse; }
+.hub-side.mirror .hub-team { display: flex; justify-content: flex-end; }
+.hub-side.mirror .team-name-lines { text-align: right; }
+.hub-edge { font-size: 12px; font-weight: 800; } .hub-edge.up { color: var(--ok); } .hub-edge.down { color: var(--danger); } .hub-edge.even { color: var(--even-t); }
+/* every tinted content box gets the guide card's look: a hairline border and 12px corners (small controls keep theirs) */
+:is(.block-bar, .bid-cell, .nom-ideas, .sync-result, .live-big, .timeline, .lm-card, .mu-card) { border: 1px solid var(--border); border-radius: 12px; }
 .mu-card.done .mu-who { opacity: 0.5; }
 .nick { font-style: italic; }
 .swap-n { font-size: 14px; font-weight: 800; fill: currentColor; text-anchor: middle; dominant-baseline: central; }
