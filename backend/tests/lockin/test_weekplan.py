@@ -154,6 +154,21 @@ def test_six_pm_player_starts_over_a_645_one_and_the_live_game_decides_the_swap(
         assert w["decision"] == want, (fp_now, w)
 
 
+def test_a_live_starter_headed_past_the_backups_projection_keeps_his_slot():
+    """Okongwu live, headed for a bit more than Sharpe's pre-game 12: the swap is off, even where the option math
+    (Sharpe's game plus the chance to pass on it for Okongwu's later games) would still say swap."""
+    from app.lockin.weekplan import swap_call
+
+    today = "2026-10-21"
+    ok = pp("okongwu", ["C"], "C", [Game(today, 11, fp=6.4, started=True, live=True, tip="2026-10-21T23:00Z",
+                                         min=16, proj_min=32, period=2, clock=0)] + future(11, 11))
+    sharpe = pp("sharpe", ["C"], "BN", [Game(today, 12, tip="2026-10-21T23:30Z", proj_min=30)])
+    call = swap_call(ok, sharpe, today)
+    assert 12 < call["est"] < call["swap"] and call["decision"] == "KEEP", call
+    ok.games[0].fp = 1.0                                                   # ice cold: headed well below 12
+    assert swap_call(ok, sharpe, today)["decision"] == "SWAP"
+
+
 def test_the_starter_headed_lowest_tonight_sits_for_the_later_player_not_the_one_with_weaker_later_games():
     """The starter headed lowest tonight sits for the later player not the one with weaker later games."""
     from app.lockin.weekplan import plan_today

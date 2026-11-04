@@ -493,7 +493,8 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
   const lockable = p.players.filter((r) => r.seat && r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess"
     && edge(r) >= -0.05)
     .sort((a, b) => edge(b) - edge(a));
-  const swaps = watch.filter((w) => w.kind === "swap"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
+  // a KEEP call (his game under way, headed past the backup's) is no swap: it drops off the list
+  const swaps = watch.filter((w) => w.kind === "swap" && w.decision !== "KEEP"), injuries = watch.filter((w) => w.kind === "gtd" || w.kind === "out");
   // the Sleeper swaps to make right now: the same steps as the lineup grid's numbered arrows (bestLineup at the clock)
   const games = Object.fromEntries(Object.entries(data.players).map(([sid, pl]) => [sid, pl.games]));
   const nameOf = Object.fromEntries(p.players.map((r) => [r.sid, r.name]));
