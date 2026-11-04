@@ -490,7 +490,8 @@ def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
         return {"decision": "PENDING", "est": None, "keep": None, "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if,
                 "gain": round(gain, 2)}
     keep = max(est, bar)
-    return {"decision": "SWAP" if swap > keep else "KEEP", "est": round(est, 1), "keep": round(keep, 1),
+    # his game is under way: headed past the backup's own projection, the swap is off (whatever the option math says)
+    return {"decision": "SWAP" if swap > keep and est <= mu_b else "KEEP", "est": round(est, 1), "keep": round(keep, 1),
             "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if, "gain": round(gain, 2)}
 
 
