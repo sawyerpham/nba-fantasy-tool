@@ -8,10 +8,16 @@ const INJ_TAG = {
 export const isOut = (tag) => INJ_TAG[tag]?.[1] === "out";
 /** True for the unsure Sleeper injury tags: DTD, GTD, Questionable. */
 export const isDoubt = (tag) => INJ_TAG[tag]?.[1] === "";
+/** The injury hover text: the tag's meaning plus Sleeper's note ("Out · Out: Knee"); undefined without a tag. */
+export function injuryTip(tag, note) {
+  if (!tag) return undefined;
+  const [abbr, , meaning] = INJ_TAG[tag] || [tag, "", tag];
+  const say = abbr.toLowerCase() === meaning ? "" : `${meaning[0].toUpperCase()}${meaning.slice(1)}`;
+  return [say, note].filter(Boolean).join(" · ") || undefined;
+}
 /** Small badge for a player's Sleeper injury tag: abbreviation, colour class, and a hover with the meaning plus Sleeper's note. Renders nothing without a tag. */
 export default function InjuryTag({ tag, note }) {
   if (!tag) return null;
-  const [abbr, cls, meaning] = INJ_TAG[tag] || [tag, "", tag];
-  const say = abbr.toLowerCase() === meaning ? "" : `${meaning[0].toUpperCase()}${meaning.slice(1)}`;
-  return <span className={`inj ${cls}`} data-tip={[say, note].filter(Boolean).join(" · ") || undefined}>{abbr}</span>;
+  const [abbr, cls] = INJ_TAG[tag] || [tag, ""];
+  return <span className={`inj ${cls}`} data-tip={injuryTip(tag, note)}>{abbr}</span>;
 }

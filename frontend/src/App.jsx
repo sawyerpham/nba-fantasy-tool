@@ -57,6 +57,13 @@ export default function App() {
     localStorage.setItem("da.tab", tab);
   }, [tab]);
 
+  // the header shows the chosen league's name (re-read on tab change, so a Sleeper rename picked up by Sync shows up)
+  const [leagueName, setLeagueName] = useState("");
+  useEffect(() => {
+    if (!leagueId) return setLeagueName("");
+    api.get("/leagues").then((ls) => setLeagueName(ls.find((l) => l.league_id === leagueId)?.name || "")).catch(() => {});
+  }, [leagueId, tab]);
+
   useEffect(() => {
     document.documentElement.style.setProperty("--wall", wall ? `url(/wallpapers/${wall}.png)` : "none");
     localStorage.setItem("da.wall", wall);
@@ -81,7 +88,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo">🏀</span>NBA Fantasy Tool</span>
+        <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo">🏀</span>{leagueName || "NBA Fantasy Tool"}</span>
         <nav>
           {TABS.map(([id, label]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} style={{ "--c": TAB_COLORS[id] }} data-testid={`tab-${id}`}>
