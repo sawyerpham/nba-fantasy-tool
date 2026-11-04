@@ -112,6 +112,10 @@ def test_today_never_moves_a_player_mid_game_and_flags_swaps_and_gtd():
     swap = next(w for w in t.watch if w["kind"] == "swap")
     assert swap["name"] == "early" and swap["backup"] == "late" and swap["by"] == "2026-10-22T02:00Z" and swap["bar"] > 0
 
+    late.injury = "out_short_term"   # ruled OUT: never offered as anyone's backup
+    plan_week(players, one_each)
+    assert not [w for w in plan_today(players, one_each, today).watch if w.get("backup") == "late"]
+
 
 def test_live_estimate_projects_the_rest_of_his_game():
     """Live estimate projects the rest of his game."""
