@@ -122,8 +122,8 @@ def test_live_estimate_projects_the_rest_of_his_game():
     from app.lockin.weekplan import live_estimate
 
     half = Game("2026-10-21", 16.0, fp=10.0, started=True, live=True, min=17.0, proj_min=34.0, period=3, clock=720.0)
-    est = live_estimate(half)                       # halftime, on pace: about double
-    assert 18 < est < 22
+    est = live_estimate(half)                       # halftime, on pace: a bit under double (fewer minutes left)
+    assert 16 < est < 20
     cold = Game("2026-10-21", 16.0, fp=2.0, started=True, live=True, min=17.0, proj_min=34.0, period=3, clock=720.0)
     assert live_estimate(cold) < est - 5            # a cold half drags the estimate down
     done = Game("2026-10-21", 16.0, fp=25.0, started=True, final=True, min=36.0)
@@ -160,7 +160,7 @@ def test_a_live_starter_headed_past_the_backups_projection_keeps_his_slot():
     from app.lockin.weekplan import swap_call
 
     today = "2026-10-21"
-    ok = pp("okongwu", ["C"], "C", [Game(today, 11, fp=6.4, started=True, live=True, tip="2026-10-21T23:00Z",
+    ok = pp("okongwu", ["C"], "C", [Game(today, 11, fp=7.0, started=True, live=True, tip="2026-10-21T23:00Z",
                                          min=16, proj_min=32, period=2, clock=0)] + future(11, 11))
     sharpe = pp("sharpe", ["C"], "BN", [Game(today, 12, tip="2026-10-21T23:30Z", proj_min=30)])
     call = swap_call(ok, sharpe, today)

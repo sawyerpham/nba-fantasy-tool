@@ -393,7 +393,11 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     return TodayLineup(seats={s: [p.sid for p in ps] for s, ps in seats.items()}, moves=moves, watch=watch)
 
 
-GAME_SECONDS, QUARTER_SECONDS, PRIOR_MINUTES = 48 * 60, 12 * 60, 10.0
+GAME_SECONDS, QUARTER_SECONDS = 48 * 60, 12 * 60
+# Fit by backtest_live.py on 1,782 player games (weeks 1-3, 2026-27): tonight's rate barely predicts the rest of his
+# game (MAE best at 60-80 vs 10), and projected minutes × share left ran ~0.7 min high (Sleeper's minutes run high,
+# starters sit late); 0.9 takes the +0.3-0.5 FP bias to ~0. Rerun the backtest to retune as the season goes on.
+PRIOR_MINUTES, MINUTES_LEFT_SCALE = 60.0, 0.9
 CLOSE_TIPS_MIN = 15  # tips this close count as the same time (bigger projection starts; no swap check between them)
 CLOSE_PROJ = 1.0     # ...unless the projections are this close: then the earlier tip
 CHECK_LEAD_MIN = 15  # check-ins sit this long before the tip they're for: a SWAP call is made then, not before
@@ -422,7 +426,8 @@ ALARM_LEAD_MIN = 5   # the swap check fires this many minutes before the later p
 def live_estimate(g: Game) -> float | None:
     """Where his game will likely finish: points so far + his scoring rate × the minutes he has left. The rate is
     his rate tonight shrunk toward his projected rate (as if he'd played PRIOR_MINUTES more at it), so a hot or cold
-    first few minutes don't swing the call; minutes left = his projected minutes × the share of the game left."""
+    first few minutes don't swing the call; minutes left = his projected minutes × the share of the game left, cut by
+    MINUTES_LEFT_SCALE."""
     if g.fp is None:
         return None
     if g.final or not g.live:
@@ -430,7 +435,7 @@ def live_estimate(g: Game) -> float | None:
     played = g.min or 0.0
     proj_rate = (g.proj or 0.0) / g.proj_min if g.proj_min else 0.0
     rate = (g.fp + proj_rate * PRIOR_MINUTES) / (played + PRIOR_MINUTES)
-    left = max(0.0, (g.proj_min or played) * _share_left(g))
+    left = max(0.0, (g.proj_min or played) * _share_left(g) * MINUTES_LEFT_SCALE)
     return g.fp + rate * left
 
 

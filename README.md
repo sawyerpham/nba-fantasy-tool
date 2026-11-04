@@ -75,3 +75,7 @@ npm run dev
 ```
 
 Open http://localhost:5173, create a league, add your Sleeper league id in Settings and pick which manager you are.
+
+To retune the live finish estimate against this season's finished games (`PRIOR_MINUTES` / `MINUTES_LEFT_SCALE` in
+`backend/app/lockin/weekplan.py`), run `python -m app.lockin.backtest_live [league_id]` from `backend`. It prints the
+error at each game-clock checkpoint and caches box scores under `backend/data/cache/backtest_live/`.
