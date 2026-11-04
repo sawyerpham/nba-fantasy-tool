@@ -133,19 +133,23 @@ def expected_max(mu: float, sigma: float, v: float) -> float:
 
 
 def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]]]:
-    """What his slot is worth left open (not locking him): each remaining day it can take the best game from him or a
-    bench player who fits the slot and isn't seated in the plan, with the option to lock the best one (wait_value).
+    """What his slot is worth left open (not locking him): one look at every remaining tip, his games or a bench
+    player's who fits the slot and isn't seated in the plan, earliest first, with the option to keep the best one
+    (wait_value). Same-day looks count too: start the 6:30 bench player, and if his game flops swap in the 9:00 one.
+    Tips CLOSE_TIPS_MIN or less apart are one look (no time to judge the first): the bigger projection.
     That's why locking a decent game can be wrong with a deep bench: it gives up every one of those chances.
     ponytail: two open slots can both count the same bench player; fine while one lock is decided at a time."""
     pool = [p] + [q for q in players if q is not p and q.seat is None and q.slot != "IR" and q.locked is None
                   and q.injury not in OUT and p.seat in roster.candidate_slots(q.eligibility)]
-    best: dict[str, tuple[Game, PlanPlayer]] = {}
-    for q in pool:
-        for g in q.games:
-            if not g.started and (g.date not in best or (g.proj or 0) > (best[g.date][0].proj or 0)):
-                best[g.date] = (g, q)
-    days = [best[d] for d in sorted(best)]
-    return wait_value([g for g, _ in days], p.swing, "healthy"), [(g.date, q.name) for g, q in days]
+    looks: list[tuple[Game, PlanPlayer]] = []
+    for g, q in sorted(((g, q) for q in pool for g in q.games if not g.started), key=lambda gq: (gq[0].date, _minutes(gq[0].tip))):
+        prev = looks[-1][0] if looks else None
+        if prev and prev.date == g.date and (g.tip == prev.tip or _minutes(g.tip) - _minutes(prev.tip) <= CLOSE_TIPS_MIN):
+            if (g.proj or 0) > (prev.proj or 0):
+                looks[-1] = (g, q)
+        else:
+            looks.append((g, q))
+    return wait_value([g for g, _ in looks], p.swing, "healthy"), [(g.date, q.name) for g, q in looks]
 
 
 def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
