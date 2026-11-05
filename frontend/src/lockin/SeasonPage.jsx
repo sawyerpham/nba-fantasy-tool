@@ -306,7 +306,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
           </div>
         )}
         {tab === "stats" && (
-          <div className="tp-stats-wrap"><table className="tp-stats" data-testid="team-stats">
+          <DragScroll className="tp-stats-wrap"><table className="tp-stats" data-testid="team-stats">
             <thead><tr><th>{t.name}</th>{["MIN", "PTS", "REB", "AST", "FG%", "FT%", "3P%", "STL", "BLK", "TO", "PF"].map((h) => <th key={h} className="num">{h}</th>)}</tr></thead>
             <tbody>{t.stats.map((r) => (
               <tr key={r.sleeper_id} className="clickable" onClick={() => onOpenPid(r.player_id)}>
@@ -315,9 +315,9 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
                   : <td className="num muted" colSpan={11}>no games yet</td>}
               </tr>
             ))}</tbody>
-          </table></div>
+          </table></DragScroll>
         )}
-        {tab === "news" && (news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
+        {tab === "news"&& (news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
           : <div className="muted">Loading news…</div>)}
         {tab === "roster" && (
           <div data-testid="team-injuries">{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
@@ -339,6 +339,24 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
       </>}
     </div>
   );
+}
+
+/** A horizontally scrollable box you can also grab and drag left / right; a drag doesn't count as a click on what's under it. */
+function DragScroll({ className, children }) {
+  const ref = useRef(null), drag = useRef(null);
+  const [on, setOn] = useState(false);
+  const down = (e) => { if (e.button === 0) drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
+  const move = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.x) > 4) { d.moved = true; setOn(true); ref.current.setPointerCapture(e.pointerId); }
+    if (d.moved) ref.current.scrollLeft = d.left - (e.clientX - d.x);
+  };
+  const up = () => { setOn(false); if (drag.current && !drag.current.moved) drag.current = null; };
+  // the click that ends a drag lands here first: swallow it so the row under the pointer doesn't open
+  const click = (e) => { if (drag.current?.moved) { e.stopPropagation(); e.preventDefault(); } drag.current = null; };
+  return <div ref={ref} className={`${className} ${on ? "dragging" : ""}`} onPointerDown={down} onPointerMove={move}
+    onPointerUp={up} onPointerCancel={() => { setOn(false); drag.current = null; }} onClickCapture={click}>{children}</div>;
 }
 
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
