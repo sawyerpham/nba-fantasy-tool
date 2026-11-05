@@ -666,8 +666,8 @@ table.depth-grid { width: 100%; margin-top: 8px; }
 .tp-date { white-space: nowrap; } .tp-at { text-align: center; } .tp-result { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tp-stats-wrap { overflow-x: auto; cursor: grab; user-select: none; }
 .tp-stats-wrap.dragging { cursor: grabbing; }
-.tp-stats { min-width: 100%; font-size: 12px; border-collapse: collapse; }
-.tp-stats th { font-size: 11px; font-weight: 700; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.tp-stats { min-width: 100%; font-size: 14px; border-collapse: collapse; }
+.tp-stats th { font-size: 12px; font-weight: 700; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
 .tp-stats td { padding: 4px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); white-space: nowrap; }
 .tp-stats .num { text-align: right; }
 .tp-player { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
