@@ -517,6 +517,9 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
   const games = Object.fromEntries(Object.entries(data.players).map(([sid, pl]) => [sid, pl.games]));
   const nameOf = Object.fromEntries(p.players.map((r) => [r.sid, r.name]));
   const nowSwaps = bestLineup(p, nowMs, data.roster_positions, false, games).pairs;
+  // a window whose check-in has come is already one of the moves due now: list it once, under Now
+  const dueNow = new Set(nowSwaps.flatMap((s) => [`${s.in}|${s.out}`, `${s.out}|${s.in}`]));
+  const windows = swaps.filter((w) => !dueNow.has(`${w.backup_sid}|${w.sid}`));
   const remaining = (o?.players || []).filter((r) => r.seat && r.locked == null && r.w > 0).sort((a, b) => b.w - a.w).slice(0, 4);
   const banked = (o?.players || []).filter((r) => r.locked != null).sort((a, b) => b.locked - a.locked);
   const odds = out ? [["Lock all now", out.safe], ["Leave all open", out.risky], ["Plan mix", p.win_chance]] : [];
@@ -596,14 +599,14 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
           })}
         </section>
       )}
-      {(nowSwaps.length > 0 || swaps.length > 0) && (
+      {(nowSwaps.length > 0 || windows.length > 0) && (
         <section className="guide-card">
           <div className="bid-label">Swaps</div>
           {/* one line per swap: "Now swap [a] & [b]" for the moves due now (in arrow order), then
               "Wed 6:55p (19h 42m) swap [backup] & [starter]" per window (the plan's pick, w.name); a line between times */}
           <div className="guide-swaps">
             {[...nowSwaps.map((s) => ({ key: `now-${s.n}`, group: "now", a: s.in, b: s.out })),
-              ...swaps.map((w) => ({ key: w.backup_sid, group: w.alarm, a: w.backup_sid, b: w.sid }))].map((r, i, rows) => (
+              ...windows.map((w) => ({ key: w.backup_sid, group: w.alarm, a: w.backup_sid, b: w.sid }))].map((r, i, rows) => (
               <div key={r.key} className="guide-swap">
                 {i > 0 && r.group !== rows[i - 1].group && <span className="guide-swap-sep" />}
                 <span className="small">{r.group === "now" ? <strong className="warn-text">Now</strong> : <>
