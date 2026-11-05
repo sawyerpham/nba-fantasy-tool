@@ -1136,7 +1136,7 @@ function NewsNote({ n, open, owner }) {
 
 const LEAGUE_NEWS = 80;
 
-/** Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most starters out first. Red counts out / IR, yellow questionable / day-to-day, with the names under it (starters bold, first). A team opens its Team card on the right, a name its player card. */
+/** Beside the news: every NBA team with injured players right now (Sleeper's tags, backend injury_report), most starters out first. Red counts out / IR, yellow questionable / day-to-day, with the names under it (starters bold, first) and why (status · body part · note). A team opens its Team card on the right, a name its player card. */
 function TeamsReport({ leagueId, open, refreshKey }) {
   const [r, setR] = useState(null);
   const openTeam = useContext(TeamLinkContext);
@@ -1163,7 +1163,7 @@ function TeamsReport({ leagueId, open, refreshKey }) {
                 <span className={`health-${h.group} ${h.starter ? "tr-starter" : ""}`}>{h.name}</span>
                 {h.role && <span className={`role-tag ${h.role.star ? "star" : ""}`}
                   data-tip={h.role.shared_with ? `Shares the #1 option with ${h.role.shared_with.name} (${h.role.shared_with.fpg} projected FP/G)` : undefined}>{h.role.label}</span>}
-                <span className="muted small">{h.status}</span></div>))}</div>
+                <span className="muted small">{h.status}{h.body ? ` · ${h.body}` : ""}{h.note ? ` · ${h.note}` : ""}</span></div>))}</div>
           </div>
         </div>
       ))}
