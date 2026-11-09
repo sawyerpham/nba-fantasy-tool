@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { PosTag } from "../core/Pos.jsx";
 import { Term, priceTone } from "../core/Terms.jsx";
+import Icon from "../core/Icon.jsx";
 
 const STATUS = { scarce: ["bad", "scarce"], tight: ["even", "tight"], plenty: ["good", "plenty"] };
 
@@ -75,7 +76,7 @@ export default function MarketPanel({ leagueId, live, refreshKey, onSelect }) {
       </div>
       {m.sales.length > 4 && (
         <button className="small ghost" onClick={() => setAllSales(!allSales)} data-testid="toggle-sales">
-          {allSales ? "▾ last 4 only" : `▸ show all ${m.sales.length} sold`}
+          <Icon name={allSales ? "chevron-down" : "chevron-right"} /> {allSales ? "last 4 only" : `show all ${m.sales.length} sold`}
         </button>
       )}
     </div>

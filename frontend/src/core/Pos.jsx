@@ -11,7 +11,7 @@ export const posClass = (text) => {
   return m ? `pos-c pos-${m[0]}` : "";
 };
 
-/** Render a list of positions ("PG SF PF"), each in its position colour, joined by `sep`. */
+/** Render a list of positions ("PG SG SF PF C"), each in its position colour, joined by `sep`. */
 export function PosList({ list, sep = " " }) {
   return (list || []).map((p, i) => (
     <React.Fragment key={p}>{i > 0 && sep}<span className={posClass(p)}>{p}</span></React.Fragment>

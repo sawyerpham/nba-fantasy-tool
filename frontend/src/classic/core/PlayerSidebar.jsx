@@ -6,6 +6,7 @@ import Headshot from "./Headshot.jsx";
 import TeamLink from "./TeamLink.jsx";
 import { ordinal } from "../draft/SpendingGuide.jsx";
 import { SeasonHistory, SeasonLog, SeasonSummary } from "../lockin/SeasonProfile.jsx";
+import Icon from "./Icon.jsx";
 
 const TABS = [["summary", "Summary"], ["log", "Game Log"], ["team", "Team"], ["history", "History"]];
 /**
@@ -69,7 +70,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
   const head = (
     <>
-      {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
+      {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close" aria-label="Close profile"><Icon name="x" /></button>}
       <div className="sec profile-top">
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={96} large />
@@ -176,8 +177,8 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             <span className="bid-label"><Term k="keeper_outlook" /></span>{" "}
             <span className={`verdict ${cls}`} data-tip={TERMS.keep_call[1]}>{k.verdict.toUpperCase()} keep</span>
             {k.stash && <> <Term k="stash" className="verdict even" /></>}
-            <span className="muted"> at his Max ${k.buy_price} → keep at <strong style={{ color: "var(--text)" }}>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
-            {k.good_up_to != null && <div className="muted">GOOD keep if you get him for <strong style={{ color: "var(--text)" }}>≤ ${k.good_up_to}</strong></div>}
+            <span className="muted"> at his Max ${k.buy_price} → keep at <strong>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
+            {k.good_up_to != null && <div className="muted">GOOD keep if you get him for <strong>≤ ${k.good_up_to}</strong></div>}
             {k.young && <span className="muted" data-tip="23 or younger: young players usually improve, which this estimate doesn't model."> · young, may improve</span>}
           </div>
         );
@@ -287,9 +288,9 @@ export function TeamHead({ t }) {
       <div>
         <div className="team-name"><TeamLink abbr={t.abbr}>{t.name}</TeamLink>{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</div>
         <div className="small muted">
-          {t.player_rank && <><strong style={{ color: "var(--text)" }}>#{t.player_rank}</strong> on the team · </>}
+          {t.player_rank && <><strong>#{t.player_rank}</strong> on the team · </>}
           <span title={`sum of the top 8 players' projected FP/G (${t.talent_fpg}); a fantasy-talent ranking, not a win projection`}>
-            team <strong style={{ color: "var(--text)" }}>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent
+            team <strong>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent
           </span>
         </div>
       </div>

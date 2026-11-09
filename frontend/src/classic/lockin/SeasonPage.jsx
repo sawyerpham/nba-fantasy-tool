@@ -12,6 +12,7 @@ import DragScroll from "../core/DragScroll.jsx";
 import InjuryTag, { injuryTip, isDoubt, isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
 import { reseat, swapSteps } from "./swaps.js";
+import Icon from "../core/Icon.jsx";
 
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 
@@ -77,7 +78,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   const [error, setError] = useState("");
   // The right side's history, like a browser's: each entry a player profile { pid }, a game card { game: { game, team,
   // sid, name } } (GamePanel) or an NBA team's card { team: abbr } (TeamPanel); ‹ › step through it, opening something
-  // new drops what was ahead. ✕ clears it back to the guide.
+  // new drops what was ahead. The close button clears it back to the guide.
   const [nav, setNav] = useState({ stack: [], i: -1 });
   const cur = nav.stack[nav.i], selected = cur?.pid ?? null, game = cur?.game ?? null, team = cur?.team ?? null;
   /** Open an entry (player profile, game card or team card) on the right. Repeating the current entry changes nothing; a new one drops whatever was ahead in the history. */
@@ -93,9 +94,6 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   const [tick, setTick] = useState(0);
   const [headerSlot, setHeaderSlot] = useState(null);
   useEffect(() => { setHeaderSlot(document.getElementById("header-slot")); }, []);
-  // the header's ◀ Week ▶ sits over the middle of the matchup column: its x within the header, kept on resize
-  const mainRef = useRef(null), weekRef = useRef(null);
-  const [weekX, setWeekX] = useState(null);
 
   /** Load the week (matchups, games, rosters) and the plan for the shown week; sets the league's time zone. */
   const load = useCallback(() => {
@@ -125,22 +123,6 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
 
   if (!leagueId) return <div className="panel muted" data-testid="no-league">No Sleeper league selected!</div>;
   if (error && !data) return <div className="panel error">{error}</div>;
-  useEffect(() => {
-    const m = mainRef.current, h = headerSlot?.closest("header");
-    if (!m || !h) return;
-    /** Centre the week bar (or, on News and Waivers, the league name) over the lineup's position tags; when that wouldn't clear the tabs and the search box, drop it inline after the tabs instead. */
-    const place = () => {
-      // the middle of the matchup column: depends on the layout only, never on what the lineup shows
-      const a = m.getBoundingClientRect(), c = a.left + a.width / 2, wk = weekRef.current;
-      const nav = h.querySelector("nav").getBoundingClientRect().right, right = h.querySelector(".season-search")?.getBoundingClientRect().left;
-      const full = wk?.children.length > 1;   // [◀ Week ▶] + name; else just the league name (News / Waivers)
-      const w = !wk ? 0 : full ? wk.children[0].getBoundingClientRect().width : wk.getBoundingClientRect().width, after = full ? wk.lastElementChild.offsetWidth : 0;
-      setWeekX(c - w / 2 >= nav + 24 && (right == null || c + w / 2 + 12 + after + 24 <= right) ? c - h.getBoundingClientRect().left : null);
-    };
-    const ro = new ResizeObserver(place);
-    ro.observe(m); ro.observe(h);
-    return () => ro.disconnect();
-  }, [headerSlot, !!(data && plan), view]);   // re-placed on resize only
   if (!data || !plan) return <div className="panel">Loading the week from Sleeper…</div>;
 
   /** The profile id for a Sleeper id. */
@@ -161,7 +143,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
-          {view === "news" || view === "waivers" ? null : <span className="season-weeknav" ref={weekRef} style={weekX != null ? { left: weekX } : undefined}>
+          {view === "news" || view === "waivers" ? null : <span className="season-weeknav">
             <span className="season-wk">
             <button className="mu-arrow neon-arrow" disabled={data.week <= 1} onClick={() => setWeek(data.week - 1)} aria-label="Previous week"><NeonArrow dir="left" /></button>
             <strong className={`season-week ${week ? "clickable" : ""}`} {...(week && { role: "button", tabIndex: 0, onClick: () => setWeek(null), onKeyDown: (e) => e.key === "Enter" && setWeek(null) })}>WEEK {data.week}</strong>
@@ -169,21 +151,21 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             </span>
           </span>}
           {error &&<span className="small warn-text">{error}</span>}
-          <span className="season-search" style={{ marginLeft: "auto" }}><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} onSelectTeam={openTeam} placeholder="Any player or team…" testId="season-search" /></span>
-          <button className="small primary" onClick={sync} disabled={syncing} data-testid="sync" aria-label="Sync">⟳</button>
+          <span className="season-tools">
+          <span className="season-search"><PlayerSearch leagueId={leagueId} onSelect={(p) => setSelected(p.player_id)} onSelectTeam={openTeam} placeholder="Any player or team…" testId="season-search" /></span>
+          <button className="small primary icon-btn" onClick={sync} disabled={syncing} data-testid="sync" aria-label="Sync" title="Sync with Sleeper"><Icon name="refresh" className={syncing ? "spin" : ""} /></button>
           <span className="bell-wrap">
-            <button className="small primary bell" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-bell" aria-label={`${count} to see`}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block" }}>
-                <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2 2 0 0 0 4 0" />
-              </svg></button>
+            <button className="small primary bell icon-btn" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-bell" aria-label={`${count} to see`}>
+              <Icon name="bell" /></button>
             {count > 0 && <button className="notif-badge" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-badge" aria-label={`${count} notifications`}>{count}</button>}
+          </span>
           </span>
         </div>
   );
   return (
     <TeamLinkContext.Provider value={openTeam}>
     <div className="season-grid">
-      <section className="season-main" ref={mainRef}>
+      <section className="season-main">
         {headerSlot ? createPortal(bar, headerSlot) : bar}
         {showNotifs && createPortal(
           <div className="notif-pop" data-testid="notif-pop">
@@ -239,20 +221,20 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
   }, [tab, news, leagueId, abbr]);
   return (
     <div className="panel scroll team-panel" data-testid="team-panel">
-      <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close">✕</button>
+      <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close" aria-label="Close team"><Icon name="x" /></button>
       {!t ? <div className="muted">{error || `Loading ${abbr}…`}</div> : <>
         <div className="tp-head sec">
           <img src={t.logo} alt="" width={52} height={52} onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
           <div>
             <h3 className="tp-name">{t.name}{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</h3>
-            <div className="small muted">team <strong style={{ color: "var(--text)" }}>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent</div>
+            <div className="small muted">team <strong>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent</div>
           </div>
         </div>
         <nav className="profile-tabs" data-testid="team-tabs">
           {TEAM_TABS.map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`team-tab-${id}`}>{label}</button>)}
         </nav>
         {tab === "schedule" && (
-          <DragScroll vertical className="tp-schedule sec news-scroll" style={{ marginTop: 0 }} data-testid="team-schedule">{t.schedule.map((g) => (
+          <DragScroll vertical className="tp-schedule sec news-scroll" data-testid="team-schedule">{t.schedule.map((g) => (
             <div key={g.date} className="tp-game">
               <span className="small muted tp-date">{dayName(g.date)} {md(g.date)}</span>
               <span className="muted tp-at">{g.home ? "vs" : "@"}</span>
@@ -280,7 +262,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
             ))}</tbody>
           </table></DragScroll>
         )}
-        {tab === "news" && <DragScroll vertical className="sec news-scroll" style={{ marginTop: 0 }}>{news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
+        {tab === "news" && <DragScroll vertical className="sec news-scroll">{news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
           : <div className="muted">Loading news…</div>}</DragScroll>}
         {tab === "roster" && (
           <div className="sec" data-testid="team-injuries"><div className="bid-label sp-head">Roster status</div>{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
@@ -342,7 +324,7 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
   const status = !g ? "" : g.state === "in" ? quarters(g.detail) : g.state === "post" ? "Final" : `Tips ${fmt(g.tip, { hour: "numeric", minute: "2-digit" })}`;
   return (
     <div className="panel scroll game-panel" data-testid="game-panel">
-      <button className="sidebar-close" onClick={onClose} title="Close game" data-testid="game-close">✕</button>
+      <button className="sidebar-close" onClick={onClose} title="Close game" data-testid="game-close" aria-label="Close game"><Icon name="x" /></button>
       {!g ? <div className="muted">{error || "Loading the game…"}</div> : <>
         <div className="gp-score">
           {g.teams.map((t, i) => (
@@ -475,8 +457,8 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
   const chip = (r, value, guess) => (
     <span key={r.sid} className="guide-chip"><span className="clickable guide-who" onClick={() => open(r.sid)}><Headshot sleeperId={r.sid} name={r.name} size={22} />{lastName(r.name)}</span> <strong>{value}{guess ? "?" : ""}</strong>
       {guess && setLock && <>
-        <button className="chip-btn" onClick={() => setLock(r.sid, r.lock_date)} data-tip="He locked it">✓</button>
-        <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked">✕</button>
+        <button className="chip-btn" onClick={() => setLock(r.sid, r.lock_date)} data-tip="He locked it" aria-label="He locked it"><Icon name="check" /></button>
+        <button className="chip-btn" onClick={() => setLock(r.sid, "")} data-tip="Not locked" aria-label="Not locked"><Icon name="x" /></button>
       </>}</span>
   );
   /** One team's side of the Matchup card: name, projected final, banked points and games left. `mirror`: the right-hand
@@ -1182,7 +1164,7 @@ function LeagueView({ data, leagueId, open }) {
   return (
     <>
       <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Matchups · week {data.week}</h3>
+        <h3>Matchups · week {data.week}</h3>
         <div className="league-matchups">
           {data.matchups.map((pair, i) => (
             <div key={i} className="lm-card">
@@ -1201,13 +1183,13 @@ function LeagueView({ data, leagueId, open }) {
       </div>
       {shown && (
         <div className="panel" data-testid="team-roster">
-          <h3 style={{ marginTop: 0 }}><TeamName t={shown} size={28} /> <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
+          <h3><TeamName t={shown} size={28} /> <span className="small muted">expected {shown.expected} FP this week · {shown.games_left} games left</span>
             <button className="small ghost" style={{ marginLeft: 8 }} onClick={() => setShown(null)}>close</button></h3>
           <TeamColumn data={data} team={shown} open={open} />
         </div>
       )}
       <div className="panel">
-        <h3 style={{ marginTop: 0 }}>Standings</h3>
+        <h3>Standings</h3>
         <table className="small" data-testid="standings">
           <thead><tr><th>#</th><th>Team</th><th className="num">W</th><th className="num">L</th><th className="num">PF</th><th className="num">FAAB left</th></tr></thead>
           <tbody>{standings.map((t, i) => (
