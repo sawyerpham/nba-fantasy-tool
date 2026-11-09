@@ -1,6 +1,6 @@
 """Telegram notifications for the in-season watch list (GTD / OUT / swap / lock calls).
 
-Setup: put TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in backend/.env (see .env.example); `python -m app.serve` then starts a
+Setup: put TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in backend/.env (see README.md, Telegram notifications); `python -m app.serve` then starts a
 watcher thread. Test delivery alone with: python -m app.notify "hello"
 """
 
