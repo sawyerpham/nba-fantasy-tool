@@ -1,6 +1,7 @@
 import React from "react";
 import TeamLink from "../core/TeamLink.jsx";
 import { fmt } from "./tz.js";
+import DragScroll from "../core/DragScroll.jsx";
 import InjuryTag from "../core/InjuryTag.jsx";
 
 // The in-season player profile's tabs (backend season_player): Summary, Game log and History; the Team tab (depth
@@ -43,6 +44,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
           <div className="small muted">{g.min} min · {g.pts} pts · {g.reb} reb · {g.ast} ast · {g.stl} stl · {g.blk} blk · {g.to} to{g.fga != null && <> · {g.fgm}/{g.fga} FG · {g.ftm}/{g.fta} FT</>}</div>
         </div>
       )}
+      <div className="sec">
       <div className="bid-label sp-head">Season averages <span className="muted">· {sea.games_played} GP</span></div>
       {a ? <div className="sp-grid">{stat("MPG", f1(a.min))}{stat("PTS", f1(a.pts))}{stat("REB", f1(a.reb))}{stat("AST", f1(a.ast))}
         {stat("STL", f1(a.stl))}{stat("BLK", f1(a.blk))}{stat("TO", f1(a.to))}</div> : <div className="small muted">No finished games yet.</div>}
@@ -51,14 +53,15 @@ export function SeasonSummary({ sea, onOpenGame }) {
         {stat("Owned", sea.owned != null ? `${Math.round(sea.owned)}%` : "—")}{stat("Started", sea.started != null ? `${Math.round(sea.started)}%` : "—")}
         {stat("FP/G", f2(a?.fp))}
       </div>
-      <div className="small sp-meta">
+      </div>
+      <div className="small sp-meta sec">
         <div><span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}</strong> : <strong>Free agent</strong>}</div>
         {sea.owner && <div><span className="muted">Slot</span> <strong>{sea.owner.slot}</strong></div>}
         <div><span className="muted">Status</span> {sea.retired ? <strong className="warn-text">retired</strong>
           : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> {sea.injury_note}</span>}</> : <strong>healthy</strong>}</div>
       </div>
       {sea.news.length > 0 && (
-        <>
+        <DragScroll vertical className="sec news-scroll">
           <div className="bid-label sp-head">Latest news</div>
           {sea.news.map((n, i) => (
             <div key={i} className="news-item small">
@@ -66,7 +69,7 @@ export function SeasonSummary({ sea, onOpenGame }) {
               {n.story && n.story !== n.headline && <div className="muted">{n.story}</div>}
             </div>
           ))}
-        </>
+        </DragScroll>
       )}
     </div>
   );
@@ -114,12 +117,12 @@ export function SeasonHistory({ sea }) {
     return a.kind === "keeper" ? `kept by ${by}${price}` : a.kind === "drafted" ? `drafted by ${by}${price}${a.season ? ` (${a.season})` : ""}`
       : a.kind === "claimed" ? `claimed by ${by}${price}` : a.kind === "traded to" ? `traded to ${by}` : a.kind === "dropped" ? `dropped by ${by}` : `added by ${by}`;
   };
-  if (!sea.acquired?.length) return <div className="small muted">No transactions this season: he hasn't been drafted, kept or moved.</div>;
+  if (!sea.acquired?.length) return <div className="small muted sec">No transactions this season: he hasn't been drafted, kept or moved.</div>;
   return (
-    <table className="sp-history" data-testid="season-history">
+    <div className="sec"><table className="sp-history" data-testid="season-history">
       <tbody>{[...sea.acquired].reverse().map((a, i) => (   /* newest first (the backend sends them oldest first) */
         <tr key={i}><td><strong>{KIND[a.kind] || a.kind}</strong></td><td>{what(a)}</td><td className="muted">{a.when ? longDate(a.when) : ""}</td></tr>
       ))}</tbody>
-    </table>
+    </table></div>
   );
 }

@@ -8,12 +8,16 @@ import PlayerSidebar, { DepthGrid, TeamRanks } from "../core/PlayerSidebar.jsx";
 import TeamLink, { TeamLinkContext } from "../core/TeamLink.jsx";
 import PlayerSearch from "../core/PlayerSearch.jsx";
 import NeonArrow from "../core/NeonArrow.jsx";
+import DragScroll from "../core/DragScroll.jsx";
 import InjuryTag, { injuryTip, isDoubt, isOut } from "../core/InjuryTag.jsx";
 import { fmt, setZone, timeOf } from "./tz.js";
-import { alarmSound } from "../core/sounds.js";
 import { reseat, swapSteps } from "./swaps.js";
 
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
+
+/** One-line headline of a watch line: who to check, bench, start or lock. */
+const watchTitle = (w) => w.kind === "gtd" ? `${w.name} GTD: check, else start ${w.backup}` : w.kind === "out" ? `${w.name} OUT: bench${w.backup ? `, start ${w.backup}` : ""}` : w.kind === "lock" ? `Lock ${w.name} now`
+  : w.decision === "SWAP" ? `SWAP: bench ${w.name}, start ${w.backup}` : `${w.decision}: ${w.backup} check`;
 
 /** Minutes from now as a countdown: "2d 5h", "19h 42m" or "7m". */
 const untilText = (mins) => {
@@ -115,48 +119,9 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     api.post(`/leagues/${leagueId}/season/sync`, {}).then(() => setTick((t) => t + 1)).catch((e) => setError(e.message)).finally(() => setSyncing(false));
   };
 
-  // Alarms: each watch line has an alarm time (5 min before the later player's tip, 30 min before a GTD starter's).
-  // When it comes, re-read the plan (live score) and ring with the current call. Works while this tab is open.
-  const [alerts, setAlerts] = useState([]);
+  // The bell lists what needs you today: GTD / DTD / OUT players and when to swap or lock (the plan's watch lines). The same lines go to Telegram from the backend (app/notify.py).
   const [showNotifs, setShowNotifs] = useState(false);
   const [focusRid, setFocusRid] = useState(null);   // the matchup on the Week tab: Week Stats follows it
-  const rung = React.useRef(new Set());   // "now" alarms already rung (late scratches)
-  const [armed, setArmed] = useState(() => { try { return localStorage.getItem("da.season.alarms") === "1"; } catch { return false; } });
-  /** Turn the alarms on or off and remember the choice. Turning them on plays a sound (which unlocks audio later) and asks for notification permission. */
-  const arm = () => {
-    const on = !armed;   // the effect below clears the pending timers when this turns off
-    if (on) {
-      alarmSound();   // the click also unlocks sound for later
-      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
-    }
-    setArmed(on); try { localStorage.setItem("da.season.alarms", on ? "1" : "0"); } catch { }
-  };
-  useEffect(() => {
-    if (!armed || !plan?.today) return undefined;
-    const timers = plan.today.watch.filter((w) => w.alarm).map((w) => {
-      const key = `${plan.today.date}-${w.kind}-${w.sid}`;
-      if (w.alarm === "now" && rung.current.has(key)) return null;
-      if (w.alarm === "now") rung.current.add(key);
-      const ms = w.alarm === "now" ? 0 : Date.parse(w.alarm) - Date.now();
-      if (ms < 0 || ms > 24 * 3600e3) return null;
-      return setTimeout(async () => {
-        let line = w;
-        try {
-          const fresh = await api.get(`/leagues/${leagueId}/season/plan` + qs({ week }));
-          setPlan(fresh);
-          line = fresh.today?.watch.find((x) => x.kind === w.kind && (w.kind === "swap" ? x.backup_sid === w.backup_sid : x.sid === w.sid)) || w;
-          if (w.kind === "lock" && !fresh.today?.watch.some((x) => x.kind === "lock" && x.sid === w.sid)) return;
-        } catch { }
-        const title = line.kind === "gtd" ? `Check ${line.name} (GTD)` : line.kind === "out" ? `${line.name} is OUT` : line.kind === "lock" ? `Lock ${line.name} now`
-          : line.decision === "SWAP" ? `SWAP: bench ${line.name}, start ${line.backup}` : `${line.decision}: ${line.backup} check`;
-        alarmSound();
-        setAlerts((a) => [{ key: `${w.sid}-${w.kind}-${Date.now()}`, title, text: line.text, decision: line.decision, kind: line.kind }, ...a]);
-        setShowNotifs(true);
-        try { if (Notification.permission === "granted") new Notification(title, { body: line.text }); } catch { }
-      }, ms);
-    }).filter(Boolean);
-    return () => timers.forEach(clearTimeout);
-  }, [armed, plan?.today?.watch?.map((w) => `${w.sid}${w.alarm}`).join(","), leagueId, week]);
 
   if (!leagueId) return <div className="panel muted" data-testid="no-league">No Sleeper league selected!</div>;
   if (error && !data) return <div className="panel error">{error}</div>;
@@ -194,7 +159,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     .then(() => setTick((t) => t + 1)).catch((e) => setError(e.message));
 
   const rosterNotes = (plan.roster?.illegal.length ? 1 : 0) + (plan.roster?.ir_candidates.length ? 1 : 0);
-  const count = alerts.length + rosterNotes;
+  const watch = [...(plan.today?.watch || [])].sort((x, y) => (x.alarm === "now" ? "" : x.alarm || "~").localeCompare(y.alarm === "now" ? "" : y.alarm || "~"));
+  const count = watch.length + rosterNotes;
   // The week bar lives in the app header (top bar) while this tab is open.
   const bar = (
         <div className="season-bar">
@@ -211,8 +177,8 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             data-tip="Pull your lineup, locks, scores and news from Sleeper now and recompute the best lineup.">
             {syncing ? "Syncing…" : "⟳ Sync"}</button>
           <span className="bell-wrap">
-            <button className={`small primary bell ${armed ? "" : "off"}`} onClick={arm} data-testid="arm-alarms" aria-label={armed ? "Alarms on" : "Turn on alarms"}
-              data-tip={`${armed ? "Alarms on. " : "Alarms off: click to turn on. "}Rings at each swap check and GTD check while this tab is open, with a browser notification. Click once to allow sound and notifications.`}>🔔</button>
+            <button className="small primary bell" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-bell" aria-label={`${count} to see`}
+              data-tip="What needs you today: GTD / OUT players and when to swap or lock.">🔔</button>
             {count > 0 && <button className="notif-badge" onClick={() => setShowNotifs((s) => !s)} data-testid="notif-badge" aria-label={`${count} notifications`}>{count}</button>}
           </span>
         </div>
@@ -222,12 +188,12 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
     <div className="season-grid">
       <section className="season-main" ref={mainRef}>
         {headerSlot ? createPortal(bar, headerSlot) : bar}
-        {showNotifs && count > 0 && createPortal(
+        {showNotifs && createPortal(
           <div className="notif-pop" data-testid="notif-pop">
-            {alerts.map((a) => (
-              <div key={a.key} className={`panel roster-alert ${["gtd", "out"].includes(a.kind) || a.decision === "SWAP" ? "bad" : "even"}`} data-testid="alarm-banner">
-                <strong>⏰ {a.title}</strong> {a.text}
-                <button className="tiny" style={{ marginLeft: 8 }} onClick={() => setAlerts((x) => x.filter((y) => y.key !== a.key))}>dismiss</button>
+            {count === 0 && <div className="panel muted">Nothing to check right now.</div>}
+            {watch.map((w) => (
+              <div key={`${w.kind}-${w.sid}-${w.backup_sid || ""}`} className={`panel roster-alert ${["gtd", "out"].includes(w.kind) || w.decision === "SWAP" ? "bad" : "even"}`} data-testid="watch-line">
+                <strong>{w.alarm === "now" ? "Now" : timeOf(w.alarm)}</strong> · {watchTitle(w)}
               </div>
             ))}
             <RosterAlerts roster={plan.roster} />
@@ -278,7 +244,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
     <div className="panel scroll team-panel" data-testid="team-panel">
       <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close">✕</button>
       {!t ? <div className="muted">{error || `Loading ${abbr}…`}</div> : <>
-        <div className="tp-head">
+        <div className="tp-head sec">
           <img src={t.logo} alt="" width={52} height={52} onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
           <div>
             <h3 className="tp-name">{t.name}{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</h3>
@@ -289,7 +255,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
           {TEAM_TABS.map(([id, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} data-testid={`team-tab-${id}`}>{label}</button>)}
         </nav>
         {tab === "schedule" && (
-          <div className="tp-schedule" data-testid="team-schedule">{t.schedule.map((g) => (
+          <DragScroll vertical className="tp-schedule sec news-scroll" style={{ marginTop: 0 }} data-testid="team-schedule">{t.schedule.map((g) => (
             <div key={g.date} className="tp-game">
               <span className="small muted tp-date">{dayName(g.date)} {md(g.date)}</span>
               <span className="muted tp-at">{g.home ? "vs" : "@"}</span>
@@ -297,7 +263,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
               <TeamLink abbr={g.opp}>{t.names[g.opp] || g.opp}</TeamLink>
               {g.result && <span className="tp-result"><strong className={g.result === "W" ? "ok" : "warn-text"}>{g.result}</strong> {g.pts}-{g.opp_pts}</span>}
             </div>
-          ))}</div>
+          ))}</DragScroll>
         )}
         {tab === "roster" && (
           <div className="team-card">
@@ -306,7 +272,7 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
           </div>
         )}
         {tab === "stats" && (
-          <DragScroll className="tp-stats-wrap"><table className="tp-stats" data-testid="team-stats">
+          <DragScroll className="tp-stats-wrap sec" ><table className="tp-stats" data-testid="team-stats">
             <thead><tr><th>{t.name}</th>{["MIN", "PTS", "REB", "AST", "FG%", "FT%", "3P%", "STL", "BLK", "TO", "PF"].map((h) => <th key={h} className="num">{h}</th>)}</tr></thead>
             <tbody>{t.stats.map((r) => (
               <tr key={r.sleeper_id} className="clickable" onClick={() => onOpenPid(r.player_id)}>
@@ -317,10 +283,10 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
             ))}</tbody>
           </table></DragScroll>
         )}
-        {tab === "news"&& (news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
-          : <div className="muted">Loading news…</div>)}
+        {tab === "news" && <DragScroll vertical className="sec news-scroll" style={{ marginTop: 0 }}>{news ? (news.length ? news.map((n, i) => <NewsNote key={i} n={n} open={onOpenPid} />) : <div className="muted">No recent notes on this team's players.</div>)
+          : <div className="muted">Loading news…</div>}</DragScroll>}
         {tab === "roster" && (
-          <div data-testid="team-injuries">{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
+          <div className="sec" data-testid="team-injuries"><div className="bid-label sp-head">Roster status</div>{[["q", "? Questionable", "Game-time and day-to-day decisions"], ["out", "(−) Out", "Out and injured reserve"]].map(([g, title, sub]) => {
             const list = t.injuries.filter((h) => h.group === g);
             return (
               <section key={g} className={`tp-inj health-box-${g}`}>
@@ -339,24 +305,6 @@ function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
       </>}
     </div>
   );
-}
-
-/** A horizontally scrollable box you can also grab and drag left / right; a drag doesn't count as a click on what's under it. */
-function DragScroll({ className, children }) {
-  const ref = useRef(null), drag = useRef(null);
-  const [on, setOn] = useState(false);
-  const down = (e) => { if (e.button === 0) drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
-  const move = (e) => {
-    const d = drag.current;
-    if (!d) return;
-    if (!d.moved && Math.abs(e.clientX - d.x) > 4) { d.moved = true; setOn(true); ref.current.setPointerCapture(e.pointerId); }
-    if (d.moved) ref.current.scrollLeft = d.left - (e.clientX - d.x);
-  };
-  const up = () => { setOn(false); if (drag.current && !drag.current.moved) drag.current = null; };
-  // the click that ends a drag lands here first: swallow it so the row under the pointer doesn't open
-  const click = (e) => { if (drag.current?.moved) { e.stopPropagation(); e.preventDefault(); } drag.current = null; };
-  return <div ref={ref} className={`${className} ${on ? "dragging" : ""}`} onPointerDown={down} onPointerMove={move}
-    onPointerUp={up} onPointerCancel={() => { setOn(false); drag.current = null; }} onClickCapture={click}>{children}</div>;
 }
 
 const BOX_COLS = [["MIN", (r) => r.min], ["PTS", (r) => r.stats.pts], ["REB", (r) => r.stats.reb], ["AST", (r) => r.stats.ast],
@@ -649,13 +597,12 @@ function RosterAlerts({ roster }) {
     <>
       {roster.illegal.length > 0 && (
         <div className="panel roster-alert bad" data-testid="roster-illegal">
-          <strong>Roster illegal:</strong> {roster.illegal.join(", ")} {roster.illegal.length > 1 ? "are" : "is"} healthy on IR, which makes 16 healthy players.
-          Sleeper won't let you change your lineup or lock games until you drop someone or trade.
+          <strong>Roster illegal:</strong> drop or trade someone: {roster.illegal.join(", ")} healthy on IR.
         </div>
       )}
       {roster.ir_candidates.length > 0 && (
         <div className="panel roster-alert even" data-testid="roster-ir">
-          <strong>IR spot open ({roster.ir_open}):</strong> move {roster.ir_candidates.join(", ")} to IR. That opens a roster spot for a waiver claim (see Waivers).
+          <strong>IR open:</strong> move {roster.ir_candidates.join(", ")} to IR.
         </div>
       )}
     </>

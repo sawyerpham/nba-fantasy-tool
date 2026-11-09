@@ -39,8 +39,18 @@ const WALLPAPERS = [
 export default function App() {
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem("da.tab");
-    return !t ? "home" : t === "data" || t === "league" ? "settings" : t;   // Data and the old League tab now live on Settings
+    return !t || ["settings", "data", "league"].includes(t) ? "home" : t;   // Settings is a popup now, not a tab
   });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Switch tab; "settings" opens the settings popup instead. */
+  const goTab = (t) => (t === "settings" ? setSettingsOpen(true) : setTab(t));
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    /** Close the popup on Escape. */
+    const k = (e) => e.key === "Escape" && setSettingsOpen(false);
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [settingsOpen]);
   const [leagueId, setLeagueIdState] = useState(() => localStorage.getItem("da.league") || "");
   const [wall, setWall] = useState(() => { const w = localStorage.getItem("da.wall") || ""; return WALLPAPERS.some(([id]) => id === w) ? w : ""; });
   const [theme, setTheme] = useState(() => localStorage.getItem("da.theme") || "");
@@ -98,11 +108,17 @@ export default function App() {
         </nav>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         {health && !health.ok && <span className="meta"><span className="small warn-text" data-testid="health">API unreachable</span></span>}
-        <button className={`cog ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")} data-testid="tab-settings" aria-label="Settings" title="Settings">⚙&#xFE0E;</button>
+        <button className={`cog ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} data-testid="tab-settings" aria-label="Settings" title="Settings">⚙&#xFE0E;</button>
       </header>
       <main>
-        {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={setTab} />}
-        {tab === "settings" && <>
+        {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={goTab} />}
+        {tab === "draft" && <DraftPage leagueId={leagueId} />}
+        {SEASON_VIEWS[tab] && <SeasonPage leagueId={leagueId} view={SEASON_VIEWS[tab]} />}
+      </main>
+      {settingsOpen && (
+        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setSettingsOpen(false)} data-testid="settings-modal">
+          <div className="modal settings-modal">
+            <button className="small settings-close" onClick={() => setSettingsOpen(false)} aria-label="Close settings" data-testid="settings-close">✕</button>
           <div className="panel section-card" data-testid="section-appearance"><h2>Appearance</h2>
           <div className="panel wall-pick"><h3>Theme</h3>
             <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
@@ -120,10 +136,9 @@ export default function App() {
             {leagueId && <SettingsPage leagueId={leagueId} />}
             <DataPage onPoolChanged={refreshHealth} />
           </div>
-        </>}
-        {tab === "draft" && <DraftPage leagueId={leagueId} />}
-        {SEASON_VIEWS[tab] && <SeasonPage leagueId={leagueId} view={SEASON_VIEWS[tab]} />}
-      </main>
+          </div>
+        </div>
+      )}
       <TipLayer />
     </>
   );

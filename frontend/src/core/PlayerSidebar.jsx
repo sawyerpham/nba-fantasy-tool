@@ -70,6 +70,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
   const head = (
     <>
       {onClose && <button className="sidebar-close" onClick={onClose} title="Close profile" data-testid="sidebar-close">✕</button>}
+      <div className="sec profile-top">
       <h3>
         <Headshot sleeperId={rec_.sleeper_id} name={rec_.full_name} size={96} large />
         {rec_.full_name} <span className="muted">{rec_.fantasy?.number != null && `#${rec_.fantasy.number} `}{rec_.team_abbr ? <TeamLink abbr={rec_.team_abbr} /> : "FA"}</span>
@@ -100,6 +101,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       <div className="small muted">
         {bio.height_in ? `${Math.floor(bio.height_in / 12)}'${bio.height_in % 12}"` : "?"} · {bio.weight_lbs ?? "?"} lb
         {bio.years_exp != null ? ` · ${bio.years_exp} yrs exp` : ""}{bio.draft_year ? ` · drafted ${bio.draft_year} R${bio.draft_round} #${bio.draft_number}` : ""}
+      </div>
       </div>
       {error && <div className="error">{error}</div>}
     </>
@@ -170,7 +172,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       {!season && fit?.keeper && fit.player_id === shownId && (() => {
         const k = fit.keeper, cls = { good: "good", even: "even", bad: "bad" }[k.verdict];
         return (
-          <div className="small keeper-line" data-testid="keeper-outlook">
+          <div className="small keeper-line sec" data-testid="keeper-outlook">
             <span className="bid-label"><Term k="keeper_outlook" /></span>{" "}
             <span className={`verdict ${cls}`} data-tip={TERMS.keep_call[1]}>{k.verdict.toUpperCase()} keep</span>
             {k.stash && <> <Term k="stash" className="verdict even" /></>}
@@ -182,14 +184,14 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
       })()}
 
       {!season && !live && row?.worth != null && (
-        <div className="small" data-testid="pre-worth">
+        <div className="small sec" data-testid="pre-worth">
           <span className="bid-label"><Term k="worth" /></span> <strong style={{ fontSize: "1.3em" }}>${row.worth}</strong>
           <span className="muted"> at the first nomination, after keepers. Max and your call show once the draft is live.</span>
         </div>
       )}
 
       {!season && rec && (
-        <div data-testid="recommendation">
+        <div className="sec" data-testid="recommendation">
           <h3>Bid guide <span className="badge info">for {userName || "you"}</span>{onBlock && <span className="badge">on the block</span>}</h3>
           <div className="bid-grid">
             <div className="bid-cell primary">
@@ -219,7 +221,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </div>
       )}
 
-      <div className="small" style={{ marginTop: 10 }} data-testid="sleeper-info">
+      <div className="small sec" data-testid="sleeper-info">
         <span className="muted">Status:</span>{" "}
         <strong className={ov.injury_status === "healthy" ? "" : "warn-text"}>{ov.injury_status.replace(/_/g, " ")}</strong>
         {ov.injury_note && <span className="muted"> · {ov.injury_note}</span>}
@@ -230,7 +232,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
 
       <h3>Fantasy points</h3>
       {row && (
-        <div className="small" data-testid="fp-this-season">
+        <div className="small sec" data-testid="fp-this-season">
           This season: <strong>{row.avg_fpts.toFixed(1)} <Term k="fpg">FP/G</Term></strong>{" "}
           {row.proj_fpts != null ? "(Sleeper projection, used by the rankings)" : "(no Sleeper projection, so last season's number)"}
           {row.proj_fpts != null && row.last_fpts ? <span className={row.proj_fpts >= row.last_fpts ? "ok" : "warn-text"}> · {(row.proj_fpts - row.last_fpts) >= 0 ? "+" : ""}{(row.proj_fpts - row.last_fpts).toFixed(1)} vs last season</span> : null}

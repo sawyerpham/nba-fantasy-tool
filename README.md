@@ -79,3 +79,7 @@ Open http://localhost:5173, create a league, add your Sleeper league id in Setti
 To retune the live finish estimate against this season's finished games (`PRIOR_MINUTES` / `MINUTES_LEFT_SCALE` in
 `backend/app/lockin/weekplan.py`), run `python -m app.lockin.backtest_live [league_id]` from `backend`. It prints the
 error at each game-clock checkpoint and caches box scores under `backend/data/cache/backtest_live/`.
+## Telegram notifications
+1. In Telegram, message @BotFather, send `/newbot`, copy the token. Message your new bot once, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy `chat.id`.
+2. Copy `backend/.env.example` to `backend/.env` and fill in `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+3. Check delivery: `python -m app.notify "hello"` (from `backend`). Then restart `python -m app.serve`; it sends each GTD / OUT / swap / lock call once, at its alarm time, while the backend is running.

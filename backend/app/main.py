@@ -18,7 +18,7 @@ from nba_fantasy_shared.providers.nba_api_provider import NbaApiProvider
 from nba_fantasy_shared.providers.sleeper_provider import SleeperProvider
 from nba_fantasy_shared.storage import JsonStore
 
-from . import config
+from . import config, notify
 from .core.api import data, leagues, players
 from .draft import api as draft
 from .lockin import api as season
@@ -49,6 +49,7 @@ def create_app(state: AppState | None = None) -> FastAPI:
         if getattr(app.state, "app_state", None) is None:
             app.state.app_state = build_default_state()
             log.info("AppState initialised from %s", app.state.app_state.store.root)
+            notify.start_watcher(app.state.app_state)
         yield
 
     app = FastAPI(title="NBA Fantasy Tool API", version=API_VERSION, lifespan=lifespan)
