@@ -30,7 +30,8 @@ const PROPS = ["display", "position", "color", "background-color", "background-i
 const BASE = process.env.DA_URL || "http://localhost:5173";
 const LEAGUE = process.env.DA_LEAGUE || "tobedecided";
 const WALL = process.env.WALL || "";   // a wallpaper id (App.jsx WALLPAPERS) to test contrast over a photo
-const OUT = `e2e/screenshots/ui-${ui}-${w}${WALL ? "-" + WALL : ""}`;
+const THEME = process.env.THEME || "";   // a theme id (App.jsx THEMES)
+const OUT = `e2e/screenshots/ui-${ui}-${w}${WALL ? "-" + WALL : ""}${THEME ? "-" + THEME : ""}`;
 fs.mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ channel: process.env.DA_BROWSER || "msedge", headless: true });
@@ -42,7 +43,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 /** Open the app on a tab with this UI and league, wait for `ready` (a test id) and let fonts and images settle. */
 async function open(tab, ready) {
   await page.goto(BASE);
-  await page.evaluate(([t, l, u, w]) => { localStorage.setItem("da.tab", t); localStorage.setItem("da.league", l); localStorage.setItem("da.ui", u === "new" ? "" : u); localStorage.setItem("da.wall", w); }, [tab, LEAGUE, ui, WALL]);
+  await page.evaluate(([t, l, u, w, th]) => { localStorage.setItem("da.tab", t); localStorage.setItem("da.league", l); localStorage.setItem("da.ui", u === "new" ? "" : u); localStorage.setItem("da.wall", w); localStorage.setItem("da.theme", th); }, [tab, LEAGUE, ui, WALL, THEME]);
   await page.goto(BASE);
   if (ready) await page.getByTestId(ready).first().waitFor();
   await page.waitForTimeout(1200);

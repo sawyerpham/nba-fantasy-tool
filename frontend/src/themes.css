@@ -1,0 +1,135 @@
+/* Design presets (Settings > Theme). Each one overrides the tokens in styles.css and restyles a few signature pieces.
+   Every rule is scoped under :root[data-theme="..."], which adds specificity to the base selector it overrides, so
+   these win regardless of file order. Token blocks use html:root[...] to also beat the wallpaper rule in styles.css.
+   Fonts load in index.html. Check a preset with: THEME=<id> node e2e/ui-shots.mjs */
+
+/* ---------- shared by the three designs: the neon layer is the default theme's identity, not theirs ---------- */
+:root:is([data-theme="courtside"], [data-theme="office"], [data-theme="locker"]) :is(
+  .panel h2, .panel h3, .guide-head h3, .guide h4, .gp-section h4, .panel h4[class^="health-"], .wv-head h3, .news-teams h3, .dg-side h3,
+  .modal > h3:first-child, .guide-card > .bid-label, .guide-chips .bid-label, header.top nav button, header.top nav button.active,
+  .pos-c, .mu-slot span, .season-week, .team-name-tag.is-me .team-user, .team-name-tag.is-me .team-name-lines > :first-child) { text-shadow: none; }
+:root:is([data-theme="courtside"], [data-theme="office"], [data-theme="locker"]) :is(.neon-arrow svg, header.top .icon-btn) { filter: none; }
+:root:is([data-theme="courtside"], [data-theme="office"], [data-theme="locker"]) .matchup .mu-team { box-shadow: none; }
+:root:is([data-theme="courtside"], [data-theme="office"], [data-theme="locker"]) :is(.panel h2, .panel h3, .guide-head h3, .guide h4, .wv-head h3,
+  .news-teams h3, .dg-side h3, .modal > h3:first-child):not(.tp-name, :has(img, .headshot)) { color: var(--text); }
+
+
+/* ========== Courtside: broadcast scoreboard ==========
+   Near-black, solid panels, sharp corners, condensed display type for scores and titles, orange broadcast accent. */
+html:root[data-theme="courtside"] {
+  --page: #060708; --bg: #060708; --panel: #0e1013; --panel-2: #171a1f; --panel-solid: #0e1013; --header: #0a0b0d; --border: #262b32; --border-inner: #1d2127;
+  --input-bg: #0a0b0d; --input-border: #2e343c; --hover: rgba(255, 255, 255, 0.05); --badge: rgba(255, 255, 255, 0.07);
+  --text: #f5f5f4; --muted: #9ca3af;
+  --primary: #f97316; --accent2: #facc15; --info-t: #fdba74; --primary-soft: color-mix(in srgb, var(--primary) 14%, transparent); --on-primary: #111;
+  --font-display: "Barlow Condensed", var(--font-ui); --font-num: "Barlow Condensed", var(--font-ui);
+  --radius: 6px; --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="courtside"] header.top { border-top: 3px solid var(--primary); }
+:root[data-theme="courtside"] header.top .brand { font-family: var(--font-display); font-size: var(--fs-2xl); text-transform: uppercase; letter-spacing: 0.02em; }
+:root[data-theme="courtside"] header.top .brand .logo { border-radius: 4px; background: var(--primary); color: #111; }
+:root[data-theme="courtside"] header.top nav { border-radius: 6px; padding: 3px; }
+:root[data-theme="courtside"] header.top nav button { text-transform: uppercase; font-weight: 700; font-size: var(--fs-lg); letter-spacing: 0.04em; border-radius: 4px; padding: 3px 14px; }
+:root[data-theme="courtside"] header.top nav button.active { background: var(--c); color: #0b0b0c; box-shadow: none; }
+:root[data-theme="courtside"] .season-wk { border-radius: 6px; }
+:root[data-theme="courtside"] .season-week { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: 0.04em; color: var(--text); }
+:root[data-theme="courtside"] header.top .icon-btn, :root[data-theme="courtside"] button.neon-arrow { border-radius: 6px; }
+:root[data-theme="courtside"] :is(.panel > h3, .panel > h2, .guide-head h3, .news-teams h3, .wv-head h3):not(.tp-name, :has(img, .headshot)) {
+  text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; font-size: var(--fs-xl); border-left: 3px solid var(--primary); padding-left: 10px; }
+:root[data-theme="courtside"] :is(.bid-label, .sp-head, th) { font-family: var(--font-display); letter-spacing: 0.06em; font-size: var(--fs-xs); }
+/* the scoreboard: both managers as broadcast score bugs, you in orange, the opponent in yellow */
+:root[data-theme="courtside"] .matchup .mu-team { border-radius: 4px; background: linear-gradient(180deg, #15181d, #0c0e11); border: 1px solid var(--border); border-top: 3px solid var(--primary); }
+:root[data-theme="courtside"] .matchup .mu-team.right { border-top-color: var(--accent2); }
+:root[data-theme="courtside"] .matchup .mc-points { font-weight: 800; font-size: clamp(30px, 2.4vw, 46px); letter-spacing: -0.01em; }
+:root[data-theme="courtside"] .matchup .mc-name { text-transform: uppercase; letter-spacing: 0.02em; font-weight: 700; }
+:root[data-theme="courtside"] .mu-slot span { font-weight: 800; font-size: var(--fs-2xl); }
+:root[data-theme="courtside"] :is(.mu-card, .game-chip, .timeline, .sec, .guide-card, .sp-game, .sp-stat, .tl-next) { border-radius: 4px; }
+:root[data-theme="courtside"] .game-chip.today { border-color: var(--primary); box-shadow: inset 0 -2px var(--primary); }
+:root[data-theme="courtside"] :is(.sp-fp span, .hub-win strong) { font-weight: 800; }
+:root[data-theme="courtside"] .profile-tabs { border-radius: 6px; }
+:root[data-theme="courtside"] .profile-tabs button { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; font-size: var(--fs-md); border-radius: 4px; }
+
+
+/* ========== Front Office: analyst terminal ==========
+   Quiet greys, one muted indigo accent, hairlines instead of boxes, monospaced figures, tighter spacing. */
+html:root[data-theme="office"] {
+  --page: #0a0b0d; --bg: #0a0b0d; --panel: #101114; --panel-2: #15171b; --panel-solid: #101114; --header: #0a0b0d; --border: #24272c; --border-inner: #1b1e22;
+  --input-bg: #0c0d10; --input-border: #2b2e34; --hover: rgba(255, 255, 255, 0.035); --badge: rgba(255, 255, 255, 0.05);
+  --text: #e6e7ea; --muted: #878c96;
+  --primary: #6e79d6; --accent2: #6e79d6; --info-t: #c3c8f4; --primary-soft: color-mix(in srgb, var(--primary) 13%, transparent);
+  --font-num: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+  --radius: 8px; --shadow: none;
+}
+:root[data-theme="office"] .panel { padding: 14px 16px; }
+:root[data-theme="office"] header.top .brand .logo { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+:root[data-theme="office"] header.top nav { background: transparent; padding: 0; gap: 2px; }
+:root[data-theme="office"] header.top nav button { color: var(--muted); border-radius: 6px; }
+:root[data-theme="office"] header.top nav button:hover { color: var(--text); background: var(--hover); }
+:root[data-theme="office"] header.top nav button.active { color: var(--text); background: var(--panel-2); box-shadow: inset 0 -2px var(--primary); font-weight: 600; }
+:root[data-theme="office"] .season-week { color: var(--text); font-weight: 600; }
+:root[data-theme="office"] header.top .icon-btn { color: var(--muted); }
+:root[data-theme="office"] header.top .icon-btn:hover:not(:disabled) { color: var(--text); }
+/* titles become small uppercase section labels: the numbers carry the page */
+:root[data-theme="office"] :is(.panel > h3, .panel > h2, .guide-head h3, .news-teams h3, .wv-head h3):not(.tp-name, :has(img, .headshot)) {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--muted); }
+:root[data-theme="office"] .matchup .mu-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; }
+:root[data-theme="office"] .matchup .mu-team:not(.right) { box-shadow: inset 2px 0 var(--primary); }
+:root[data-theme="office"] .matchup .mc-points { font-weight: 600; letter-spacing: -0.03em; }
+:root[data-theme="office"] .mu-slot span { font-weight: 600; font-size: var(--fs-md); }
+:root[data-theme="office"] :is(.mu-card, .game-chip, .timeline, .sec, .guide-card, .sp-game, .sp-stat) { border-radius: 6px; }
+:root[data-theme="office"] .game-chip { background: transparent; }
+:root[data-theme="office"] .gch-fp { letter-spacing: -0.04em; }
+/* tabs as an underlined strip instead of a filled bar */
+:root[data-theme="office"] .profile-tabs { background: transparent; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; }
+:root[data-theme="office"] .profile-tabs button { border-radius: 0; color: var(--muted); }
+:root[data-theme="office"] .profile-tabs button.active { background: transparent; color: var(--text); box-shadow: inset 0 -2px var(--primary); }
+:root[data-theme="office"] :is(.sp-fp span, .hub-win strong) { font-weight: 600; letter-spacing: -0.03em; }
+
+
+/* ========== Locker Room: light ==========
+   White cards on a soft grey page, rounded corners, soft shadows, darker data colours so they read on white.
+   The wallpaper photo is off here: a pixelated photo behind white cards fights the light look. */
+html:root[data-theme="locker"] {
+  --page: #eceff3; --bg: #f2f4f7; --panel: #ffffff; --panel-2: #f3f5f8; --panel-solid: #ffffff; --header: rgba(255, 255, 255, 0.9); --border: #e1e5eb; --border-inner: #eceff3;
+  --input-bg: #ffffff; --input-border: #d4d9e1; --hover: rgba(15, 23, 42, 0.04); --selected: color-mix(in srgb, var(--primary) 10%, transparent);
+  --badge: rgba(15, 23, 42, 0.06); --badge-text: #374151; --progress: #e5e7eb;
+  --text: #121620; --muted: #5b6474;
+  --primary: #2563eb; --accent2: #7c3aed; --info-t: #1d4ed8; --primary-soft: color-mix(in srgb, var(--primary) 10%, transparent); --on-primary: #fff;
+  --ok: #15803d; --danger: #dc2626; --error: #dc2626; --live: #ef4444; --q: #b45309;
+  --good: #dcfce7; --good-t: #166534; --even: #fef3c7; --even-t: #92400e; --bad: #fee2e2; --bad-t: #b91c1c; --warn: #fee2e2; --warn-t: #b91c1c;
+  --sleeper: #e0f2fe; --sleeper-t: #0369a1; --manual: #fef3c7; --manual-t: #92400e; --user-card: rgba(22, 163, 74, 0.06); --user-b: rgba(22, 163, 74, 0.4);
+  --pos-PG: #e11d48; --pos-SG: #ea580c; --pos-SF: #0d9488; --pos-PF: #0284c7; --pos-C: #9333ea;
+  --rank-1: #16a34a; --rank-2: #65a30d; --rank-3: #ca8a04; --rank-4: #f87171;
+  --font-ui: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --radius: 16px; --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 14px rgba(16, 24, 40, 0.06);
+  color-scheme: light;
+}
+:root[data-theme="locker"] body::before { display: none; }
+:root[data-theme="locker"] * { scrollbar-color: rgba(15, 23, 42, 0.25) transparent; }
+/* the dark theme's legibility outlines and dark badge underlays are for dark pages only */
+:root[data-theme="locker"] :is(.pos-c, .pos-rank, .teammate-rank, .room-slot-pos, .player-sub, .trend, .fit-num, .bid-label, .muted) { text-shadow: none; }
+:root[data-theme="locker"] :is(.badge, .verdict, .tier-cell, .tier-tag, .role-tag, .inj, .toast-tag, .chips .chip) { box-shadow: none; }
+:root[data-theme="locker"] :is(.tier-cell, .tier-tag) { color: hsl(var(--h, 230) 70% 34%); background: hsl(var(--h, 230) 75% 50% / 0.13); }
+:root[data-theme="locker"] header.top { box-shadow: 0 1px 0 var(--border); border-bottom: 0; backdrop-filter: blur(10px); }
+:root[data-theme="locker"] header.top nav { background: #e9ecf1; }
+:root[data-theme="locker"] header.top nav button { color: var(--muted); }
+:root[data-theme="locker"] header.top nav button:hover { background: rgba(255, 255, 255, 0.6); }
+:root[data-theme="locker"] header.top nav button.active { background: #fff; color: color-mix(in srgb, var(--c) 72%, #000); box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12); }
+:root[data-theme="locker"] header.top .icon-btn { background: #fff; color: var(--muted); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); }
+:root[data-theme="locker"] header.top .icon-btn:hover:not(:disabled) { color: var(--primary); background: #fff; }
+:root[data-theme="locker"] .season-wk { background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); border: 1px solid var(--border); }
+:root[data-theme="locker"] .season-week { color: var(--text); font-weight: 800; }
+:root[data-theme="locker"] button.neon-arrow { color: var(--muted); }
+:root[data-theme="locker"] button.neon-arrow:hover:not(:disabled) { color: var(--primary); background: var(--primary-soft); }
+:root[data-theme="locker"] .matchup .mu-team { background: #fff; border: 1px solid var(--border); box-shadow: var(--shadow); }
+:root[data-theme="locker"] .matchup .mu-team:not(.right) { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+:root[data-theme="locker"] :is(.mu-card, .sec, .guide-card, .sp-game) { background: #fff; border-radius: 12px; }
+:root[data-theme="locker"] .panel :is(.mu-card, .sec, .guide-card, .sp-game) { border-color: var(--border); }
+:root[data-theme="locker"] .panel.matchup, :root[data-theme="locker"] .season-side > .panel { background: var(--panel-2); }
+:root[data-theme="locker"] .game-chip { background: var(--panel-2); border-color: var(--border-inner); border-radius: 10px; }
+:root[data-theme="locker"] .game-chip.today { background: var(--primary-soft); }
+:root[data-theme="locker"] .timeline { background: #fff; border-radius: 12px; }
+:root[data-theme="locker"] .sp-stat { background: var(--panel-2); }
+:root[data-theme="locker"] .sec .sp-stat { background: var(--panel-2); }
+:root[data-theme="locker"] .live-lot-bid { border: 1px solid var(--border); }
+:root[data-theme="locker"] .log-box.even { background: #fde047; } :root[data-theme="locker"] .log-box.down { background: #fca5a5; }
+:root[data-theme="locker"] .modal-backdrop { background: rgba(15, 23, 42, 0.35); }

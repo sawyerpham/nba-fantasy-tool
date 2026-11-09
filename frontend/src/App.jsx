@@ -20,7 +20,9 @@ const TAB_COLORS = { season: "#3b82f6", news: "#f59e0b", standings: "#10b981", w
 const SEASON_VIEWS = { season: "week", news: "news", standings: "league", waivers: "waivers" };
 
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
-const THEMES = [["", "Indigo (default)"], ["ocean", "Ocean"], ["sunset", "Sunset"]];   // accent colour presets, see styles.css
+// accent presets (styles.css) and full design presets (themes.css): fonts, surfaces, corners and effects
+const THEMES = [["", "Indigo (default)"], ["ocean", "Ocean"], ["sunset", "Sunset"],
+  ["courtside", "Courtside: broadcast scoreboard"], ["office", "Front Office: analyst terminal"], ["locker", "Locker Room: light"]];
 
 const WALLPAPERS = [
   ["", "No wallpaper"],
