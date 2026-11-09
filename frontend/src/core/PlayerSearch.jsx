@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Headshot from "./Headshot.jsx";
 import { PosList } from "./Pos.jsx";
 import { api, qs } from "../api.js";
+import Icon from "./Icon.jsx";
 
 const TEAMS = ("ATL Atlanta Hawks,BOS Boston Celtics,BKN Brooklyn Nets,CHA Charlotte Hornets,CHI Chicago Bulls,CLE Cleveland Cavaliers," +
   "DAL Dallas Mavericks,DEN Denver Nuggets,DET Detroit Pistons,GSW Golden State Warriors,HOU Houston Rockets,IND Indiana Pacers," +
@@ -80,7 +81,7 @@ export default function PlayerSearch({ leagueId, onSelect, onSelectTeam, placeho
           ))}
         </div>
       )}
-      {q && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => { setQ(""); setOpen(false); input.current?.focus(); }}>✕</button>}
+      {q && <button type="button" className="search-clear" aria-label="Clear search" onClick={() => { setQ(""); setOpen(false); input.current?.focus(); }}><Icon name="x" /></button>}
     </div>
   );
 }

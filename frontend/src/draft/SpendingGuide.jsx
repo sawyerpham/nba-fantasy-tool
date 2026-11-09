@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { PosTag } from "../core/Pos.jsx";
 import { api } from "../api.js";
 import { CallBadge, Term, TERMS, liveCall } from "../core/Terms.jsx";
+import Icon from "../core/Icon.jsx";
 
 /** English ordinal for a number (1st, 2nd, 3rd, 11th, 22nd). */
 export const ordinal = (n) => {
@@ -35,7 +36,7 @@ export default function SpendingGuide({ leagueId, live, refreshKey, onSelect, lo
       <div className="row">
         <h3 style={{ margin: 0 }}>Spending guide <span className="badge info">for {g.name}</span></h3>
         {!open && <span className="small muted">${me.remaining} · {me.open_mandatory} open</span>}
-        <button className="small ghost" onClick={toggle} data-testid="toggle-spending" style={{ marginLeft: "auto" }}>{open ? "▾ hide" : "▸ show"}</button>
+        <button className="small ghost" onClick={toggle} data-testid="toggle-spending" style={{ marginLeft: "auto" }}><Icon name={open ? "chevron-down" : "chevron-right"} /> {open ? "hide" : "show"}</button>
       </div>
       {open && (
         <>

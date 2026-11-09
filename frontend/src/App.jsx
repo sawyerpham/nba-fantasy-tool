@@ -7,6 +7,7 @@ import SettingsPage from "./core/SettingsPage.jsx";
 import DraftPage from "./draft/DraftPage.jsx";
 import SeasonPage from "./lockin/SeasonPage.jsx";
 import { TipLayer } from "./core/Terms.jsx";
+import Icon from "./core/Icon.jsx";
 
 const TABS = [
   ["season", "Season"],
@@ -31,6 +32,11 @@ const WALLPAPERS = [
   ["lebron-block", "LeBron chase-down block"],
   ["lebron-chalk", "LeBron chalk toss"],
 ];
+
+/** The UI this page loaded with ("" new, "classic" the pre-makeover backup in src/classic); main.jsx picks it. */
+const UI = (() => { try { return localStorage.getItem("da.ui") || ""; } catch { return ""; } })();
+/** Switch UI: remember the choice and reload, since each UI brings its own global stylesheet. */
+const setUi = (v) => { try { localStorage.setItem("da.ui", v); } catch { } location.reload(); };
 
 /**
  * Root component: the header (tabs, settings cog) and the page for the open tab (Home, Settings, Draft or a Season view).
@@ -76,6 +82,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.style.setProperty("--wall", wall ? `url(/wallpapers/${wall}.png)` : "none");
+    document.documentElement.dataset.wall = wall;   // styles.css darkens content panels over a photo
     localStorage.setItem("da.wall", wall);
   }, [wall]);
 
@@ -98,7 +105,8 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo">🏀</span>{leagueName || "NBA Fantasy Tool"}</span>
+        <div className="header-left">
+        <span className="brand" onClick={() => setTab("home")} title="Home" data-testid="home"><span className="logo"><Icon name="ball" /></span>{leagueName || "NBA Fantasy Tool"}</span>
         <nav>
           {TABS.map(([id, label]) => (
             <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} style={{ "--c": TAB_COLORS[id] }} data-testid={`tab-${id}`}>
@@ -106,9 +114,10 @@ export default function App() {
             </button>
           ))}
         </nav>
+        </div>
         <div id="header-slot" className="header-slot" />   {/* pages can put their own bar here (Season: week bar) */}
         {health && !health.ok && <span className="meta"><span className="small warn-text" data-testid="health">API unreachable</span></span>}
-        <button className={`cog ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} data-testid="tab-settings" aria-label="Settings" title="Settings">⚙&#xFE0E;</button>
+        <button className={`cog icon-btn ${settingsOpen ? "active" : ""}`} onClick={() => setSettingsOpen(true)} data-testid="tab-settings" aria-label="Settings" title="Settings"><Icon name="settings" /></button>
       </header>
       <main>
         {tab === "home" && <HomePage setLeagueId={setLeagueId} setTab={goTab} />}
@@ -118,8 +127,13 @@ export default function App() {
       {settingsOpen && (
         <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setSettingsOpen(false)} data-testid="settings-modal">
           <div className="modal settings-modal">
-            <button className="small settings-close" onClick={() => setSettingsOpen(false)} aria-label="Close settings" data-testid="settings-close">✕</button>
+            <button className="small settings-close" onClick={() => setSettingsOpen(false)} aria-label="Close settings" data-testid="settings-close"><Icon name="x" /></button>
           <div className="panel section-card" data-testid="section-appearance"><h2>Appearance</h2>
+          <div className="panel wall-pick"><h3>UI</h3>
+            <select value={UI} onChange={(e) => setUi(e.target.value)} data-testid="ui">
+              <option value="">New</option><option value="classic">Classic (backup, Nov 2026)</option>
+            </select>
+          </div>
           <div className="panel wall-pick"><h3>Theme</h3>
             <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
               {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}

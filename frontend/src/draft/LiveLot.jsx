@@ -132,7 +132,7 @@ export default function LiveLot({ leagueId, lot, row, rankings, managers, onOpen
         </div>
         <div className="live-card keeper" data-testid="live-keeper">
           <div className="live-card-title"><Term k="keeper_outlook" /></div>
-          {k ? <div><span className="muted">at his Max ${k.buy_price}: </span><span className={`verdict ${k.verdict}`}>{k.verdict.toUpperCase()} keep</span>{k.stash && <> <Term k="stash" className="verdict even" /></>}{k.good_up_to != null ? <span className="muted"> · GOOD keep if ≤ <strong style={{ color: "var(--text)" }}>${k.good_up_to}</strong></span> : <span className="muted"> · not a good keep at any price</span>}</div>
+          {k ? <div><span className="muted">at his Max ${k.buy_price}: </span><span className={`verdict ${k.verdict}`}>{k.verdict.toUpperCase()} keep</span>{k.stash && <> <Term k="stash" className="verdict even" /></>}{k.good_up_to != null ? <span className="muted"> · GOOD keep if ≤ <strong>${k.good_up_to}</strong></span> : <span className="muted"> · not a good keep at any price</span>}</div>
             : <div className="muted">—</div>}
         </div>
       </div>

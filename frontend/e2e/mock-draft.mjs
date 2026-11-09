@@ -29,12 +29,16 @@ page.on("pageerror", (e) => log("PAGE ERROR:", e.message));
 /** Save a full-page screenshot under e2e/screenshots. */
 const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 const summary = { league: LEAGUE, steps: [], picks: [] };
+/** Open the Settings popup (the cog) unless it is already open. */
+const openSettings = async () => { if (!(await page.getByTestId("settings-modal").count())) await page.getByTestId("tab-settings").click(); };
+/** Close the Settings popup if it is open, so the tabs underneath can be clicked. */
+const closeSettings = async () => { if (await page.getByTestId("settings-modal").count()) await page.getByTestId("settings-close").click(); };
 
 try {
   await page.goto(BASE);
   await page.getByTestId("home").waitFor();
 
-  await page.getByTestId("tab-settings").click();   // settings and data pull live on the Settings tab
+  await openSettings();   // settings and data pull live in the Settings popup
   if (process.env.DA_SKIP_PULL !== "1") {
     await page.getByTestId("pull-button").click();
     await page.waitForFunction(() => {
@@ -50,7 +54,7 @@ try {
   await shot("01-data");
   summary.steps.push("data pull done");
 
-  await page.getByTestId("tab-settings").click();
+  await openSettings();
   await page.getByTestId("create-league-id").fill(LEAGUE);
   await page.getByTestId("create-league-name").fill("Mock Auction 2026-27");
   await page.getByTestId("create-league-submit").click();
@@ -73,7 +77,7 @@ try {
   await shot("02-league");
   summary.steps.push("league created, 12 managers named/paced in bulk and saved with one click");
 
-  await page.getByTestId("tab-settings").click();   // settings and data pull live on the Settings tab
+  await openSettings();
   await page.getByTestId("budget").waitFor();
   assert((await page.getByTestId("budget").inputValue()) === "200", "budget default 200");
   assert((await page.getByTestId("slot-BN").inputValue()) === "8", "8 bench slots");
@@ -85,6 +89,7 @@ try {
   await shot("03-settings");
   summary.steps.push("settings verified and saved");
 
+  await closeSettings();
   await page.getByTestId("tab-draft").click();
   await page.getByTestId("rankings-table").waitFor();
   const top = await apiGet(`/leagues/${LEAGUE}/rankings?limit=1`);

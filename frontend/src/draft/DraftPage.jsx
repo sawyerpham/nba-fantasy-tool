@@ -16,6 +16,7 @@ import NominationOrderBar from "./NominationOrderBar.jsx";
 import SpendingGuide from "./SpendingGuide.jsx";
 import MarketPanel from "./MarketPanel.jsx";
 import EditPickDialog from "./EditPickDialog.jsx";
+import Icon from "../core/Icon.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
@@ -244,17 +245,17 @@ export default function DraftPage({ leagueId }) {
           <span className="small muted">{view.picks.length} picks · {view.available_count} left</span>
           {live && (
             <span className="small muted upcoming">
-              Nominating: <strong style={{ color: "var(--text)" }} data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong>
+              Nominating: <strong data-testid="next-nominator" data-manager-id={view.next_nominator || ""}>{nameOf(view.next_nominator) || "—"}</strong>
               {upcoming.length > 0 && <> · then {upcoming.join(", ")}</>}
             </span>
           )}
           <button className="small ghost" onClick={() => document.getElementById("room")?.scrollIntoView({ behavior: "smooth" })} data-testid="btn-room"
             title="every manager's money, roster and who to nominate to make them spend">Room ↓</button>
           <button className={`small ${showOrder ? "" : "ghost"}`} onClick={() => setOrderOpen(!showOrder)} data-testid="btn-order"
-            title="change the nomination order or who nominates next">{showOrder ? "▾ Order" : "▸ Order"}</button>
+            title="change the nomination order or who nominates next"><Icon name={showOrder ? "chevron-down" : "chevron-right"} /> Order</button>
           <span className="spacer" />
           <button className="small ghost" onClick={() => { nominationSound(); setTimeout(bidSound, 1100); }} data-testid="test-sounds"
-            data-tip="Plays the new-nomination sound, then the new-bid sound. Also lets the browser play them during the draft.">🔊 Test sounds</button>
+            data-tip="Plays the new-nomination sound, then the new-bid sound. Also lets the browser play them during the draft."><Icon name="volume" /> Test sounds</button>
           {live && (
             <span className="sync-box" data-testid="sync-box">
               <label className="inline small" data-tip="Checks the Sleeper draft every second: records picks, shows the live nomination and bid.">
@@ -272,7 +273,7 @@ export default function DraftPage({ leagueId }) {
             </span>
           )}
           {view.status === "setup" && <button className="primary" onClick={() => setStartOpen(true)} data-testid="btn-start">Start draft…</button>}
-          {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo">↶ Undo</button>}
+          {live && <button onClick={() => act("undo")} disabled={!view.picks.some((p) => !p.is_keeper)} data-testid="btn-undo"><Icon name="undo" /> Undo</button>}
           {live && <button onClick={() => window.confirm("Complete the draft?") && act("complete")} data-testid="btn-complete">Complete</button>}
           <button className="ghost" onClick={exportLeague} data-testid="btn-export">Export</button>
           {view.status !== "setup" && <button className="danger" onClick={() => window.confirm("Reset the draft? All picks are removed.") && act("reset")} data-testid="btn-reset">Reset</button>}
@@ -370,7 +371,7 @@ export default function DraftPage({ leagueId }) {
             <label className="inline small muted"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> show unrosterable</label>
             </>}
             {view2 === "players" && <label className="inline small muted">top <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}><option>50</option><option>150</option><option>300</option><option>1000</option></select></label>}
-            <button className="ghost" onClick={() => { loadRankings(); loadView(); }} title="Refresh">↻</button>
+            <button className="ghost" onClick={() => { loadRankings(); loadView(); }} title="Refresh" aria-label="Refresh"><Icon name="refresh" /></button>
           </div>
           <div className="panel scroll" style={{ padding: "0 4px" }}>
             {view2 === "nba" ? <NbaTeamsTable leagueId={leagueId} refreshKey={refreshKey} onSelectPlayer={setSelected} />

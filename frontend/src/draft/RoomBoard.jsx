@@ -3,10 +3,11 @@ import { PosList, PosTag } from "../core/Pos.jsx";
 import { api } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 import { Term, TERMS, priceTone } from "../core/Terms.jsx";
+import Icon from "../core/Icon.jsx";
 
 /**
  * Page 2 of the draft: one card per manager with money, roster by spot, needs and habits.
- * Click a player for his profile, ✎ to edit the pick, or drag a pick onto another card to move it.
+ * Click a player for his profile, the pencil to edit the pick, or drag a pick onto another card to move it.
  */
 export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPick, onMovePick, onSelectPlayer }) {
   const [room, setRoom] = useState(null);
@@ -44,8 +45,8 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
             </div>
             <div className="room-money">
               <span><span className="big" data-testid={`remaining-${m.manager_id}`}>${b.remaining}</span></span>
-              <span className="muted"><Term k="cap">cap</Term> <strong style={{ color: "var(--text)" }} data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
-              <span className="muted"><strong style={{ color: "var(--text)" }}>${m.per_slot}</strong><Term k="per_slot">/slot</Term></span>
+              <span className="muted"><Term k="cap">cap</Term> <strong data-testid={`maxbid-${m.manager_id}`}>${b.max_bid}</strong></span>
+              <span className="muted"><strong>${m.per_slot}</strong><Term k="per_slot">/slot</Term></span>
               <span className="muted">{b.open_mandatory} <Term k="open">open</Term></span>
             </div>
             <div className="room-slots">
@@ -59,7 +60,7 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                         onDragStart={(e) => { setDragging(p); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(p.pick_number)); }}
                         onDragEnd={() => { setDragging(null); setOver(null); }}
                         onClick={() => onSelectPlayer?.(p.player_id)}
-                        data-tip={`Click for his profile${onEditPick ? ", drag to move, ✎ to edit" : ""}`}>
+                        data-tip={`Click for his profile${onEditPick ? ", drag to move, the pencil to edit" : ""}`}>
                         <Headshot sleeperId={p.sleeper_id} name={p.player_name} size={30} />
                         <span className="room-slot-who">
                           <span className="room-slot-name">{p.player_name}</span>
@@ -68,7 +69,7 @@ export default function RoomBoard({ leagueId, rosterSlots, refreshKey, onEditPic
                         <span className="room-slot-fpg" data-tip={TERMS.fpg[1]}>{p.fpg != null ? p.fpg.toFixed(1) : ""}</span>
                         {(() => { const t = priceTone(p.price, p.worth, p.is_keeper); return <strong className={`room-slot-price ${t.cls}`} data-tip={t.tip}>${p.price}</strong>; })()}
                         {onEditPick && <button type="button" className="pick-edit" title="edit or remove this pick"
-                          onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`}>✎</button>}
+                          onClick={(e) => { e.stopPropagation(); onEditPick(p); }} data-testid={`pick-chip-${p.pick_number}`} aria-label="Edit pick"><Icon name="pencil" /></button>}
                       </span>
                     ) : <span className="muted">—</span>}
                   </div>

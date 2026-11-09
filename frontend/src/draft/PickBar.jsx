@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import Headshot from "../core/Headshot.jsx";
 import { tierHue } from "../core/Pos.jsx";
 import { Term, TERMS } from "../core/Terms.jsx";
+import Icon from "../core/Icon.jsx";
 
 /**
  * Inline "who won it?" bar: the price is prefilled with the recommended max, and one click on a manager records the pick.
@@ -91,7 +92,7 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
         {interest.length > 0 && (
           <div className="small muted" data-testid="pick-interest">
             <span className="label" style={{ marginRight: 6 }}>Watch out</span>
-            {interest.map(({ m, why }, i) => <span key={m.manager_id}>{i ? " · " : ""}<strong style={{ color: "var(--text)" }}>{m.name}</strong> ({why})</span>)}
+            {interest.map(({ m, why }, i) => <span key={m.manager_id}>{i ? " · " : ""}<strong>{m.name}</strong> ({why})</span>)}
           </div>
         )}
         {error && <div className="error" data-testid="pick-error">{error}</div>}
@@ -112,7 +113,7 @@ export default function PickBar({ leagueId, view, player, nominatedBy, tier, sea
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => <button key={d} type="button" onClick={() => tap(d)} data-testid={`numpad-${d}`}>{d}</button>)}
             <button type="button" className="zero" onClick={() => tap(0)} data-testid="numpad-0">0</button>
           </div>
-          <button type="button" className="numpad-clear" onClick={clear} title="erase the price" data-testid="numpad-clear">✕</button>
+          <button type="button" className="numpad-clear" onClick={clear} title="erase the price" data-testid="numpad-clear" aria-label="Erase the price"><Icon name="x" /></button>
         </div>
       </div>
     </div>
