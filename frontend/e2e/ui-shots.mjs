@@ -1,6 +1,6 @@
 // Screenshots of every main screen in one UI, for before / after comparison during the redesign.
 // Prereqs: backend on :8000 and the Vite dev server on :5173, and a league with a Sleeper link.
-// Run:     node e2e/ui-shots.mjs [new|classic] [width] [height]   (env: DA_URL, DA_LEAGUE, DA_BROWSER)
+// Run:     node e2e/ui-shots.mjs [new|command|broadcast|classic] [width] [height]   (env: DA_URL, DA_LEAGUE, DA_BROWSER)
 // Output:  e2e/screenshots/ui-<ui>-<width>/<screen>.png (gitignored)
 // DUMP=<label> also writes every element's computed style per screen to e2e/screenshots/styles-<label>.json;
 // node e2e/ui-shots.mjs --diff a b compares two dumps (a pure CSS refactor must show no differences).
@@ -30,7 +30,7 @@ const PROPS = ["display", "position", "color", "background-color", "background-i
 const BASE = process.env.DA_URL || "http://localhost:5173";
 const LEAGUE = process.env.DA_LEAGUE || "tobedecided";
 const WALL = process.env.WALL || "";   // a wallpaper id (App.jsx WALLPAPERS) to test contrast over a photo
-const THEME = process.env.THEME || "";   // a theme id (App.jsx THEMES)
+const THEME = process.env.THEME || "courtside";   // a theme id (App.jsx THEMES)
 const OUT = `e2e/screenshots/ui-${ui}-${w}${WALL ? "-" + WALL : ""}${THEME ? "-" + THEME : ""}`;
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -45,7 +45,7 @@ async function open(tab, ready) {
   await page.goto(BASE);
   await page.evaluate(([t, l, u, w, th]) => { localStorage.setItem("da.tab", t); localStorage.setItem("da.league", l); localStorage.setItem("da.ui", u === "new" ? "" : u); localStorage.setItem("da.wall", w); localStorage.setItem("da.theme", th); }, [tab, LEAGUE, ui, WALL, THEME]);
   await page.goto(BASE);
-  if (ready) await page.getByTestId(ready).first().waitFor();
+  if (ready) await (ready.startsWith("[") ? page.locator(ready) : page.getByTestId(ready)).first().waitFor();
   await page.waitForTimeout(1200);
 }
 /** Screenshot the viewport as <name>.png. */
@@ -66,7 +66,7 @@ const shot = async (name) => {
 
 try {
   await open("home", "home"); await shot("01-home");
-  await open("season", "timeline"); await shot("02-week");
+  await open("season", '[data-testid^="open-"]'); await shot("02-week");   // any player row: every UI has them
   await page.locator('[data-testid^="open-"]').first().click();
   await page.getByTestId("season-summary").waitFor(); await page.waitForTimeout(800); await shot("03-player-card");
   await page.locator(".profile-tabs button").nth(1).click(); await page.waitForTimeout(800); await shot("04-player-gamelog");

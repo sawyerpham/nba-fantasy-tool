@@ -17,20 +17,20 @@ import Icon from "../core/Icon.jsx";
 const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP calls
 
 /** One-line headline of a watch line: who to check, bench, start or lock. */
-const watchTitle = (w) => w.kind === "gtd" ? `${w.name} GTD: check, else start ${w.backup}` : w.kind === "out" ? `${w.name} OUT: bench${w.backup ? `, start ${w.backup}` : ""}` : w.kind === "lock" ? `Lock ${w.name} now`
+export const watchTitle = (w) => w.kind === "gtd" ? `${w.name} GTD: check, else start ${w.backup}` : w.kind === "out" ? `${w.name} OUT: bench${w.backup ? `, start ${w.backup}` : ""}` : w.kind === "lock" ? `Lock ${w.name} now`
   : w.decision === "SWAP" ? `SWAP: bench ${w.name}, start ${w.backup}` : `${w.decision}: ${w.backup} check`;
 
 /** Minutes from now as a countdown: "2d 5h", "19h 42m" or "7m". */
-const untilText = (mins) => {
+export const untilText = (mins) => {
   const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
 };
 /** Short weekday name ("Mon") for a YYYY-MM-DD date. */
-const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
+export const dayName = (d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" });
 /** "2026-10-20" -> "10/20". */
 const md = (d) => d.slice(5).replace("-", "/");
 /** Fantasy points to two decimals (like Sleeper); empty for null. */
-const fp = (x) => (x == null ? "" : x.toFixed(2));
+export const fp = (x) => (x == null ? "" : x.toFixed(2));
 /** Whether to show the nicknames managers set on Sleeper: on unless switched off in Settings > General (this browser only). */
 const showNicks = () => { try { return localStorage.getItem("da.nicks") !== "off"; } catch { return true; } };
 // A narrow window (keep in step with the 1599px @media block in styles.css): the chips become a small bar graph per
@@ -49,7 +49,7 @@ const useThin = () => useMedia("(max-width: 999px)");
  * A fantasy team: its Sleeper avatar, its team name, and under it the manager's username (when that differs) and W-L record with a green up / red down arrow for the latest result.
  * `mine` makes the username (or the team name when there is none) glow in the theme tint.
  */
-function TeamName({ t, cls = "", size = 24, record = true, mine = false }) {
+export function TeamName({ t, cls = "", size = 24, record = true, mine = false }) {
   const rec = record && t.wins != null;
   return (
     <span className={`team-name-tag ${mine ? "is-me" : ""}`}>
@@ -203,14 +203,14 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
 
 const TEAM_TABS = [["roster", "Roster"], ["schedule", "Schedule"], ["stats", "Stats"], ["news", "News"]];
 /** Sleeper's logo URL for an NBA team abbreviation. */
-const teamLogo = (abbr) => `https://sleepercdn.com/images/team_logos/nba/${abbr.toLowerCase()}.png`;
+export const teamLogo = (abbr) => `https://sleepercdn.com/images/team_logos/nba/${abbr.toLowerCase()}.png`;
 /** "R. Hachimura" from "Rui Hachimura". */
 const shortName = (n) => { const [first, ...rest] = (n || "").split(" "); return rest.length ? `${first[0]}. ${rest.join(" ")}` : n; };
 /**
  * The right side's Team card (a team's name clicked anywhere on the Season tab, or a team in the News tab's report): logo and name, then tabs (backend /season/team), Roster first.
  * Roster: offense / defense ranks and the depth chart (names coloured by injury), then the injuries (yellow: questionable / game-time / day-to-day; red: out / IR). Schedule: every game, vs / @ the opponent, and W / L with the score once it's played. Stats: every player's per-game line for this team. News: the News tab's notes on this team's players only, loaded when the tab opens.
  */
-function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
+export function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
   const [t, setT] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("roster");
@@ -302,7 +302,7 @@ const GpHead = ({ src, size }) => src
  * The right side when a game card is clicked: that NBA game (backend game_detail, ESPN's summary), live or past. Refreshes every minute.
  * Score and status, a stream link (streamed.pk) while it's on, each team's top 5 by fantasy points with their headline stats, then per team its box score (players who got minutes, fantasy points in the league's scoring; rostered players tagged with their fantasy team; any player matched to ours opens his profile), its offense / defense ranks and depth chart. Before the tip: both teams with their records, ranks and depth charts. Team names open the Team card.
  */
-function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
+export function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
   const [g, setG] = useState(null);
   const [error, setError] = useState("");
   const { list: matches } = useNBAMatches();
@@ -398,14 +398,14 @@ function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
 }
 
 /** A 0-1 share as a whole-number percent. */
-const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
+export const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 /** Everything after the first word of a name (the whole name when it has one word). */
 const lastName = (n) => n.split(" ").slice(1).join(" ") || n;
 /**
  * The right side when no player is open: the week's Lock-In numbers for any team (yours by default; the drop-down loads another's plan from the plan endpoint). Stats, not instructions: open(sid) opens a player's profile.
  * Matchup: win probability; projected final, banked points and games left for both teams. By approach: win probability locking every lockable game now vs leaving every slot open vs the plan's mix (backend outlook); the opponent's remaining projections and banked games. Lockable games: each game that could be locked now with its score, the open slot's value (his later games or a spare bench player's, the best each day: backend open_slot), win % locked vs open and the next tip. Swap windows and Injury watch: tonight's live-vs-later comparisons and questionable / out starters.
  */
-function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
+export function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
   const [rid, setRid] = useState(focus ?? plan.roster_id);
   useEffect(() => { if (focus != null) setRid(focus); }, [focus]);
   const [other, setOther] = useState(null);
@@ -570,7 +570,7 @@ function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
 }
 
 /** Roster warnings from the plan: an illegal roster (a healthy player on IR makes 16 healthy players, so Sleeper blocks lineup changes and locks) and open IR spots, with the players to move there. */
-function RosterAlerts({ roster }) {
+export function RosterAlerts({ roster }) {
   if (!roster) return null;
   return (
     <>
@@ -645,16 +645,16 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
 }
 
 /** ESPN's live status in quarters: "3:14 - 1st" -> "Q1 3:14", "1:05 - OT" -> "OT 1:05", "End of 3rd" -> "End of Q3". */
-const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1")
+export const quarters = (detail) => (detail || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $1").replace(/^(.+) - (\d?OT)$/, "$2 $1")
   .replace(/\b(\d)(?:st|nd|rd|th)\b/g, "Q$1");
 /** A status short enough for a live card's top line, in place of the weekday: "Q1 3:14", "End Q3", "Half". */
-const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").replace("Start of ", "Start ").replace("Halftime", "Half") || "—";
+export const shortQuarter = (detail) => quarters(detail).replace("End of ", "End ").replace("Start of ", "Start ").replace("Halftime", "Half") || "—";
 
 /** His box score on one line: "38 PTS, 5 REB, 3 AST, 0 BLK, 12/21 FG, 7/8 FT, 3 TO, 5 PF". */
 const boxLine = (b, min) => `${min != null ? `${Math.round(min)} MIN, ` : ""}${b.pts} PTS, ${b.reb} REB, ${b.ast} AST, ${b.blk} BLK, ${b.fgm}/${b.fga} FG, ${b.ftm}/${b.fta} FT, ${b.to} TO, ${b.pf} PF`;
 
 /** A small padlock: a locked game with no unlock button shows it where "final" would be; open (shackle lifted) on the lock button. */
-const LockIcon = ({ open }) => (
+export const LockIcon = ({ open }) => (
   <svg className="gch-lock" viewBox="0 0 10 12" aria-hidden="true">
     <path d={open ? "M3 5.2V2.6a2 2 0 0 1 4 0v.6" : "M3 5.2V3.6a2 2 0 0 1 4 0v1.6"} fill="none" stroke="currentColor" strokeWidth="1.4" />
     <rect x="1" y="5" width="8" height="6.5" rx="1.6" fill="currentColor" />
@@ -746,7 +746,7 @@ const PlayerCard = React.memo(function PlayerCard({ data, r, open, openGame, set
 }, sameCard);
 
 /** Slot order down the middle (PG PG SG SG ... C C), then every bench spot and every IR spot (empty ones too); each team's players fill their current slots. Returns { lines, bench, ir }. */
-function bySlot(rows, positions, irSlots) {
+export function bySlot(rows, positions, irSlots) {
   const pool = {};
   for (const r of [...rows].sort((a, b) => b.value - a.value)) (pool[r.slot] ||= []).push(r);
   /** `n` entries for a slot, each taking the next player left in the pool (or empty). */
@@ -761,7 +761,7 @@ function bySlot(rows, positions, irSlots) {
  * One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
  * On a thin window only the left team is shown. The left team can show its best lineup (default) or the one it has in Sleeper now when they differ.
  */
-function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
+export function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
   const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
   const [idx, setIdx] = useState(mineIdx);
   useEffect(() => { onShow?.(idx === mineIdx ? plan.roster_id : data.matchups[idx]?.[0]?.roster_id); }, [idx]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -892,7 +892,7 @@ const GAME_MS = 135 * 60000;   // a game counts as under way this long after its
  * A team's best lineup at `atMs` from its timeline (one lineup per check-in; locked players never move): rows with everyone in the slot he should be in then, and the swaps from its Sleeper lineup as it is right now (so the arrows are the moves you'd make in Sleeper from where you are, at any point of the timeline).
  * `asIs` (rivals): rows stay their real Sleeper lineup; the arrows still show the moves to the best one.
  */
-function bestLineup(team, atMs, positions, asIs, games = {}) {
+export function bestLineup(team, atMs, positions, asIs, games = {}) {
   const tl = team?.timeline, players = team?.players || [];
   const seg = tl?.segments[Math.max(0, tl.segments.findIndex((s) => atMs < Date.parse(s.to)))];
   const seats = seg ? seg.seats : team?.today?.seats;
@@ -1101,7 +1101,7 @@ function TeamsReport({ leagueId, open, refreshKey }) {
 }
 
 /** News tab: fantasy notes on your players (collapsible, always starts open), then on the other teams' players under it, filterable by search, NBA team, manager and injured-only. Reloads on Sync; the backend caches both lists for 15 minutes otherwise. */
-function NewsView({ leagueId, open, refreshKey }) {
+export function NewsView({ leagueId, open, refreshKey }) {
   const [news, setNews] = useState(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState(""), [nba, setNba] = useState(""), [mgr, setMgr] = useState(""), [inj, setInj] = useState(false);
@@ -1155,7 +1155,7 @@ function NewsView({ leagueId, open, refreshKey }) {
 }
 
 /** League tab: this week's matchups (click a team for its roster and games) and the standings with FAAB left. */
-function LeagueView({ data, leagueId, open }) {
+export function LeagueView({ data, leagueId, open }) {
   const team = Object.fromEntries(data.teams.map((t) => [t.roster_id, t]));
   const [shown, setShown] = useState(null);
   /** Load another team's week plan (roster and games) into the shown team. */
@@ -1205,7 +1205,7 @@ function LeagueView({ data, leagueId, open }) {
  * Waivers tab: free agents ranked by how much they'd upgrade your weakest player, with value, upgrade, games once he lands, a guide bid and each player's season line. Shows the next waiver run and, for FAAB leagues, your budget.
  * Every column header sorts: a click cycles ascending, descending, off (the backend's order), and rows with nothing to show for a column sort last.
  */
-function WaiversView({ leagueId, onSelect }) {
+export function WaiversView({ leagueId, onSelect }) {
   const [w, setW] = useState(null);
   const [sort, setSort] = useState(null);   // {k, dir}: a header click cycles ascending, descending, off (the backend's order)
   useEffect(() => { api.get(`/leagues/${leagueId}/season/waivers`).then(setW).catch(() => setW(null)); }, [leagueId]);

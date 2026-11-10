@@ -1,0 +1,117 @@
+@import "../styles.css";   /* the shared components' styles (and the themes); this file only lays out the Command Center shell */
+
+/* ---- shell: icon rail + page ---- */
+.cc { display: grid; grid-template-columns: 76px minmax(0, 1fr); min-height: 100vh; }
+.cc-rail { position: sticky; top: 0; height: 100vh; z-index: 26; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px;
+  background: var(--header); border-right: 1px solid var(--border); backdrop-filter: var(--glass); }
+.cc-logo { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; margin-bottom: 12px; border: 0; border-radius: 12px; font-size: 24px;
+  background: linear-gradient(135deg, var(--primary), var(--accent2)); color: var(--on-primary); box-shadow: none; }
+.cc-rail-btn { position: relative; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0 6px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--muted); font-size: var(--fs-3xs); font-weight: 600; box-shadow: none; }
+.cc-rail-btn .icon { font-size: 22px; }
+.cc-rail-btn:hover { color: var(--text); background: var(--hover); filter: none; }
+.cc-rail-btn.active { color: var(--info-t); background: var(--primary-soft); }
+.cc-rail-btn.active::before { content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
+.cc-rail-gap { flex: 1; }
+.cc-health { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: var(--fs-3xs); font-weight: 700; margin-bottom: 6px; }
+.cc-health .icon { font-size: 20px; }
+main.cc-main { min-width: 0; }
+main.cc-main:has(.cc-page) { padding: 0; max-width: none; margin: 0; }
+
+/* ---- Season page: title bar, then the view filling the window ---- */
+.cc-page { height: 100vh; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
+.cc-top { flex: none; display: flex; align-items: center; gap: 18px; min-width: 0; }
+.cc-title { margin: 0; display: flex; align-items: baseline; gap: 12px; min-width: 0; font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.cc-sub { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.week-nav { display: flex; align-items: center; gap: 6px; flex: none; }
+.week-nav button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
+.week-nav-name { min-width: 96px; text-align: center; font-family: var(--font-display); font-size: var(--fs-lg); letter-spacing: 0.04em; }
+.season-tools-x { margin-left: auto; display: flex; align-items: center; gap: 8px; width: min(420px, 40%); flex: none; }
+.season-tools-x .season-search { flex: 1; min-width: 0; }
+.season-tools-x .season-search :is(.search-wrap, input) { width: 100%; min-width: 0; }
+.season-tools-x .icon-btn { flex: none; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; font-size: var(--fs-lg); }
+
+.cc-week { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w); gap: 12px; }
+.cc-center { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.cc-center > .panel, .cc-pair > .panel, .cc-side > .panel { margin: 0; }
+.cc-center > .matchup { flex: 1 0 auto; min-height: 460px; display: flex; flex-direction: column; padding: 10px 14px; }
+.cc-side { min-height: 0; display: flex; flex-direction: column; }
+.cc-side > .panel.scroll { flex: 1; min-height: 0; max-height: none; }
+
+/* status tiles */
+.cc-tiles { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.cc-tile { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--border); }
+.cc-tile.hot { border-color: color-mix(in srgb, var(--q) 60%, var(--border)); background: color-mix(in srgb, var(--q) 8%, var(--panel)); }
+.cc-tile-label { font-size: var(--fs-3xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.cc-tile-num { font-family: var(--font-num); font-size: var(--fs-3xl); font-weight: 800; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-tile .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-vs { color: var(--muted); font-weight: 600; }
+.cc-meter { height: 6px; margin-top: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.cc-meter > span { display: block; height: 100%; background: var(--primary); }
+
+/* Do now + Tonight */
+.cc-pair { flex: none; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; max-height: 240px; min-height: 0; }
+.cc-pair > .panel { min-height: 0; overflow: auto; padding: 10px 14px; }
+.cc-pair h3 { margin: 0 0 8px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.06em; }
+.cc-call { display: grid; grid-template-columns: 22px 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px;
+  background: var(--panel-2); border-left: 3px solid var(--muted); }
+.cc-call + .cc-call { margin-top: 6px; }
+.cc-call.bad { border-left-color: var(--danger); } .cc-call.bad .cc-call-icon { color: var(--danger); }
+.cc-call.even { border-left-color: var(--q); } .cc-call.even .cc-call-icon { color: var(--even-t); }
+.cc-call-icon { display: grid; place-items: center; font-size: 18px; }
+.cc-call-when { font-family: var(--font-num); font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
+.cc-call-body { min-width: 0; display: flex; flex-direction: column; }
+.cc-call-body > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-call-who { display: flex; gap: 4px; }
+.cc-head-btn { padding: 0; border: 0; background: none; box-shadow: none; border-radius: 50%; }
+.cc-head-btn img { display: block; border-radius: 50%; }
+.cc-empty { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--good-t); font-weight: 600; }
+.cc-slate-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.cc-game { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; text-align: left; font-weight: 500; color: var(--text);
+  border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border-inner); box-shadow: none; }
+.cc-game:hover { border-color: var(--primary); filter: none; }
+.cc-game-teams { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; font-family: var(--font-num); font-size: var(--fs-sm); }
+.cc-game-teams b { text-align: right; }
+.cc-game-status { display: flex; align-items: center; gap: 5px; font-size: var(--fs-3xs); color: var(--muted); }
+.cc-game.in .cc-game-status { color: var(--live); font-weight: 700; }
+.cc-game .live-dot { background: var(--live); width: 6px; height: 6px; }
+.cc-game-mine { font-size: var(--fs-3xs); font-weight: 700; color: var(--info-t); }
+
+/* other views fill the page */
+.cc-fill { flex: 1; min-height: 0; display: flex; }
+.cc-scroll { flex: 1; min-height: 0; overflow: auto; }
+.cc-page .waivers { margin-left: 0; }
+
+/* ---- card drawer: slides in over the right column ---- */
+.cc-drawer-wrap { position: fixed; inset: 0 0 0 76px; z-index: 25; background: rgba(0, 0, 0, 0.28); }
+.cc-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(100%, calc(var(--side-w) + 80px)); display: flex; flex-direction: column; padding: 12px;
+  background: var(--panel-solid); border-left: 1px solid var(--border); box-shadow: -24px 0 48px rgba(0, 0, 0, 0.4); animation: cc-in 0.18s ease-out; }
+@keyframes cc-in { from { transform: translateX(48px); opacity: 0; } }
+.cc-drawer > .panel { flex: 1; min-height: 0; max-height: none; margin: 0; overflow: auto; padding-top: 50px; }
+.card-nav { position: absolute; top: 22px; left: 22px; z-index: 3; display: flex; gap: 4px; }
+.card-nav button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
+
+/* ---- narrower windows: one column; a phone: the rail becomes a bottom bar ---- */
+@media (max-width: 1199px) {
+  .cc-page { height: auto; min-height: 100vh; }
+  .cc-week { grid-template-columns: minmax(0, 1fr); }
+  .cc-center { overflow: visible; }
+  .cc-center > .matchup { min-height: 70vh; }
+  .cc-side { max-height: 80vh; }
+  .cc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-pair { grid-template-columns: minmax(0, 1fr); max-height: none; }
+  .cc-fill { min-height: 80vh; }
+}
+@media (max-width: 699px) {
+  .cc { grid-template-columns: minmax(0, 1fr); }
+  .cc-rail { position: fixed; inset: auto 0 0 0; height: 62px; flex-direction: row; justify-content: space-around; padding: 4px; border-right: 0; border-top: 1px solid var(--border); background: var(--panel-solid); }
+  .cc-logo, .cc-rail-gap, .cc-health { display: none; }
+  .cc-rail-btn { width: auto; flex: 1; }
+  .cc-rail-btn.active::before { display: none; }
+  main.cc-main { padding-bottom: 76px; }
+  main.cc-main:has(.cc-page) { padding-bottom: 62px; }
+  .cc-top { flex-wrap: wrap; gap: 10px; }
+  .season-tools-x { width: 100%; }
+  .cc-drawer-wrap { left: 0; bottom: 62px; }
+  .cc-drawer { width: 100%; }
+}

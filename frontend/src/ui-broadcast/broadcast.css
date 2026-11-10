@@ -1,0 +1,169 @@
+@import "../styles.css";   /* the shared components' styles (and the themes); this file only lays out the Broadcast shell */
+
+/* ---- network bar ---- */
+.bc-top { position: sticky; top: 0; z-index: 24; height: 56px; display: flex; align-items: stretch; gap: 22px; padding: 0 16px;
+  background: var(--panel-solid); border-bottom: 3px solid var(--primary); }
+.bc-brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; box-shadow: none; color: var(--text);
+  font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.bc-brand:hover { filter: none; }
+.bc-logo { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; font-size: 20px; background: var(--primary); color: var(--on-primary); }
+.bc-nav { display: flex; align-items: stretch; }
+.bc-nav button { position: relative; padding: 0 16px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--muted);
+  font-family: var(--font-display); font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.bc-nav button:hover { color: var(--text); background: var(--hover); filter: none; }
+.bc-nav button.active { color: var(--text); background: color-mix(in srgb, var(--primary) 18%, transparent); }
+.bc-nav button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px; background: var(--accent2); }
+.bc-top-gap { flex: 1; }
+.bc-top > .warn-text { align-self: center; }
+.bc-cog { align-self: center; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 8px; font-size: var(--fs-lg); }
+main.bc-main:has(.bc-season) { padding: 0; max-width: none; margin: 0; }
+
+/* ---- Season page ---- */
+.bc-season { height: calc(100vh - 56px); display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 12px; }
+.bc-season.bc-view-week { padding-bottom: 58px; }   /* the chyron */
+.bc-season .panel { margin-bottom: 0; }
+
+/* score bug */
+.bc-bug { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, auto) minmax(0, 1fr); align-items: stretch;
+  border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--panel-solid); }
+.bc-bug-team { min-width: 0; display: flex; align-items: center; gap: 14px; padding: 10px 18px; }
+.bc-bug-team.me { background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 30%, transparent), transparent); border-left: 5px solid var(--primary); }
+.bc-bug-team.right { flex-direction: row-reverse; text-align: right; background: linear-gradient(270deg, color-mix(in srgb, var(--accent2) 26%, transparent), transparent); border-right: 5px solid var(--accent2); }
+.bc-bug-avatar { width: 52px; height: 52px; border-radius: 50%; flex: none; }
+.bc-bug-name { min-width: 0; display: flex; flex-direction: column; }
+.bc-bug-name strong { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 800; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-bug-name span { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-bug-score { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
+.bc-bug-team.right .bc-bug-score { margin-left: 0; margin-right: auto; align-items: flex-start; }
+.bc-bug-score strong { font-family: var(--font-num); font-size: clamp(34px, 2.8vw, 54px); font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.bc-bug-score span { font-size: var(--fs-xs); color: var(--muted); font-family: var(--font-num); }
+.bc-bug-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 18px; background: var(--panel-2); }
+.week-nav { display: flex; align-items: center; gap: 6px; }
+.week-nav button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; }
+.week-nav-name { min-width: 96px; text-align: center; font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 800; letter-spacing: 0.06em; }
+.bc-winbar { width: 100%; height: 8px; border-radius: 4px; overflow: hidden; background: var(--accent2); }
+.bc-winbar > span { display: block; height: 100%; background: var(--primary); }
+.bc-win-nums { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: var(--fs-3xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.bc-win-nums strong { font-family: var(--font-num); font-size: var(--fs-md); color: var(--text); letter-spacing: 0; }
+.bc-next { font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; }
+.bc-next strong { color: var(--text); }
+
+/* ticker strip + tools */
+.bc-strip { flex: none; display: flex; align-items: center; gap: 14px; min-width: 0; }
+.bc-ticker { flex: 1; min-width: 0; display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel-solid); }
+.bc-ticker-label { display: flex; align-items: center; padding: 0 18px 0 12px; background: var(--primary); color: var(--on-primary); font-family: var(--font-display); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--fs-sm); clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); white-space: nowrap; }
+.bc-ticker-list { flex: 1; min-width: 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; padding: 4px; }
+.bc-tick { flex: none; min-width: 112px; display: flex; flex-direction: column; gap: 1px; padding: 3px 12px; border: 0; border-radius: 6px;
+  background: none; box-shadow: none; color: var(--text); font-family: var(--font-num); font-size: var(--fs-xs); font-weight: 600; text-align: left; line-height: 1.3; }
+.bc-tick + .bc-tick { border-left: 1px solid var(--border-inner); border-radius: 0 6px 6px 0; }
+.bc-tick:hover { background: var(--hover); filter: none; }
+.bc-tick-row { display: flex; align-items: center; gap: 6px; }
+.bc-tick b { margin-left: auto; padding-left: 10px; }
+.bc-tick-st { display: flex; gap: 8px; font-family: var(--font-ui); font-size: var(--fs-3xs); color: var(--muted); font-weight: 600; }
+.bc-tick-st em { font-style: normal; color: var(--info-t); }
+.bc-tick.in .bc-tick-st { color: var(--live); }
+.bc-tick.post { color: var(--muted); }
+.season-tools-x { display: flex; align-items: center; gap: 8px; width: min(380px, 32%); flex: none; }
+.season-tools-x .season-search { flex: 1; min-width: 0; }
+.season-tools-x .season-search :is(.search-wrap, input) { width: 100%; min-width: 0; }
+.season-tools-x .icon-btn { flex: none; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 8px; font-size: var(--fs-lg); }
+
+/* the desk: matrix + analysis */
+.bc-desk { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w); gap: 12px; }
+.bc-analysis { min-height: 0; display: flex; flex-direction: column; }
+.bc-analysis > .panel.scroll { flex: 1; min-height: 0; max-height: none; }
+.bc-matrix-wrap { min-height: 0; display: flex; flex-direction: column; padding: 10px 12px; }
+.bc-matrix-head { flex: none; display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.bc-seg { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--panel-2); }
+.bc-seg button { padding: 4px 14px; border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--muted); font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: var(--fs-sm); }
+.bc-seg button.active { background: var(--primary); color: var(--on-primary); }
+.bc-matrix-scroll { flex: 1; min-height: 0; overflow: auto; }
+.bc-matrix { width: 100%; min-width: 760px; table-layout: fixed; border-collapse: separate; border-spacing: 4px 3px; }
+.bc-matrix th { position: sticky; top: 0; z-index: 1; background: var(--panel-solid); padding: 4px; font-family: var(--font-display); font-size: var(--fs-2xs); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); text-align: center; }
+.bc-matrix th span { display: block; font-family: var(--font-ui); font-weight: 500; font-size: var(--fs-3xs); letter-spacing: 0; }
+.bc-matrix th.today { color: var(--text); box-shadow: inset 0 -3px var(--primary); }
+.bc-slot-h { width: 48px; } .bc-player-h { width: 24%; text-align: left !important; } .bc-week-h { width: 80px; }
+.bc-sep td { padding: 10px 4px 0; font-size: var(--fs-3xs); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-top: 1px dashed var(--border); }
+.bc-slot { text-align: center; }
+.bc-player { min-width: 0; padding: 0 4px; }
+.bc-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bc-who img { border-radius: 50%; flex: none; }
+.bc-who-lines { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.bc-who-lines > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-name { font-weight: 700; }
+.bc-who:hover .bc-name { text-decoration: underline; }
+.bc-move { margin-left: 6px; color: var(--even-t); font-weight: 700; }
+.bc-row.bench .bc-player { opacity: 0.8; }
+.bc-row.empty td { height: 46px; }
+.bc-cell { position: relative; height: 54px; padding: 3px 4px; text-align: center; vertical-align: middle; cursor: pointer; border-radius: 6px;
+  background: var(--panel-2); border: 1px solid var(--border-inner); line-height: 1.15; }
+.bc-cell:hover { border-color: var(--primary); }
+.bc-cell.none { background: transparent; border-style: dashed; cursor: default; }
+.bc-cell.none:hover { border-color: var(--border-inner); }
+.bc-cell.today:not(.none) { box-shadow: inset 0 -3px color-mix(in srgb, var(--primary) 70%, transparent); }
+.bc-opp { display: block; font-size: var(--fs-3xs); color: var(--muted); white-space: nowrap; }
+.bc-fp { display: block; font-family: var(--font-num); font-size: var(--fs-lg); font-weight: 800; }
+.bc-fp.proj { color: var(--muted); font-weight: 600; }
+.bc-st { display: block; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.bc-cell.live { border-color: var(--live); box-shadow: inset 0 0 0 1px var(--live); }
+.bc-cell.live .bc-st { color: var(--live); font-weight: 800; }
+.bc-cell.live .bc-fp.proj { color: var(--text); }
+.bc-cell.locked { background: color-mix(in srgb, var(--primary) 24%, var(--panel-2)); border-color: var(--primary); }
+.bc-cell.dead { opacity: 0.38; }
+.bc-cell.dead .bc-fp { text-decoration: line-through; }
+.bc-lockbtn { position: absolute; top: 2px; right: 3px; width: 16px; height: 16px; padding: 0; display: grid; place-items: center; border: 0; background: none; box-shadow: none; color: var(--muted); }
+.bc-lockbtn:hover { color: var(--primary); filter: none; }
+.bc-lockbtn.static { color: var(--info-t); }
+.bc-lockbtn .gch-lock { width: 10px; height: 12px; }
+.bc-week { text-align: right; padding-right: 6px; line-height: 1.15; }
+.bc-week strong { display: block; font-family: var(--font-num); font-size: var(--fs-lg); font-weight: 800; }
+.bc-week strong.proj { color: var(--muted); font-weight: 600; }
+.bc-week span { font-size: var(--fs-3xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* other views */
+.bc-fill { flex: 1; min-height: 0; display: flex; }
+.bc-body { flex: 1; min-height: 0; overflow: auto; }
+.bc-season .waivers { margin-left: 0; }
+
+/* ---- chyron ---- */
+.bc-chyron { position: fixed; left: 0; right: 0; bottom: 0; z-index: 22; height: 46px; display: flex; align-items: stretch; background: var(--panel-solid); border-top: 2px solid var(--border); }
+.bc-chyron.hot { border-top-color: var(--primary); }
+.bc-chyron-label { display: flex; align-items: center; padding: 0 28px 0 16px; background: var(--panel-2); color: var(--muted); font-family: var(--font-display); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+.bc-chyron.hot .bc-chyron-label { background: var(--primary); color: var(--on-primary); }
+.bc-chyron-list { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.bc-call { flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 12px; border: 0; border-left: 3px solid var(--q); border-radius: 4px;
+  background: var(--panel-2); box-shadow: none; color: var(--text); font-size: var(--fs-sm); font-weight: 500; }
+.bc-call.bad { border-left-color: var(--danger); }
+.bc-call:hover { filter: none; background: var(--hover); }
+.bc-call strong { font-family: var(--font-num); text-transform: uppercase; }
+
+/* ---- card sheet ---- */
+.bc-sheet-wrap { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(5, 8, 15, 0.72); }
+.bc-sheet { position: relative; width: min(860px, 94vw); height: 88vh; display: flex; flex-direction: column; animation: bc-up 0.2s ease-out; }
+@keyframes bc-up { from { transform: translateY(24px); opacity: 0; } }
+.bc-sheet > .panel { flex: 1; min-height: 0; max-height: none; margin: 0; overflow: auto; padding-top: 52px; background: var(--panel-solid); border-top: 4px solid var(--primary); }
+.card-nav { position: absolute; top: 14px; left: 14px; z-index: 3; display: flex; gap: 4px; }
+.card-nav button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
+
+/* ---- narrower windows ---- */
+@media (max-width: 1199px) {
+  .bc-season { height: auto; min-height: calc(100vh - 56px); }
+  .bc-bug { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .bc-bug-mid { grid-column: 1 / -1; grid-row: 2; }
+  .bc-desk { grid-template-columns: minmax(0, 1fr); }
+  .bc-matrix-wrap { max-height: 80vh; }
+  .bc-analysis { max-height: 80vh; }
+  .bc-strip { flex-wrap: wrap; }
+  .season-tools-x { width: 100%; }
+  .bc-fill { min-height: 80vh; }
+}
+@media (max-width: 699px) {
+  .bc-top { gap: 8px; overflow-x: auto; }
+  .bc-brand span:last-child { display: none; }
+  .bc-nav button { padding: 0 9px; font-size: var(--fs-xs); }
+  .bc-bug-team { padding: 8px 10px; gap: 8px; }
+  .bc-bug-avatar, .bc-bug-name span { display: none; }
+}

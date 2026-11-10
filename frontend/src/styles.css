@@ -28,10 +28,6 @@
   color-scheme: dark;
 }
 
-/* Settings > Theme: only the accent (buttons, links, selection, focus, sync/alarm toggles) changes; good/bad/even stay red/green/yellow */
-:root[data-theme="ocean"] { --primary: #0284c7; --accent2: #14b8a6; --info-t: #7dd3fc; }
-:root[data-theme="sunset"] { --primary: #ea580c; --accent2: #db2777; --info-t: #fdba74; }
-
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
 body {
   margin: 0;
