@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backend/data
+backend/.env
+frontend/dist
+frontend/e2e/screenshots
+docs
+*.md
+!README.md

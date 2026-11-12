@@ -16,15 +16,16 @@ from datetime import date
 from pathlib import Path
 
 import requests
+
+import app.lockin.weekplan as weekplan
 from nba_fantasy_shared.models.players import GameLine
 from nba_fantasy_shared.scoring.formula import score_game
+from nba_fantasy_shared.storage import JsonStore
 
 from .. import config
 from ..core.services.league_repository import LeagueRepository
-from nba_fantasy_shared.storage import JsonStore
 from .service import SLEEPER, projected_fp
 from .weekplan import Game, live_estimate
-import app.lockin.weekplan as weekplan
 
 CHECKPOINTS = (12, 24, 36, 42)   # minutes of game clock elapsed: end of Q1, half, end of Q3, midway through Q4
 MIN_PROJ_MIN = 15.0              # only rotation players: the ones a lineup call is about

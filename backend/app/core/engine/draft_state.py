@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Iterable, Mapping
 
-from nba_fantasy_shared.models.draft import CurrentNomination, DraftState, KeeperRecord, KeeperCost, Pick
+from nba_fantasy_shared.models.draft import CurrentNomination, DraftState, KeeperCost, KeeperRecord, Pick
 from nba_fantasy_shared.models.league import LeagueSettings, Manager
 from nba_fantasy_shared.models.players import PlayerOverrides, PlayerRecord
 from nba_fantasy_shared.providers.base import utcnow

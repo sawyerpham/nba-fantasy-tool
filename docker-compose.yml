@@ -1,0 +1,13 @@
+# docker compose up --build            -> http://localhost:8000 (API + app in one container)
+# docker compose run --rm app python -m app.pull   -> first-time data pull (NBA stats + Sleeper players) into ./backend/data
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/data      # the JSON store and caches, shared with a non-Docker run
+    env_file:
+      - path: backend/.env        # TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (optional)
+        required: false
+    restart: unless-stopped

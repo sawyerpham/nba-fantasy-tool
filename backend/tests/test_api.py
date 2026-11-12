@@ -5,8 +5,8 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.core.services.app_state import AppState
+from app.main import create_app
 from nba_fantasy_shared.models.export import DraftExport
 from nba_fantasy_shared.providers.fixture_provider import FixturePlatformProvider, FixtureStatsProvider
 from nba_fantasy_shared.storage import JsonStore

@@ -6,3 +6,4 @@ httpx
 nba_api
 pytest
 -e ../shared
+ruff

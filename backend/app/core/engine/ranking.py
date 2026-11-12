@@ -15,12 +15,11 @@ Everything is pure: re-running after a pick, an override edit, or a settings cha
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Iterable, Mapping
 
 from nba_fantasy_shared.models.draft import Pick
 from nba_fantasy_shared.models.league import LeagueSettings, RankingSettings
-from types import SimpleNamespace
-
 from nba_fantasy_shared.models.players import PlayerOverrides, PlayerRecord, PlayerValuation
 from nba_fantasy_shared.models.scoring import ScoringSettings
 from nba_fantasy_shared.scoring import availability_factor, base_points, ceiling_value, confidence_factor

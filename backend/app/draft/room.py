@@ -14,8 +14,8 @@ from __future__ import annotations
 from nba_fantasy_shared.scoring.aggregate import NO_GAMES_AVAILABILITY
 
 from ..core.engine.bidding import market_rate
-from .market import sale_worths
 from ..core.engine.ranking import expected_fpts
+from .market import sale_worths
 
 
 def room_board(session, my_manager_id: str) -> list[dict]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from nba_fantasy_shared.models.draft import DraftState, KeeperHistory
+from nba_fantasy_shared.models.draft import DraftState
 from nba_fantasy_shared.models.export import DraftExport, KeeperBlock
 from nba_fantasy_shared.models.league import LeagueSettings, Manager
 from nba_fantasy_shared.storage import JsonStore

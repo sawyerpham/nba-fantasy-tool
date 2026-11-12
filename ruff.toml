@@ -1,0 +1,17 @@
+# Lint config for backend/ and shared/ (CI runs `ruff check` from the repo root).
+line-length = 200
+target-version = "py313"
+extend-exclude = ["backend/venv", "backend/data", "frontend"]
+
+[lint]
+select = ["E", "F", "W", "I"]
+# Long lines are the house style (dense one-line expressions with a trailing comment); lambda assignments are used
+# for tiny local helpers next to their one caller.
+ignore = ["E501", "E731"]
+
+[lint.per-file-ignores]
+# pytest fixtures are imported so they're in scope, then taken as arguments: that's how pytest finds them
+"backend/tests/**" = ["F811"]
+
+[lint.isort]
+known-first-party = ["app", "nba_fantasy_shared"]

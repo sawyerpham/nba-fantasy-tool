@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, timezone
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from nba_fantasy_shared.models.league import KeeperEscalation, Manager
-from nba_fantasy_shared.providers.base import as_int
 from nba_fantasy_shared.models.players import PlayerRecord
+from nba_fantasy_shared.providers.base import as_int
 from nba_fantasy_shared.storage import JsonStore
 
 log = logging.getLogger(__name__)

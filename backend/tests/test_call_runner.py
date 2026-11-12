@@ -1,6 +1,5 @@
-import requests
-
 import pytest
+import requests
 
 from nba_fantasy_shared.providers.base import CallFailed, CallRunner, RetryPolicy
 

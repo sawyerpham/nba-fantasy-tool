@@ -221,8 +221,8 @@ def test_market_board_counts_need_and_supply_and_prices_each_sale_at_its_moment(
 
 def test_keeper_outlook_prices_next_year_with_the_league_rule_and_flags_stashes(fixture_world):
     """Keeper outlook prices next year with the league rule and flags stashes."""
-    from app.draft.fit import team_fit
     from app.core.engine.keepers import keeper_outlook
+    from app.draft.fit import team_fit
 
     s = make_session(fixture_world)
     s.start([])
