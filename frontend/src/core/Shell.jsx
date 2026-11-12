@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import DataPage from "./DataPage.jsx";
 import LeaguePage from "./LeaguePage.jsx";
 import SettingsPage from "./SettingsPage.jsx";
+import NotifyPage from "./NotifyPage.jsx";
 import Icon from "./Icon.jsx";
 
 // What every UI's shell shares (src/App.jsx, src/ui-command, src/ui-broadcast): the app state kept in localStorage and the Settings popup.
@@ -29,8 +30,10 @@ export const SEASON_VIEWS = { season: "week", news: "news", standings: "league",
 
 /** The UI this page loaded with (see UIS). */
 const UI = (() => { try { return localStorage.getItem("da.ui") || ""; } catch { return ""; } })();
-/** Switch UI: remember the choice and reload, since each UI brings its own global stylesheet. */
-const setUi = (v) => { try { localStorage.setItem("da.ui", v); } catch { } location.reload(); };
+/** Switch UI: remember the choice and reload, since each UI brings its own global stylesheet. Settings reopens after the reload. */
+const setUi = (v) => { try { localStorage.setItem("da.ui", v); sessionStorage.setItem("da.settings", "1"); } catch { } location.reload(); };
+/** True once after a UI switch (setUi): the new UI opens with Settings still showing. */
+const reopenSettings = () => { try { const v = sessionStorage.getItem("da.settings"); sessionStorage.removeItem("da.settings"); return !!v; } catch { return false; } };
 
 /**
  * The app state every shell needs: the open tab, the league (and its name), theme, wallpaper, API health and the Settings popup.
@@ -41,7 +44,7 @@ export function useAppState() {
     const t = localStorage.getItem("da.tab");
     return !t || ["settings", "data", "league"].includes(t) ? "home" : t;   // Settings is a popup now, not a tab
   });
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(reopenSettings);
   /** Switch tab; "settings" opens the settings popup instead. */
   const goTab = (t) => (t === "settings" ? setSettingsOpen(true) : setTab(t));
   useEffect(() => {
@@ -97,7 +100,7 @@ export function useAppState() {
   return { tab, setTab, goTab, settingsOpen, setSettingsOpen, leagueId, setLeagueId, leagueName, wall, setWall, theme, setTheme, health, refreshHealth };
 }
 
-/** The Settings popup (Appearance: UI, theme, wallpaper; League: league, its settings, the data pull). `app` is useAppState()'s result. */
+/** The Settings popup (Appearance: UI, theme, wallpaper; Notifications: the Telegram link and what to push; League: league, its settings, the data pull). `app` is useAppState()'s result. */
 export function SettingsModal({ app }) {
   if (!app.settingsOpen) return null;
   const close = () => app.setSettingsOpen(false);
@@ -121,6 +124,9 @@ export function SettingsModal({ app }) {
           {WALLPAPERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
       </div>
+      </div>
+      <div className="panel section-card" data-testid="section-notify"><h2>Notifications</h2>
+        <NotifyPage />
       </div>
       <div className="panel section-card" data-testid="section-league"><h2>League</h2>
         <LeaguePage leagueId={app.leagueId} setLeagueId={app.setLeagueId} />

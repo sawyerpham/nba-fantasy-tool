@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
+import { TelegramLink, useNotify } from "./NotifyPage.jsx";
 
 // top (bold): only this app; rest: Sleeper has it too, brought alongside
 const FEATURES = {
@@ -20,6 +21,18 @@ const FEATURES = {
 const APPLY = ["name", "scoring", "roster_slots", "num_managers", "keepers"];
 /** Pull a Sleeper league id (a run of 12+ digits) out of pasted text, alone or inside a league link. Returns null when there is none. */
 const sleeperId = (text) => (String(text).match(/\d{12,}/) || [])[0] || null;
+
+/** One line under the import box: where Telegram alerts go (with a link to the chat), or that they aren't set up; a button opens Settings > Notifications. */
+function TelegramLine({ setTab }) {
+  const [st] = useNotify();
+  if (!st) return null;
+  return (
+    <div className="home-telegram small" data-testid="home-telegram">
+      <TelegramLink st={st} />
+      <button className="small ghost" onClick={() => setTab("settings")} data-testid="home-notify-settings">{st.configured ? "Notification settings" : "Set up in Settings"}</button>
+    </div>
+  );
+}
 
 /** Landing page: import a Sleeper league by id or link, then jump into the app. Also lists what the Draft and Season Advisor tabs offer. */
 export default function HomePage({ setLeagueId, setTab }) {
@@ -73,6 +86,7 @@ export default function HomePage({ setLeagueId, setTab }) {
           <button className="primary" onClick={importLeague} disabled={busy || !input.trim()} data-testid="home-import">{busy ? "Importing…" : "Import"}</button>
         </div>
         {error && <div className="error">{error}</div>}
+        <TelegramLine setTab={setTab} />
         {done && (
           <div className="home-done" data-testid="home-imported">
             <div className="home-check" aria-hidden="true">✓</div>
