@@ -1,93 +1,220 @@
 # NBA Fantasy Tool
 
-A local helper for Sleeper NBA fantasy leagues.
+[![CI](https://github.com/sawyerpham/nba-fantasy-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/sawyerpham/nba-fantasy-tool/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.13](https://img.shields.io/badge/python-3.13-3776ab.svg)
+![React 19](https://img.shields.io/badge/react-19-61dafb.svg)
 
-- **Draft**: rankings, bid guide and live Sleeper sync for auction drafts
-- **Season**: best lineup, lock calls, week timeline, news and waivers for Lock-In leagues
+A full-stack assistant for Sleeper NBA fantasy leagues. Before the season it runs an auction-draft advisor. During the
+season it runs a lineup engine for Sleeper's **Lock-In** format: at any minute of the week it shows the best lineup,
+which finished games to lock, which bench player to swap in before the next tip, and how much each call changes the
+chance of winning the matchup. It is used every week by a 12-team league and pushes its calls to Telegram.
 
-## Features
+![The Season tab in week 4](docs/season-week.png)
 
-### Draft
+*The Season tab: your best lineup against this week's opponent, every player's games with projections, scores and
+padlocks, the arrows for the moves Sleeper still needs, and on the right the win probability under each strategy and
+the games worth locking.*
 
-- **Live Sleeper draft sync**
-- **Live bid calls on the nominee**
-- **Rival drafting habits from past leagues**
-- Auction value rankings
-- Worth and max bid per player
-- Budget plan for open roster spots
-- Position scarcity and tier cliffs
-- Rival manager money and needs
-- Fantasy team strength estimates
-- NBA team win totals and fantasy talent
-- Keeper keep-or-cut verdicts
+## What it does
 
-### Season
+**In season (Lock-In leagues)**
 
-- **Optimal lineup at any time of the week**
-- **Live keep-or-swap calls**
-- **Swap and lock alarms**
-- **Next Sleeper check-in**
-- **Live NBA game cards**
-- **Injury watch**
-- Lineup swap instructions
-- Lock-or-wait calls
-- Win probability by strategy
-- Lockable games
-- Opponent lineups
-- Box scores and top performers
-- Game stream links
-- Player game logs and news
-- NBA team offense and defense ranks
-- NBA depth charts
-- League standings and FAAB
-- Waiver targets with FAAB bids
+- The best lineup for the current time of the week, re-planned on every request. A timeline slider replays the plan
+  at any minute of the week, with ticks at the check-ins where a Sleeper visit is needed.
+- Lock or wait calls for every finished game, each with the win chance locked and the win chance left open. The app
+  shows both numbers and never dictates.
+- Keep or swap calls while games are live: where a starter's game is headed versus the bench player tipping later.
+- Injury watch (GTD / OUT) with the backup to start, the week's lockable games ranked by win-probability added, and the
+  opponent's remaining projection and banked points.
+- Live game cards from ESPN (score, box scores in league scoring, top performers, depth charts), player profiles with
+  game logs and news, NBA team cards with records, ranks and schedules, the week's best games across the whole NBA,
+  waiver targets with FAAB bids, league standings.
+- Telegram pushes: each GTD / OUT / swap / lock call once at its alarm time, and the lineup moves due before a tip.
 
-## Run
+**Before the season (auction drafts)**
+
+- Auction values and rankings from last season's game logs under the league's own scoring, with position scarcity and
+  tier cliffs, keeper keep-or-cut verdicts, a budget plan for the open roster spots, and rival managers' money, needs
+  and bidding habits from past Sleeper leagues.
+- Live sync with the Sleeper draft room: a bid call on each nominee as it comes up.
+
+## How it works
+
+```
+  React 19 + Vite  (frontend/src)             FastAPI, Python 3.13  (backend/app)          Outside
+ ┌───────────────────────────────┐   /api   ┌───────────────────────────────────┐    ┌───────────────────┐
+ │ Season · League · News        │ ───────▶ │ lockin/   week_view, team_plan    │ ─▶ │ Sleeper API       │
+ │ Waivers · Draft · Settings    │ ◀─────── │           weekplan  (the engine)  │ ─▶ │ ESPN scoreboard   │
+ │ three UIs, three themes       │          │ draft/    auction room, bid calls │ ─▶ │ stats.nba.com     │
+ └───────────────────────────────┘          │ core/     league session, pull    │    └───────────────────┘
+                                            │ notify    Telegram watcher thread │ ─▶   Telegram
+                                            └─────────────────┬─────────────────┘
+                                                              │
+                                            ┌─────────────────▼─────────────────┐
+                                            │ shared/nba_fantasy_shared         │
+                                            │ models · providers · reconcile    │
+                                            │ scoring · JSON store              │
+                                            └───────────────────────────────────┘
+```
+
+- **Backend:** FastAPI, everything under `/api`. One `AppState` per process holds the providers, the player pool and
+  the open league sessions. Persistence is flat JSON under `backend/data/`; there is no database. The same process
+  serves the built frontend, so one container runs the whole app.
+- **Frontend:** React 19 with Vite, plain JSX, no UI library. Three interchangeable UIs (default, Command Center,
+  Broadcast) share the same data hooks and cards; three design presets are pure CSS tokens.
+- **Shared package:** the data models (Pydantic), the Sleeper / nba_api / fixture providers, name reconciliation, the
+  scoring formula and the JSON store, installed editable into the backend.
+- **Data:** Sleeper (rosters, matchups, per-game projections, box scores, injuries, news, transactions), ESPN (tip
+  times, live status, game summaries) and nba_api (game logs for valuations). Every fetch goes through one per-URL
+  cache with a TTL by volatility: 90 s on game days, 30 min for projections, 6 h for schedules. A week's requests are
+  prefetched in parallel.
+
+## The interesting problems
+
+**Lock or wait, decided by win probability.** In Lock-In each starting slot scores exactly one game a week: the game
+you lock, or else the slot's last game. Locking a finished game is final; waiting risks a worse last game. For each
+starter the engine compares *X*, his finished game, with *W*, the value of his remaining games played optimally,
+computed backwards from his last game:
+
+    V_last = p · μ_last
+    V_k    = p · E[max(X_k, V_k+1)] + (1 − p) · V_k+1,     X_k ~ Normal(μ_k, μ_k · swing)
+
+where *p* is his chance to play (from his injury tag) and *swing* is his own game-to-game variation under the league's
+scoring. The call is not "which is bigger" but which gives the higher chance to win the matchup: every open slot is a
+normal, the week's totals are summed, and P(win) = Φ(Δ / √(σ²<sub>me</sub> + σ²<sub>opp</sub>)). Both chances are shown
+on every card (`weekplan.py: wait_value, decide_by_win_chance`).
+
+**Seating a lineup under multi-position eligibility.** Slots are PG PG SG SG SF SF PF PF C C and most players fit
+two or three. Seating highest value first and sliding already-seated players along augmenting paths is optimal here
+(the slots form a transversal matroid), and it is what puts a PG/SG's lock in the SG slot when two better PGs still
+have games (`seat_players`).
+
+**A week as a timeline of check-ins.** Sleeper can only be changed by hand, so the lineup changes only at check-ins
+15 minutes before a tip where someone moves in, and every swap available at that moment is made at once: one visit
+per slate rather than one per game. Each check-in replans the day from the previous one's lineup. The slider replays
+the result at any minute, and the arrows on the cards are the exact moves to make in Sleeper, in a legal order
+(`week_timeline`, `swaps.js`).
+
+**Keep or swap on a live score.** Where a game in progress will finish: points so far plus a rate times the minutes
+left, with the rate shrunk toward the pregame projection as if he had played `PRIOR_MINUTES` more at it, so a hot or
+cold first quarter does not swing the call. The two constants were fit by replaying this season's finished games at
+fixed points on the game clock (`backtest_live.py`; numbers below).
+
+**One player, three sources.** nba_api, Sleeper and ESPN each have their own ids and spellings. A five-stage
+reconciliation matches on normalized name and team, then unique name, then birthdate, then nba_api's static list;
+nothing is dropped silently and every non-trivial match lands in a report shown in Settings.
+
+**Working with Sleeper as it is.** The multi-megabyte player file may be fetched once a day, so it sits behind an
+on-disk guard that is never bypassed at startup. Sleeper serves one lineup day at a time and flips to the next in the early
+morning, so the app knows when the lineup it reads is yesterday's. Whether a rival locked a game is inferred by
+comparing Sleeper's counted points with the box scores, and a finished week takes Sleeper's final count over any
+saved answer.
+
+## Measured
+
+The live finish estimate was backtested by replaying every finished game of the 2026-27 season so far (Oct 20 to
+Nov 11: **2,843 player games, 11,296 checkpoints** at the end of Q1, halftime, end of Q3 and mid-Q4), for rotation
+players projected for 15+ minutes. Error is in league fantasy points, where a typical starter's game is 8 to 15 FP.
+
+| Estimate at                     | end of Q1 | halftime | end of Q3 | mid-Q4 |
+|---------------------------------|----------:|---------:|----------:|-------:|
+| naive: tonight's rate continues | 3.46      | 2.14     | 1.36      | 0.90   |
+| **shipped: rate shrunk toward the projection** | **2.28** | **1.84** | **1.33** | **0.91** |
+| pregame projection's rate alone | 2.27      | 1.84     | 1.34      | 0.92   |
+
+Mean absolute error of the predicted final; bias is within 0.15 FP at every checkpoint, and the predicted minutes
+left are within about a minute of the actual at each checkpoint. Two findings worth knowing: shrinking the live rate
+cuts the first-quarter error by a third against naive extrapolation, and a player's live rate adds almost nothing
+over his projection on average, so the engine leans on the projection and lets the actual score, not the rate, move
+the keep-or-swap call. Reproduce with `python -m app.lockin.backtest_live` from `backend`.
+
+## Testing and CI
+
+- 302 backend tests (`pytest`) run offline against captured real API responses under `backend/tests/fixtures`:
+  the engine, the API, reconciliation, scoring, the week plan and the Telegram watcher.
+- `frontend/src/lockin/swaps.check.mjs` replays every lineup swap the UI can propose and asserts each step is legal.
+- Playwright end-to-end scripts in `frontend/e2e`: a mock auction draft driven entirely through the browser, and
+  screenshot / computed-style diffs for CSS refactors.
+- GitHub Actions runs `ruff`, the test suite, the swap checks, the production build and the Docker build on every push.
+
+## Run it
+
+### Docker
+
+```sh
+docker compose run --rm app python -m app.pull   # first time only: NBA game logs and the Sleeper player file (a few minutes)
+docker compose up --build                         # then open http://localhost:8000
+```
+
+Pulled data lives in `backend/data/`, which the container mounts, so Docker and local runs share it.
+
+### Local
 
 Needs Python 3.13 and Node 20+.
 
-### macOS / Linux
-
 ```sh
 cd backend
-python3 -m venv venv
-./venv/bin/python -m pip install -r requirements.txt
+python -m venv venv
+./venv/bin/python -m pip install -r requirements.txt     # Windows: .\venv\Scripts\python.exe
 ./venv/bin/python -m app.pull
 ./venv/bin/python -m app.serve --port 8000
 ```
 
-### Windows PowerShell
-
-```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
-.\venv\Scripts\python.exe -m app.pull
-.\venv\Scripts\python.exe -m app.serve --port 8000
-```
-
-In another terminal, start the frontend:
+In another terminal:
 
 ```sh
 cd frontend
 npm install
-npm run dev
+npm run dev          # http://localhost:5173, proxies /api to the backend
 ```
 
-Open http://localhost:5173, create a league, add your Sleeper league id in Settings and pick which manager you are.
+Then create a league, enter your Sleeper league id in Settings and pick which manager you are. On Windows,
+`start.ps1` runs both servers hidden and opens the browser; `stop.ps1` stops them.
 
-On Windows, once installed, `start.ps1` runs both servers in hidden windows and opens the browser (running it again
-restarts them); `stop.ps1` stops them. For a desktop shortcut, point it at
-`powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File <repo>\start.ps1`.
+Checks: `python -m pytest -q tests` and `ruff check` for the backend, `node src/lockin/swaps.check.mjs` and
+`npm run build` for the frontend.
 
-To retune the live finish estimate against this season's finished games (`PRIOR_MINUTES` / `MINUTES_LEFT_SCALE` in
-`backend/app/lockin/weekplan.py`), run `python -m app.lockin.backtest_live [league_id]` from `backend`. It prints the
-error at each game-clock checkpoint and caches box scores under `backend/data/cache/backtest_live/`.
-## Telegram notifications
-1. In Telegram, message @BotFather, send `/newbot`, copy the token. Message your new bot once, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy `chat.id`.
-2. Create `backend/.env` (gitignored) with your two values:
+### Telegram notifications (optional)
+
+1. In Telegram, message @BotFather, send `/newbot` and copy the token. Message your new bot once, then open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy `chat.id`.
+2. Create `backend/.env` (gitignored):
    ```
    TELEGRAM_BOT_TOKEN=123456:ABC-your-token
    TELEGRAM_CHAT_ID=123456789
    ```
-3. Check delivery: `python -m app.notify "hello"` (from `backend`). Then restart `python -m app.serve`; it sends each GTD / OUT / swap / lock call once, at its alarm time, while the backend is running.
+3. Test with `python -m app.notify "hello"` from `backend`, then restart the server. The watcher polls every minute
+   while the backend runs and logs to `backend/data/cache/notify.log`.
+
+The home page and Settings > Notifications show which chat the bot is linked to, with a link to it. The same section
+picks what to push (lock calls, keep / swap calls, players ruled OUT, GTD / DTD or cleared, lineup moves) and the win
+chance a lock call must add before it is pushed.
+
+## Repository layout
+
+```
+backend/app/
+  core/      api/ (leagues, players, data pull)   engine/ (session, ranking, bidding, budget, roster, keepers)
+             services/ (app state, pull, valuations, Sleeper league link and changelog)
+  draft/     auction routes, fit, market, room
+  lockin/    api, service (week view, plans, game and team cards), weekplan (the engine), backtest_live
+  main.py    notify.py (Telegram)   pull.py / valuate.py (CLIs)
+backend/tests/      pytest suite; fixtures/ holds captured API responses
+frontend/src/
+  core/      shell, settings, player sidebar and search, shared widgets
+  draft/     the Draft tab          lockin/   the Season tabs, swaps.js, time zone helpers
+  ui-command/ ui-broadcast/         the two alternative UIs
+shared/nba_fantasy_shared/   models, providers, reconcile, scoring, storage
+```
+
+## Scope
+
+Sleeper leagues only. The Season tab supports the Lock-In format; the Draft tab supports auction drafts. The app is
+single-user with no login: it is meant to run on your own machine or a private container. Projections and news come
+from Sleeper's feeds; stats.nba.com throttles aggressively and blocks some cloud networks, so the first data pull is
+best run from a home connection.
+
+## License
+
+[MIT](LICENSE)
