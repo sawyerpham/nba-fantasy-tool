@@ -95,11 +95,6 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
   return (
     <details className="panel panel-toggle" data-testid="managers-toggle">
       <summary><h3>Managers ({rows.length})</h3></summary>
-      <div className="row sticky-bar">
-        <button className="primary" onClick={saveAll} disabled={!dirty || busy} data-testid="managers-save-all">Save all (Ctrl+S)</button>
-        {dirty && <span className="badge dirty">unsaved changes</span>}
-        {msg && <span className="small">{msg}</span>}
-      </div>
       <div className="grid2" style={{ marginBottom: 8 }}>
         <div>
           <div className="small muted">Paste names, one per line (or comma-separated), in manager order:</div>
@@ -142,6 +137,11 @@ function ManagersEditor({ leagueId, managers, draftStatus, reload }) {
           ))}
         </tbody>
       </table>
+      <div className="row sticky-bar">
+        <button className="primary" onClick={saveAll} disabled={!dirty || busy} data-testid="managers-save-all">Save all (Ctrl+S)</button>
+        {dirty && <span className="badge dirty">unsaved changes</span>}
+        {msg && <span className="small">{msg}</span>}
+      </div>
     </details>
   );
 }

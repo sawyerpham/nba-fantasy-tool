@@ -111,13 +111,6 @@ export default function SettingsPage({ leagueId }) {
   return (
     <div>
       <h2>League settings <span className="muted small">— every value is editable, before and during the draft</span></h2>
-      <div className="row sticky-bar">
-        <button className="primary" onClick={save} data-testid="settings-save">Save settings (Ctrl+S)</button>
-        {dirty ? <span className="badge dirty" data-testid="settings-dirty">unsaved changes</span> : <span className="muted small">all changes saved</span>}
-        {dirty && <button onClick={() => setS(saved)}>Discard</button>}
-        {msg && <span className="ok">{msg}</span>}{error && <span className="error">{error}</span>}
-      </div>
-
       <div className="panel">
         <h3>General</h3>
         <div className="grid3">
@@ -151,7 +144,7 @@ export default function SettingsPage({ leagueId }) {
           <label>Budget per manager $<Num value={s.budget_per_manager} onChange={(v) => set({ budget_per_manager: v })} data-testid="budget" /></label>
           <label>Minimum bid $<Num value={s.min_bid} onChange={(v) => set({ min_bid: v })} /></label>
           <label>Bid increment $<Num value={s.bid_increment} onChange={(v) => set({ bid_increment: v })} /></label>
-          <label>Managers <span className="muted">{s.num_managers} (edit on the Settings tab)</span></label>
+          <label>Managers <span className="muted">{s.num_managers} (edit under Managers, above)</span></label>
         </div>
       </div>
 
@@ -258,7 +251,7 @@ export default function SettingsPage({ leagueId }) {
           <label className="inline small" title="other Sleeper leagues with the same people (dynasty, old seasons, any format): used only to learn favourite teams, young/veteran lean and who drafted whom">history leagues
             <input type="text" key={(s.sleeper_history_league_ids || []).join(",")} defaultValue={(s.sleeper_history_league_ids || []).join(", ")} placeholder="ids, comma-separated" onBlur={(e) => set({ sleeper_history_league_ids: e.target.value.split(/[\s,]+/).filter(Boolean) })} data-testid="sleeper-history-ids" style={{ minWidth: 260 }} />
           </label>
-          <span className="small muted">Save, then pull data (top of this page) to fetch managers, keepers and past drafts.</span>
+          <span className="small muted">Save, then pull data (Data pull, below) to fetch managers, keepers and past drafts.</span>
         </div>
         {preview && (
           <div>
@@ -278,6 +271,12 @@ export default function SettingsPage({ leagueId }) {
             </div>
           </div>
         )}
+      </div>
+      <div className="row sticky-bar">
+        <button className="primary" onClick={save} data-testid="settings-save">Save settings (Ctrl+S)</button>
+        {dirty ? <span className="badge dirty" data-testid="settings-dirty">unsaved changes</span> : <span className="muted small">all changes saved</span>}
+        {dirty && <button onClick={() => setS(saved)}>Discard</button>}
+        {msg && <span className="ok">{msg}</span>}{error && <span className="error">{error}</span>}
       </div>
     </div>
   );

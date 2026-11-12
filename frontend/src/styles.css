@@ -132,7 +132,9 @@ pre { font-size: var(--fs-2xs); background: var(--panel-2); padding: 10px; borde
 .panel.scroll { max-height: 72vh; overflow: auto; scrollbar-width: thin; }
 .dg-pane .panel.scroll { max-height: none; overflow: visible; }
 .panel.flush { padding: 0; overflow: hidden; }
-.sticky-bar { position: sticky; top: 58px; z-index: 4; background: var(--panel); padding: 10px 0; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+/* a form's Save bar: the last thing in its section, held at the bottom edge of the scrolling Settings popup while the section is in view */
+.sticky-bar { position: sticky; bottom: 0; z-index: 4; background: var(--panel-solid); padding: 10px 0; margin-top: 10px; border-top: 1px solid var(--border); }
+.modal th { position: static; }   /* table headers stay with their rows inside the popup (the page-level sticky th would float over them) */
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; }
 .grid3 > label, .grid2 > label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); }
@@ -209,7 +211,8 @@ tr:hover .row-actions, tr.selected .row-actions, .row-actions:focus-within { opa
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(5, 8, 15, 0.72); display: flex; align-items: center; justify-content: center; z-index: 30; }
 .modal { background: var(--panel); color: var(--text); padding: 24px 26px; min-width: 480px; max-width: 920px; max-height: 90vh; overflow: auto; border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35); }
-.settings-modal { position: relative; width: min(1100px, 92vw); height: 88vh; max-width: none; }
+.settings-modal { position: relative; width: min(1100px, 92vw); height: 88vh; max-width: none; padding-bottom: 0; }   /* no bottom padding: a Save bar sticks flush to the edge */
+.settings-modal > .section-card:last-child { margin-bottom: 24px; }
 .settings-close { position: sticky; top: 0; float: right; z-index: 2; }
 .modal > h3:first-child { margin-top: 0; font-size: var(--fs-xl); }
 .dropdown { position: absolute; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; box-shadow: var(--shadow); z-index: 25; max-height: 280px; overflow: auto; min-width: 320px; padding: 4px; margin-top: 4px; }
@@ -807,7 +810,8 @@ main:has(.season-grid) { max-width: none; padding: 12px 16px; flex: 1; min-heigh
 .game-chip.pick { border: 2px solid var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
 .game-chip.dim { opacity: 0.45; }
 .verdict.off { opacity: 0.6; font-weight: 600; }
-.day-pick { display: inline-flex; gap: 3px; margin-left: 8px; align-items: center; }
+.day-pick { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }   /* Mon..Sun wrap inside a settings column */
+.day-pick button { padding: 4px 9px; font-size: var(--fs-sm); }
 .mu-score { display: inline-flex; align-items: center; gap: 8px; }
 .matchup .mu-team { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; padding: 2px 10px 2px 7px; border-radius: 10px; background: var(--primary-soft); border: 1px solid var(--primary); box-shadow: 0 0 6px var(--primary), 0 0 14px color-mix(in srgb, var(--primary) 55%, transparent), inset 0 0 6px color-mix(in srgb, var(--primary) 35%, transparent); }   /* a neon-bordered pill from the manager's name across to the expected FP; 7px = the player cards' 2px padding + 5px, so the avatars line up with the headshots below */
 .matchup .mu-team.right { justify-content: flex-end; padding: 2px 5px 2px 10px; }
