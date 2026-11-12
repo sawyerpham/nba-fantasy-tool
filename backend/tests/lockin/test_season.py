@@ -56,6 +56,30 @@ def test_week_view_joins_schedule_projections_scores_and_tips(fixture_world):
         season.RETIRED.discard("999")
 
 
+def test_best_games_ranks_every_players_games_by_league_fp_with_the_game(fixture_world):
+    """Best games: anyone's games (rostered or not) ranked by league FP, best first, with stat line and ESPN game."""
+    from app.lockin.service import best_games
+
+    s = make_session(fixture_world, sleeper_league_id="L1")
+    s.players[JOKIC] = s.players[JOKIC].model_copy(update={"sleeper_id": "999", "team_abbr": "DEN"})
+    big = {"pts": 40, "reb": 12, "ast": 10, "fgm": 15, "fga": 25, "ftm": 8, "fta": 9, "sp": 2160}
+    canned = {
+        "schedule/nba/regular/2026": [{"date": "2026-10-20", "week": 1, "home": {"team": "DEN"}, "away": {"team": "LAL"}}],
+        "stats/nba/2026/1": [{"player_id": "5", "date": "2026-10-20", "team": "LAL", "opponent": "DEN", "stats": {"pts": 10, "sp": 1200},
+                              "player": {"first_name": "Some", "last_name": "Guy", "fantasy_positions": ["SF"]}},
+                             {"player_id": "999", "date": "2026-10-20", "team": "DEN", "opponent": "LAL", "stats": big},
+                             {"player_id": "7", "date": "2026-10-20", "team": "LAL", "stats": {}},   # no minutes: not a game
+                             {"player_id": "TEAM_DEN", "date": "2026-10-20", "team": "DEN", "stats": {"pts": 120, "sp": 14400}}],   # team total
+        "scoreboard?dates=20261020": {"events": [{"id": "401", "date": "2026-10-21T02:00Z", "status": {"type": {"state": "post"}},
+                                                  "competitions": [{"competitors": [{"homeAway": "home", "score": "120", "team": {"abbreviation": "DEN"}},
+                                                                                    {"homeAway": "away", "score": "110", "team": {"abbreviation": "LAL"}}]}]}]},
+    }
+    got = best_games(s, lambda url, ttl: next((v for k, v in canned.items() if k in url), None), today=date(2026, 10, 21))
+    assert [g["sid"] for g in got] == ["999", "5"] and got[0]["player_id"] == JOKIC and got[1]["name"] == "Some Guy"
+    assert got[0]["fp"] == round(actual_fp(big, s.league.scoring), 2) and got[0]["lead"][0] == ["PTS", 40] and got[0]["fg"] == [15, 25]
+    assert got[0]["game"].items() >= {"event": "401", "opp": "LAL", "home": True, "score": "120", "opp_score": "110", "state": "post"}.items()
+
+
 def test_current_week_is_the_monday_to_sunday_span_holding_today():
     """Current week is the monday to sunday span holding today."""
     weeks = {1: ["2026-10-20", "2026-10-25"], 2: ["2026-10-26", "2026-11-01"]}
@@ -157,6 +181,7 @@ def test_news_merges_my_players_newest_first_and_flags_injuries():
 def test_acquisitions_draft_price_then_moves_in_order():
     """Acquisitions draft price then moves in order."""
     from types import SimpleNamespace
+
     from app.lockin.service import acquisitions
 
     def fetch(url, ttl):

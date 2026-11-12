@@ -26,6 +26,7 @@ through one slot; good enough to rank lock/pass, revisit if the calls look off i
 
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass, field, replace
 
@@ -658,6 +659,17 @@ def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float])
         p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · keep the slot open (~{w:.1f} from games still to come): {p.win_wait:.0%}"
                  + (f" · lock in the {p.seat} slot" if p.action == "LOCK" else ""))
     return win_chance(team_total(players), theirs)
+
+
+def bench_lock_chance(p: PlanPlayer, players: list[PlanPlayer], slot_counts: dict[str, int], slot: str,
+                      theirs: tuple[float, float]) -> float:
+    """Chance to win if a starter the plan benches locks his final game in `slot` anyway (Sleeper allows it while he
+    sits in a starting slot): the week re-planned on copies with him locked there, decided by win chance."""
+    clones = copy.deepcopy(players)
+    c = clones[players.index(p)]
+    c.locked, c.slot = c.x, slot
+    plan_week(clones, slot_counts)
+    return decide_by_win_chance(clones, theirs)
 
 
 def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, backup_swing: float,

@@ -71,8 +71,11 @@ export function TeamName({ t, cls = "", size = 24, record = true, mine = false }
  * Data: backend services/season.py and engine/weekplan.py. The plan is "what to do now": the backend re-runs the rules against the clock on every load, so it reloads every minute and whenever the tab comes back into view.
  * Alarms ring before swap and GTD checks while the tab is open, and the week bar is portalled into the app header.
  */
-export default function SeasonPage({ leagueId, view }) {   // view: week | news | league | waivers (the app's top tabs)
+export default function SeasonPage({ leagueId, view, onWeek }) {   // view: week | news | league | waivers (the app's top tabs); onWeek() opens the Week tab
   const [week, setWeek] = useState(null);
+  const [matchup, setMatchup] = useState(null);   // { rid }: the matchup the lineup grid jumps to (a new object per click)
+  /** Show a fantasy team's matchup this week on the Week tab (from a player card's owner); Week Stats follows it. */
+  const openMatchup = (rid) => { setWeek(null); setMatchup({ rid }); close(); onWeek?.(); };
   const [plan, setPlan] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -177,9 +180,9 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
             ))}
             <RosterAlerts roster={plan.roster} />
           </div>, document.body)}
-        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} onShow={setFocusRid} />}
+        {view === "week" && <WeekView key={data.week} data={data} plan={plan} open={open} openGame={openGame} setLock={setLock} leagueId={leagueId} onShow={setFocusRid} focus={matchup} />}
         {view === "news" && <NewsView leagueId={leagueId} open={setSelected} refreshKey={tick} />}
-        {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} />}
+        {view === "league" && <LeagueView data={data} leagueId={leagueId} open={open} openPid={setSelected} openGame={openGame} />}
         {view === "waivers" && <WaiversView leagueId={leagueId} onSelect={setSelected} />}
       </section>
       <aside className={`season-side ${cur ? "has-nav" : ""}`}>
@@ -190,7 +193,7 @@ export default function SeasonPage({ leagueId, view }) {   // view: week | news 
           </span>
         )}
         {selected
-          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={close} onOpenGame={openGame} />
+          ? <PlayerSidebar leagueId={leagueId} playerId={selected} season plan={plan} onSelectPlayer={setSelected} refreshKey={tick} onClose={close} onOpenGame={openGame} onOpenMatchup={openMatchup} />
           : game ? <GamePanel key={game.game.event} sel={game} data={data} leagueId={leagueId}
             onOpenPid={setSelected} onClose={close} />
           : team ? <TeamPanel key={team} abbr={team} leagueId={leagueId} onOpenPid={setSelected} onClose={close} />
@@ -219,6 +222,7 @@ export function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
   useEffect(() => {
     if (tab === "news" && !news) api.get(`/leagues/${leagueId}/season/team/news` + qs({ abbr })).then((x) => setNews(x.news)).catch(() => setNews([]));
   }, [tab, news, leagueId, abbr]);
+  const results = (t?.schedule || []).map((g) => g.result).filter(Boolean);   // the record: its finished games' W / L
   return (
     <div className="panel scroll team-panel" data-testid="team-panel">
       <button className="sidebar-close" onClick={onClose} title="Close team" data-testid="team-close" aria-label="Close team"><Icon name="x" /></button>
@@ -227,7 +231,8 @@ export function TeamPanel({ abbr, leagueId, onOpenPid, onClose }) {
           <img src={t.logo} alt="" width={52} height={52} onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
           <div>
             <h3 className="tp-name">{t.name}{t.conference && <span className={`conf conf-${t.conference}`}>{t.conference}</span>}</h3>
-            <div className="small muted">team <strong>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent</div>
+            <div className="small muted">{results.length > 0 && <><strong data-testid="team-nba-record">{results.filter((r) => r === "W").length}-{results.filter((r) => r === "L").length}</strong> · </>}
+              team <strong>#{t.talent_rank}</strong> of {t.teams} in projected fantasy talent</div>
           </div>
         </div>
         <nav className="profile-tabs" data-testid="team-tabs">
@@ -332,7 +337,7 @@ export function GamePanel({ sel, data, leagueId, onOpenPid, onClose }) {
               {i === 1 && <div className="gp-status"><span className={g.state === "in" ? "gp-live" : ""}>{status}</span><span className="small muted">{when}</span></div>}
               <div className={`gp-team ${i ? "gp-home" : ""}`}>
                 {t.logo && <TeamLink abbr={t.abbr}><img src={t.logo} alt="" width={40} height={40} /></TeamLink>}
-                <div><div className="gp-abbr"><TeamLink abbr={t.abbr} /></div>
+                <div><div className="gp-abbr"><TeamLink abbr={t.abbr} />{g.state !== "pre" && t.record && <span className="gp-rec"> {t.record}</span>}</div>
                   {g.state === "pre" ? <div className="gp-record">{t.record || "—"}</div> : <div className="gp-pts">{t.score ?? "—"}</div>}</div>
               </div>
             </React.Fragment>
@@ -435,7 +440,8 @@ export function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
   /** A row's win-probability edge from locking: win % locked minus win % left open. */
   const edge = (r) => (r.win_lock ?? 0) - (r.win_wait ?? 0);
   // a lock that costs more than 5 points of win chance isn't worth a card
-  const lockable = p.players.filter((r) => r.seat && r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess"
+  // x is only set for a player in a starting slot, so this includes starters the plan benches (Sleeper lets them lock)
+  const lockable = p.players.filter((r) => r.x != null && r.x_final && r.lock_status !== "locked" && r.lock_status !== "guess"
     && edge(r) >= -0.05)
     .sort((a, b) => edge(b) - edge(a));
   // a KEEP call (his game under way, headed past the backup's) is no swap: it drops off the list
@@ -508,14 +514,14 @@ export function LockinGuide({ data, plan, leagueId, setLock, open, focus }) {
               <div key={r.sid} className="guide-item">
                 <Headshot sleeperId={r.sid} name={r.name} size={34} />
                 <div className="guide-lock-main">
-                  <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat}</span></div>
+                  <div className="guide-lock-top"><strong className="clickable" onClick={() => open(r.sid)}>{r.name}</strong> <span className="muted small">{r.seat || r.slot}</span></div>
                   {/* the open slot: what it can still get from his and spare bench players' games (backend open_slot) */}
                   <div className="small muted guide-lock-top">{nba && <><TeamLink abbr={nba}><img src={teamLogo(nba)} alt="" width={14} height={14} style={{ verticalAlign: "-2px" }} /> {nba}</TeamLink> · </>}
-                    Open slot <span className="guide-hi">~{fp(r.slot_w ?? r.w)}</span></div>
+                    {r.seat ? <>Open slot <span className="guide-hi">~{fp(r.slot_w ?? r.w)}</span></> : "Plan benches him"}</div>
                   <div className="small muted">
                     {best && <span data-tip={detail}>Lock <span className="guide-hi">{best.slot}</span>{r.slot !== best.slot ? ` (now ${r.slot})` : ""}
                       {diff.length > 0 && ` (${diff.map((o) => `${o.slot} −${fp(best.team - o.team)}`).join(", ")})`}</span>}
-                    {r.win_lock != null && <> · win <span className="guide-hi">{pct(r.win_lock)}</span> vs <span className="guide-hi">{pct(r.win_wait)}</span> open
+                    {r.win_lock != null && <> · win <span className="guide-hi">{pct(r.win_lock)}</span> vs <span className="guide-hi">{pct(r.win_wait)}</span> {r.seat ? "open" : "benched"}
                       {here && <> · <span className="warn-text">{pct(here.win)} at {here.slot}</span></>}</>}
                   </div>
                 </div>
@@ -591,7 +597,7 @@ export function RosterAlerts({ roster }) {
 /**
  * One card per game he has this week (so 3-4 at most): day, tip time, then his FP (a dash before the game) with the projection small beside it. Live, that number is where his game is headed instead (backend pace: live_estimate), green or red as it beats his projection or not; once the game is final it goes back to the pregame projection.
  * A game that can't be locked (or count any more) is crossed out: every game but the locked one once he's locked; a final game once a later one has tipped, or that the backend can't lock (lockable = r.x: benched for it); a live game while he sits on the bench. Games off the lineup day dim, except the locked game and a final game he can still lock. A game that's on or about to start gets a stream link (streamed.pk) in the same corner as the padlock.
- * `lane` (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs). `onOpen(game)` opens that game on the right (GamePanel). `onLock(date)`: the corner padlock locks or unlocks (open on a final game he can still lock, filled on the locked game; unlock is "").
+ * `lane` (matchup cards): { xs: tip ms -> x px, scale }, so the chips line up as a timeline (see laneXs). `onOpen(game)` opens that game on the right (GamePanel). `onLock(date)`: the corner padlock locks or unlocks (open on any final game he played while not benched, past ones too, when nothing is locked; filled on the locked game; unlock is "").
  */
 function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, lane, team, onOpen, onLock }) {
   const { list: matches } = useNBAMatches();
@@ -607,7 +613,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
         const later = games.slice(i + 1).some((x) => x.state !== "pre" || x.fp != null);
         const dead = lockDate ? g.date !== lockDate : (g.state === "post" && (later || !lockable)) || (live && benched);
         const upcoming = g.state === "pre" && !played && !dead;
-        const toggle = !onLock ? null : lockDate === g.date ? "" : g.state === "post" && played && !dead ? g.date : null;
+        // any final game he played while not benched can be marked locked, even one a later game has passed (a lock you forgot to record)
+        const toggle = !onLock ? null : lockDate === g.date ? "" : !lockDate && g.state === "post" && played && !benched ? g.date : null;
         /** Click on the corner padlock: lock this game, or unlock it when it's the locked one. */
         const lockClick = (e) => { e.stopPropagation(); onLock(toggle); };
         const watch = watches[i];
@@ -618,8 +625,8 @@ function GameChips({ games, today, lockDate, lockGuess, lockable, benched, day, 
           played && g.min != null && !g.box && `${Math.round(g.min)} MIN`,
           g.b2b && g.state === "pre" && "2nd night of a back-to-back",
           g.beat != null && `${Math.round(g.beat * 100)}% to score higher this week`,
-          lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && "can't be locked",
-          toggle === "" ? "padlock: unlock" : toggle && "padlock: lock",
+          lockDate === g.date ? (lockGuess ? "locked (a guess: his next game confirms it)" : "locked") : dead && !toggle && "can't be locked",
+          toggle === "" ? "padlock: unlock" : toggle && (dead ? "padlock: mark it locked (a lock you didn't record)" : "padlock: lock"),
           watch && "▶: watch",
         ].filter(Boolean).join(" · ") + (g.box ? `\n${boxLine(g.box, g.min)}` : "");
         return (
@@ -761,9 +768,13 @@ export function bySlot(rows, positions, irSlots) {
  * One matchup side by side. ◀ ▶ step through the league's matchups (yours first); calls and lock buttons show on yours only. Other matchups come from the plan endpoint for their first team (its opponent rides along).
  * On a thin window only the left team is shown. The left team can show its best lineup (default) or the one it has in Sleeper now when they differ.
  */
-export function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow }) {
-  const mineIdx = Math.max(0, data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === plan.roster_id)));
-  const [idx, setIdx] = useState(mineIdx);
+export function WeekView({ data, plan, open, openGame, setLock, leagueId, onShow, focus }) {
+  /** The index of the matchup a fantasy team plays in this week (-1: none). */
+  const idxOf = (rid) => data.matchups.findIndex((pair) => pair.some((m) => m.roster_id === rid));
+  const mineIdx = Math.max(0, idxOf(plan.roster_id));
+  // `focus` ({ rid }, from a player card's owner) jumps to that team's matchup
+  const [idx, setIdx] = useState(() => (focus && idxOf(focus.rid) >= 0 ? idxOf(focus.rid) : mineIdx));
+  useEffect(() => { if (focus && idxOf(focus.rid) >= 0) setIdx(idxOf(focus.rid)); }, [focus]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { onShow?.(idx === mineIdx ? plan.roster_id : data.matchups[idx]?.[0]?.roster_id); }, [idx]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [other, setOther] = useState(null);
   const isMine = idx === mineIdx;
@@ -1154,8 +1165,47 @@ export function NewsView({ leagueId, open, refreshKey }) {
   );
 }
 
-/** League tab: this week's matchups (click a team for its roster and games) and the standings with FAAB left. */
-export function LeagueView({ data, leagueId, open }) {
+/**
+ * The League tab's Best games: the week's 10 best single games by any NBA player in league FP (backend /season/best), two columns.
+ * Each: rank, headshot and name (opens his profile when he's in our pool), his stat line, a small game card (score, status, day: opens the game card) and his FP.
+ */
+function BestGames({ leagueId, week, openPid, openGame }) {
+  const [games, setGames] = useState(null);
+  useEffect(() => { api.get(`/leagues/${leagueId}/season/best` + qs({ week })).then((x) => setGames(x.games)).catch(() => setGames([])); }, [leagueId, week]);
+  return (
+    <div className="panel" data-testid="best-games">
+      <h3>Best games · week {week}</h3>
+      {!games ? <div className="muted small">Loading…</div> : !games.length ? <div className="muted small">No games played yet.</div> : (
+        <div className="best-games">{games.map((b, i) => {
+          const g = b.game, sides = [[b.team, g.score], [g.opp, g.opp_score]], [away, home] = g.home ? [sides[1], sides[0]] : sides;
+          const status = g.state === "in" ? quarters(g.detail) : g.state === "post" ? "Final" : "";
+          return (
+            <div key={`${b.sid}-${g.date}`} className="best-game">
+              <span className="best-rank">{i + 1}</span>
+              <Headshot sleeperId={b.sid} name={b.name} size={44} />
+              <div className="best-main">
+                <div><strong className={b.player_id && openPid ? "clickable" : ""} onClick={b.player_id && openPid ? () => openPid(b.player_id) : undefined}>{b.name}</strong>
+                  {" "}<span className="small muted"><TeamLink abbr={b.team} /> <PosList list={b.pos} /></span></div>
+                <div className="small muted best-line">{b.lead.map(([k, v]) => <span key={k}><strong>{v}</strong> {k}</span>)}
+                  <span>{b.fg[0]}/{b.fg[1]} FG</span><span>{b.ft[0]}/{b.ft[1]} FT</span><span>{b.min} MIN</span></div>
+              </div>
+              <div className={`best-gamecard ${g.event && openGame ? "clickable" : ""}`} data-tip={g.event && openGame ? "Open the game card" : undefined}
+                onClick={g.event && openGame ? () => openGame({ game: g, team: b.team, sid: b.sid, name: b.name }) : undefined}>
+                {[away, home].map(([abbr, pts]) => (
+                  <div key={abbr} className={`best-gc-team ${abbr === b.team ? "his" : ""}`}><img src={teamLogo(abbr)} alt="" width={16} height={16} /> {abbr}<strong>{pts ?? "—"}</strong></div>))}
+                <div className="best-gc-status"><span className={g.state === "in" ? "gp-live" : ""}>{status}</span> {dayName(g.date)}</div>
+              </div>
+              <span className="best-fp">{fp(b.fp)}<small>FP</small></span>
+            </div>
+          );
+        })}</div>
+      )}
+    </div>
+  );
+}
+
+/** League tab: this week's matchups (click a team for its roster and games), the week's best games and the standings with FAAB left. */
+export function LeagueView({ data, leagueId, open, openPid, openGame }) {
   const team = Object.fromEntries(data.teams.map((t) => [t.roster_id, t]));
   const [shown, setShown] = useState(null);
   /** Load another team's week plan (roster and games) into the shown team. */
@@ -1188,6 +1238,7 @@ export function LeagueView({ data, leagueId, open }) {
           <TeamColumn data={data} team={shown} open={open} />
         </div>
       )}
+      <BestGames leagueId={leagueId} week={data.week} openPid={openPid} openGame={openGame} />
       <div className="panel">
         <h3>Standings</h3>
         <table className="small" data-testid="standings">

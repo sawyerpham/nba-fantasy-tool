@@ -10,7 +10,7 @@ import { GamePanel, TeamPanel, bestLineup, watchTitle } from "./SeasonPage.jsx";
 export function CurrentCard({ s, leagueId }) {
   const c = s.cur;
   if (!c) return null;
-  if (c.pid) return <PlayerSidebar leagueId={leagueId} playerId={c.pid} season plan={s.plan} onSelectPlayer={s.openPid} refreshKey={s.tick} onClose={s.close} onOpenGame={s.openGame} />;
+  if (c.pid) return <PlayerSidebar leagueId={leagueId} playerId={c.pid} season plan={s.plan} onSelectPlayer={s.openPid} refreshKey={s.tick} onClose={s.close} onOpenGame={s.openGame} onOpenMatchup={s.openMatchup} />;
   if (c.game) return <GamePanel key={c.game.game.event} sel={c.game} data={s.data} leagueId={leagueId} onOpenPid={s.openPid} onClose={s.close} />;
   return <TeamPanel key={c.team} abbr={c.team} leagueId={leagueId} onOpenPid={s.openPid} onClose={s.close} />;
 }

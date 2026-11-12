@@ -310,6 +310,22 @@ def test_lock_or_wait_by_the_chance_to_win_your_scenario():
     assert 0 < star.win_lock < 1 and 0 < star.win_wait < 1 and "to win" in star.why
 
 
+def test_a_starter_the_plan_benches_still_gets_a_win_chance_for_locking():
+    """A starter the plan benches (a better player takes his slot) can still lock his final game: win % re-planned."""
+    from app.lockin.weekplan import bench_lock_chance, decide_by_win_chance
+
+    one = {"C": 1}
+    starter = pp("starter", ["C"], "C", [Game("2026-10-24", 10, fp=10.0, started=True, final=True), Game("2026-10-26", 11)])
+    better = pp("better", ["C"], "BN", future(14))
+    players = [starter, better]
+    plan_week(players, one)
+    assert starter.seat is None and starter.x == 10.0 and starter.x_final   # benched by the plan, yet lockable
+    plan_chance = decide_by_win_chance(players, (12.0, 4.0))
+    locked = bench_lock_chance(starter, players, one, "C", (12.0, 4.0))
+    assert 0 < locked < plan_chance                    # a sure 10 vs their ~12 loses more often than the 14-proj player
+    assert starter.seat is None and starter.locked is None and better.seat == "C"   # the originals are untouched
+
+
 def test_late_scratch_alarms_now_and_close_projections_go_to_the_earlier_tip():
     """Late scratch alarms now and close projections go to the earlier tip."""
     from app.lockin.weekplan import plan_today

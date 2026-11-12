@@ -8,12 +8,32 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from ..core.services.app_state import AppState
-from .service import (_cache, game_detail, http_fetch, injury_report, read_locks, season_news, season_player, sleeper_injuries,
-                      team_news, team_plan, team_player_stats, team_ranks, team_schedule, team_stat_rows, trending, waivers,
-                      week_view, write_lock, SLEEPER, DAY_TTL)
 from ..core.api.deps import _session, get_state
 from ..core.api.players import _team_role, team_rosters
+from ..core.services.app_state import AppState
+from .service import (
+    DAY_TTL,
+    SLEEPER,
+    _cache,
+    best_games,
+    game_detail,
+    http_fetch,
+    injury_report,
+    read_locks,
+    season_news,
+    season_player,
+    sleeper_injuries,
+    team_news,
+    team_plan,
+    team_player_stats,
+    team_ranks,
+    team_schedule,
+    team_stat_rows,
+    trending,
+    waivers,
+    week_view,
+    write_lock,
+)
 
 router = APIRouter(prefix="/leagues/{league_id}/season", tags=["season"])
 
@@ -53,6 +73,12 @@ def plan(league_id: str, week: int | None = Query(None, ge=1), roster_id: int | 
 def game(league_id: str, event: str = Query(..., pattern=r"^\d+$"), state: AppState = Depends(get_state)) -> dict:
     """One NBA game (ESPN event id) for the game card: score, box scores in league FP, depth charts."""
     return game_detail(_session(state, league_id), _fetch(state), event)
+
+
+@router.get("/best")
+def best(league_id: str, week: int | None = Query(None, ge=1), state: AppState = Depends(get_state)) -> dict:
+    """The week's 10 best single games by any NBA player in league FP (the League tab's Best games)."""
+    return {"games": best_games(_session(state, league_id), _fetch(state), week)}
 
 
 @router.get("/team")

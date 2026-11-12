@@ -13,6 +13,7 @@ import useSeason from "../lockin/useSeason.js";
 import { CardNav, CurrentCard, SeasonTools, WeekNav, callsOf, nextCheckIn, nowOf, slate } from "../lockin/seasonBits.jsx";
 import { LeagueView, LockIcon, LockinGuide, NewsView, WaiversView, bestLineup, bySlot, dayName, fp, pct, quarters, shortQuarter, teamLogo, untilText } from "../lockin/SeasonPage.jsx";
 import { fmt, timeOf } from "../lockin/tz.js";
+import { api, qs } from "../api.js";
 
 // Broadcast (Settings > UI): game night on TV. A scoreboard band on top, a ticker of tonight's games, the week as a grid
 // of roster spots by day (one cell per game: points, projection, live state, lock), the analysis desk (Week Stats) on the
@@ -43,7 +44,7 @@ export default function App() {
       <main className="bc-main">
         {tab === "home" && <HomePage setLeagueId={app.setLeagueId} setTab={app.goTab} />}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
-        {SEASON_VIEWS[tab] && <BroadcastSeason leagueId={leagueId} view={SEASON_VIEWS[tab]} />}
+        {SEASON_VIEWS[tab] && <BroadcastSeason leagueId={leagueId} view={SEASON_VIEWS[tab]} onWeek={() => setTab("season")} />}
       </main>
       <SettingsModal app={app} />
       <TipLayer />
@@ -52,8 +53,8 @@ export default function App() {
 }
 
 /** The Season side of Broadcast: score bug (Week), the games ticker with search and Sync, then the view; cards open in a sheet. */
-function BroadcastSeason({ leagueId, view }) {
-  const s = useSeason(leagueId);
+function BroadcastSeason({ leagueId, view, onWeek }) {
+  const s = useSeason(leagueId, onWeek);
   useEffect(() => {
     if (!s.cur) return undefined;
     /** Escape closes the sheet. */
@@ -77,12 +78,12 @@ function BroadcastSeason({ leagueId, view }) {
         </div>
         {view === "week" && (
           <div className="bc-desk">
-            <Matrix data={data} plan={plan} s={s} />
+            <Matrix data={data} plan={plan} s={s} leagueId={leagueId} />
             <aside className="bc-analysis"><LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={s.setLock} open={s.open} /></aside>
           </div>
         )}
         {view === "news" && <div className="bc-fill"><NewsView leagueId={leagueId} open={s.openPid} refreshKey={s.tick} /></div>}
-        {view === "league" && <div className="bc-body"><LeagueView data={data} leagueId={leagueId} open={s.open} /></div>}
+        {view === "league" && <div className="bc-body"><LeagueView data={data} leagueId={leagueId} open={s.open} openPid={s.openPid} openGame={s.openGame} /></div>}
         {view === "waivers" && <div className="bc-body"><WaiversView leagueId={leagueId} onSelect={s.openPid} /></div>}
       </div>
       {view === "week" && <Chyron data={data} plan={plan} s={s} />}
@@ -154,12 +155,23 @@ function Ticker({ data, s }) {
  * the status; a locked game is filled, a game that can't count any more is struck out (the same rules as the lineup
  * grid's game chips). On your rows the corner padlock locks a final game or unlocks the locked one; ⇄ marks a player the
  * best lineup moves (his Sleeper slot → the slot he should be in).
+ * A player card's owner (s.matchup) shows that team's matchup instead: both its teams' Sleeper lineups, no lock buttons.
  */
-function Matrix({ data, plan, s }) {
-  const [side, setSide] = useState("me");
+function Matrix({ data, plan, s, leagueId }) {
+  const [side, setSide] = useState("me");   // "me": the matchup's first team (you in yours), "opp": the other
+  const [other, setOther] = useState(null);  // another matchup's plan (its first team, the opponent riding along)
+  useEffect(() => {
+    const rid = s.matchup?.rid, pair = rid && data.matchups.find((p) => p.some((m) => m.roster_id === rid));
+    if (!pair) return;
+    if (pair.some((m) => m.roster_id === plan.roster_id)) { setOther(null); setSide(rid === plan.roster_id ? "me" : "opp"); return; }
+    setSide(rid === pair[0].roster_id ? "me" : "opp");
+    // ponytail: loaded once per click, not on the minute reload; reopen it from the card for fresh numbers
+    api.get(`/leagues/${leagueId}/season/plan` + qs({ week: data.week, roster_id: pair[0].roster_id })).then(setOther).catch(() => setOther(null));
+  }, [s.matchup, data.week]);   // eslint-disable-line react-hooks/exhaustive-deps
   const gamesOf = useMemo(() => Object.fromEntries(Object.entries(data.players).map(([sid, p]) => [sid, p.games])), [data.players]);
-  const mine = side === "me" || !plan.opponent;
-  const team = mine ? plan : plan.opponent;
+  const base = other || plan, first = side === "me" || !base.opponent;
+  const team = first ? base : base.opponent;
+  const mine = !other && first;   // your team: best lineup and lock buttons
   const { rows } = bestLineup(team, nowOf(data), data.roster_positions, !mine, gamesOf);
   const from = Object.fromEntries(team.players.map((r) => [r.sid, r.slot]));
   const { lines, bench, ir } = bySlot(rows, data.roster_positions, data.reserve_slots);
@@ -168,9 +180,10 @@ function Matrix({ data, plan, s }) {
     <section className="panel bc-matrix-wrap" data-testid="lineup-matrix">
       <div className="bc-matrix-head">
         <div className="bc-seg">
-          <button className={mine ? "active" : ""} onClick={() => setSide("me")}>Your lineup</button>
-          {plan.opponent && <button className={mine ? "" : "active"} onClick={() => setSide("opp")} data-testid="matrix-opp">{plan.opponent.user || plan.opponent.name}</button>}
+          <button className={first ? "active" : ""} onClick={() => setSide("me")}>{other ? other.user || other.name : "Your lineup"}</button>
+          {base.opponent && <button className={first ? "" : "active"} onClick={() => setSide("opp")} data-testid="matrix-opp">{base.opponent.user || base.opponent.name}</button>}
         </div>
+        {other && <button className="small" onClick={() => { setOther(null); setSide("me"); }} data-testid="matrix-mine">Your matchup</button>}
         <span className="small muted">{mine ? "Best lineup right now. Click a game for its box score." : "Their lineup in Sleeper now."}</span>
       </div>
       <div className="bc-matrix-scroll">

@@ -32,7 +32,7 @@ export default function App() {
       <main>
         {tab === "home" && <HomePage setLeagueId={app.setLeagueId} setTab={goTab} />}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
-        {SEASON_VIEWS[tab] && <SeasonPage leagueId={leagueId} view={SEASON_VIEWS[tab]} />}
+        {SEASON_VIEWS[tab] && <SeasonPage leagueId={leagueId} view={SEASON_VIEWS[tab]} onWeek={() => setTab("season")} />}
       </main>
       <SettingsModal app={app} />
       <TipLayer />

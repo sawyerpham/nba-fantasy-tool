@@ -8,9 +8,11 @@ const REFRESH_MS = 60000;   // every minute: live scores feed the KEEP / SWAP ca
  * The Season data and actions for the redesigned UIs (src/ui-*), the same loading SeasonPage does: the shown week and its
  * plan (reloaded every minute and when the tab comes back into view), Sync, lock answers, and the card history (a player
  * { pid }, a game { game: { game, team, sid, name } } or an NBA team { team: abbr }) stepped through with back / forward.
+ * `onWeek()` switches the app to the Week view: openMatchup(roster_id) calls it, then shows that team's matchup this week.
  */
-export default function useSeason(leagueId) {
+export default function useSeason(leagueId, onWeek) {
   const [week, setWeek] = useState(null);
+  const [matchup, setMatchup] = useState(null);   // { rid }: the matchup the lineup grid jumps to (a new object per click)
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState("");
@@ -55,8 +57,11 @@ export default function useSeason(leagueId) {
   /** Open a player's card by Sleeper id. */
   const open = (sid) => { const pid = data?.players[sid]?.player_id; if (pid) go({ pid }); };
 
+  /** Show a fantasy team's matchup this week on the Week view (the cards close so it's in sight). */
+  const openMatchup = (rid) => { setWeek(null); setMatchup({ rid }); close(); onWeek?.(); };
+
   return {
-    week, setWeek, data, plan, error, tick, syncing, sync, setLock,
+    week, setWeek, data, plan, error, tick, syncing, sync, setLock, matchup, openMatchup,
     cur, go, close, openPid, open, openTeam: (abbr) => go({ team: abbr }), openGame: (g) => go({ game: g }),
     back: nav.i > 0 ? () => setNav((n) => ({ ...n, i: n.i - 1 })) : null,
     forward: nav.i < nav.stack.length - 1 ? () => setNav((n) => ({ ...n, i: n.i + 1 })) : null,

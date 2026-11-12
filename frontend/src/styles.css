@@ -634,6 +634,20 @@ button.tiny { font-size: var(--fs-3xs); padding: 1px 6px; }
 .news-story { color: var(--muted); margin-top: 2px; max-width: 100ch; line-height: 1.45; }
 .league-matchups { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .lm-card { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+/* League tab's Best games: rank, headshot, name + stat line, a small game card, FP */
+.best-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(560px, 100%), 1fr)); gap: 8px; }
+.best-game { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--border-inner, var(--border)); border-radius: 10px; padding: 8px 12px; }
+.best-rank { width: 18px; flex: none; text-align: center; font-weight: 900; color: var(--muted); }
+.best-main { flex: 1; min-width: 0; line-height: 1.35; }
+.best-main .clickable:hover { text-decoration: underline; }
+.best-line { display: flex; flex-wrap: wrap; gap: 0 9px; } .best-line strong { color: var(--text); }
+.best-gamecard { flex: none; width: 104px; padding: 4px 8px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); font-size: var(--fs-2xs); }
+.best-gamecard.clickable { cursor: pointer; } .best-gamecard.clickable:hover { border-color: var(--primary); }
+.best-gc-team { display: flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 700; }
+.best-gc-team strong { margin-left: auto; color: var(--text); } .best-gc-team.his { color: var(--text); }
+.best-gc-status { color: var(--muted); font-size: var(--fs-3xs); font-weight: 700; text-transform: uppercase; }
+.best-fp { flex: none; min-width: 64px; text-align: right; font-size: var(--fs-xl); font-weight: 900; line-height: 1; }
+.best-fp small { margin-left: 2px; font-size: var(--fs-3xs); color: var(--muted); font-weight: 700; }
 .lm-row { display: flex; justify-content: space-between; padding: 2px 0; }
 .lm-row.lead strong { color: var(--ok); }
 .season-block table { width: 100%; }
@@ -900,6 +914,7 @@ main:has(.season-grid) { max-width: none; padding: 12px 16px; flex: 1; min-heigh
 .team-link { cursor: pointer; border-radius: 4px; } .team-link:hover { color: var(--primary); text-decoration: underline; }
 .team-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .gp-record { font-size: var(--fs-2xl); font-weight: 800; line-height: 1.2; color: var(--muted); }
+.gp-rec { font-weight: 500; opacity: 0.8; }   /* the record beside the abbreviation once the game has tipped */
 .game-chip.openable { cursor: pointer; }
 .game-chip.openable:hover { box-shadow: 0 0 0 2px var(--primary-soft); }
 .game-chip { container-type: inline-size; position: relative; }
@@ -1048,6 +1063,34 @@ header.top .brand .logo .icon { width: 20px; height: 20px; }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* Season tab's right column (Week Stats, player / team / game cards; also Command Center's and Broadcast's side): tighter boxes, less scrolling. The matchup grid is left alone. */
+:is(.season-side, .cc-side, .bc-analysis) {
+  & > .panel { padding: 12px 14px; }
+  &.has-nav > .panel { padding-top: 40px; }
+  .guide-head { margin-bottom: 6px; }
+  .guide-card, .sec, .sp-game, .team-card, .gp-section[class*="gp-tint-"] { padding: 7px 10px; }
+  .guide-card + .guide-card, .sec { margin-top: 6px; }
+  .guide-card > .bid-label { margin-bottom: 4px; }
+  .guide-item { padding: 4px 0; gap: 8px; }
+  .guide-lock-main { line-height: 1.25; }
+  .guide-lock-x { font-size: var(--fs-lg); }
+  .hub-win { margin: 2px 0 6px; } .hub-win strong { font-size: var(--fs-2xl); }
+  .hub-team { margin-bottom: 2px; } .hub-stat { padding: 0; }
+  .guide-odds { gap: 3px; margin-bottom: 2px; }
+  .guide-chips { margin-top: 6px; gap: 4px; }
+  .guide-swaps { gap: 5px 6px; }
+  .profile-top { margin-top: 28px; }
+  .profile-tabs { margin: 8px 0; } .profile-tabs button { padding: 4px; }
+  .sp-head { margin: 6px 0 4px; } .sp-stat { padding: 3px 2px; } .sp-grid-5 { margin-top: 4px; }
+  .sp-game { margin-bottom: 6px; } .sp-game-mid { margin: 3px 0 2px; } .sp-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 2px 16px; }
+  .news-item { padding: 3px 0; } .news-item .muted { -webkit-line-clamp: 2; }
+  .team-card { margin: 6px 0 2px; } .team-card-head { margin-bottom: 4px; }
+  .team-ranks { margin: 2px 0 6px; } .team-ranks-row { padding: 1px 0; }
+  .gp-score { margin-bottom: 6px; } .gp-section { margin-top: 8px; }
+  .gp-box td { padding: 2px 1.5px; } .gp-leader { padding: 2px 0; }
+  .sp-log td { padding: 2px 3px; } .sp-history :is(td, th) { padding-block: 3px; }
+}
 
 /* Settings > Notifications, and the home page's Telegram line under the import box */
 .notify-kinds { display: grid; gap: 8px; margin: 6px 0 10px; }

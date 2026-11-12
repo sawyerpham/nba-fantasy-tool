@@ -41,7 +41,7 @@ export default function App() {
       <main className="cc-main">
         {tab === "home" && <HomePage setLeagueId={app.setLeagueId} setTab={app.goTab} />}
         {tab === "draft" && <DraftPage leagueId={leagueId} />}
-        {SEASON_VIEWS[tab] && <CommandSeason leagueId={leagueId} leagueName={app.leagueName} view={SEASON_VIEWS[tab]} />}
+        {SEASON_VIEWS[tab] && <CommandSeason leagueId={leagueId} leagueName={app.leagueName} view={SEASON_VIEWS[tab]} onWeek={() => setTab("season")} />}
       </main>
       <SettingsModal app={app} />
       <TipLayer />
@@ -50,8 +50,8 @@ export default function App() {
 }
 
 /** The Season side of Command Center: a title bar (week, search, sync), then the view; cards open in a drawer. */
-function CommandSeason({ leagueId, leagueName, view }) {
-  const s = useSeason(leagueId);
+function CommandSeason({ leagueId, leagueName, view, onWeek }) {
+  const s = useSeason(leagueId, onWeek);
   const [focusRid, setFocusRid] = useState(null);   // the matchup on the lineup grid: Week Stats follows it
   useEffect(() => {
     if (!s.cur) return undefined;
@@ -81,13 +81,13 @@ function CommandSeason({ leagueId, leagueName, view }) {
                 <Calls data={data} plan={plan} s={s} />
                 <Slate data={data} s={s} />
               </div>
-              <WeekView key={data.week} data={data} plan={plan} open={s.open} openGame={s.openGame} setLock={s.setLock} leagueId={leagueId} onShow={setFocusRid} />
+              <WeekView key={data.week} data={data} plan={plan} open={s.open} openGame={s.openGame} setLock={s.setLock} leagueId={leagueId} onShow={setFocusRid} focus={s.matchup} />
             </section>
             <aside className="cc-side"><LockinGuide data={data} plan={plan} leagueId={leagueId} setLock={s.setLock} open={s.open} focus={focusRid} /></aside>
           </div>
         )}
         {view === "news" && <div className="cc-fill"><NewsView leagueId={leagueId} open={s.openPid} refreshKey={s.tick} /></div>}
-        {view === "league" && <div className="cc-scroll"><LeagueView data={data} leagueId={leagueId} open={s.open} /></div>}
+        {view === "league" && <div className="cc-scroll"><LeagueView data={data} leagueId={leagueId} open={s.open} openPid={s.openPid} openGame={s.openGame} /></div>}
         {view === "waivers" && <div className="cc-scroll"><WaiversView leagueId={leagueId} onSelect={s.openPid} /></div>}
       </div>
       {s.cur && (

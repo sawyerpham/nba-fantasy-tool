@@ -20,9 +20,10 @@ const quarters = (d) => (d || "").replace(/^(.+) - (\d)(?:st|nd|rd|th)$/, "Q$2 $
 
 /**
  * Summary tab: his live or last game (both teams, score, quarter and clock, his FP and line), season averages, then ranks, ownership and FP per game, with owner and injury status under them.
- * `onOpenGame(game)` opens that game's card (GamePanel) on the right when the game box is clicked.
+ * `onOpenGame(game)` opens that game's card (GamePanel) on the right when the game box is clicked; `onOpenMatchup(roster_id)`
+ * shows the owner's matchup this week when his name is clicked.
  */
-export function SeasonSummary({ sea, onOpenGame }) {
+export function SeasonSummary({ sea, onOpenGame, onOpenMatchup }) {
   const g = sea.last_game, a = sea.averages, live = g?.state === "in";
   /** One labelled number in the summary grid. */
   const stat = (label, value) => <div className="sp-stat"><span>{label}</span><strong>{value}</strong></div>;
@@ -55,7 +56,12 @@ export function SeasonSummary({ sea, onOpenGame }) {
       </div>
       </div>
       <div className="small sp-meta sec">
-        <div><span className="muted">Owner</span> {sea.owner ? <strong className={sea.owner.is_user ? "ok" : ""}>{sea.owner.is_user ? "You" : sea.owner.name}</strong> : <strong>Free agent</strong>}</div>
+        <div><span className="muted">Owner</span> {sea.owner
+          ? <strong className={`${sea.owner.is_user ? "ok" : ""} ${onOpenMatchup ? "clickable" : ""}`} data-testid="owner"
+            {...(onOpenMatchup && { role: "button", tabIndex: 0, "data-tip": "Show this week's matchup",
+              onClick: () => onOpenMatchup(sea.owner.roster_id), onKeyDown: (e) => e.key === "Enter" && onOpenMatchup(sea.owner.roster_id) })}>
+            {sea.owner.is_user ? "You" : sea.owner.name}</strong>
+          : <strong>Free agent</strong>}</div>
         {sea.owner && <div><span className="muted">Slot</span> <strong>{sea.owner.slot}</strong></div>}
         <div><span className="muted">Status</span> {sea.retired ? <strong className="warn-text">retired</strong>
           : sea.injury_tag ? <><InjuryTag tag={sea.injury_tag} />{sea.injury_note && <span className="muted"> {sea.injury_note}</span>}</> : <strong>healthy</strong>}</div>

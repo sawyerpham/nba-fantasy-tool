@@ -13,8 +13,9 @@ const TABS = [["summary", "Summary"], ["log", "Game Log"], ["team", "Team"], ["h
  * A player's profile card beside the rankings (Draft) or the lineup (Season).
  * Draft: Fit for your team, Worth, Max, bid guide, keeper outlook, tier, and editable overrides (eligibility, injury, notes). With `live`, the recommendation and spending call for him.
  * Season (`season`): the in-season profile like Sleeper's, four tabs under his name: Summary, Game log, Team (his team card and depth chart) and History; no draft parts.
+ * `onOpenMatchup(roster_id)`: the Summary's owner name shows that manager's matchup this week.
  */
-export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose, onOpenGame }) {
+export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, onOverridesChanged, userName, onBlock, rankings, onSelectPlayer, season, plan, onClose, onOpenGame, onOpenMatchup }) {
   const [data, setData] = useState(null);
   const [rec, setRec] = useState(null);
   const [spend, setSpend] = useState(null);
@@ -143,7 +144,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
         </nav>
         {!ready ? <div className="small muted">Loading…</div>
           : tab === "summary" ? <>
-            <SeasonSummary sea={sea} onOpenGame={onOpenGame} />
+            <SeasonSummary sea={sea} onOpenGame={onOpenGame} onOpenMatchup={onOpenMatchup} />
             <textarea rows="1" style={{ width: "100%", marginTop: 10 }} placeholder="your notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (ov.notes || "") && patch({ notes })} />
           </>
           : tab === "log" ? <SeasonLog sea={sea} />

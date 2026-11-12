@@ -370,6 +370,32 @@ def game_detail(session, fetch: Fetch, event: str) -> dict:
     return {"event": event, "tip": comp.get("date"), "state": st.get("state"), "detail": st.get("shortDetail"), "teams": teams}
 
 
+def best_games(session, fetch: Fetch, week: int | None = None, n: int = 10, today: date | None = None) -> list[dict]:
+    """The League tab's Best games: the week's n best single games by any NBA player (rostered or not) in league FP,
+    from Sleeper's weekly box scores, best first: the player, his stat line, and the game (ESPN: event id, score,
+    status) for the game card."""
+    lg = session.league
+    year, today = lg.roster_season.split("-")[0], today or today_ct(league_tz(lg))
+    week = week or current_week(week_dates(fetch(f"{SLEEPER}/schedule/nba/regular/{year}", DAY_TTL) or []), today)
+    # the feed also has a team-total row per team and game ("TEAM_CLE", position TEAM): players only
+    rows = [e for e in fetch(f"{SLEEPER}/stats/nba/{year}/{week}?season_type=regular", LIVE_TTL) or []
+            if not str(e["player_id"]).startswith("TEAM_") and ((e.get("stats") or {}).get("sp") or (e.get("stats") or {}).get("gp"))]
+    top = sorted(((actual_fp(e["stats"], lg.scoring), e) for e in rows), key=lambda x: -x[0])[:n]
+    by_sid = {r.sleeper_id: r for r in session.players.values() if r.sleeper_id}
+    out = []
+    for f, e in top:
+        sid, st, pl, team = str(e["player_id"]), e["stats"], e.get("player") or {}, e.get("team")
+        rec, g = by_sid.get(sid), espn_day(fetch, e["date"], today).get(team, {})
+        out.append({"sid": sid, "player_id": rec.player_id if rec else None,
+                    "name": rec.full_name if rec else f"{pl.get('first_name', '')} {pl.get('last_name', '')}".strip(),
+                    "pos": pl.get("fantasy_positions") or [], "team": team, "fp": round(f, 2),
+                    "min": round(float(st.get("sp") or 0) / 60), "lead": lead_stats(st, lg.scoring),
+                    "fg": [int(st.get("fgm") or 0), int(st.get("fga") or 0)], "ft": [int(st.get("ftm") or 0), int(st.get("fta") or 0)],
+                    "game": {"date": e["date"], "opp": e.get("opponent") or g.get("opp"),
+                             **{k: g.get(k) for k in ("event", "tip", "state", "detail", "home", "score", "opp_score")}}})
+    return out
+
+
 def detect_lock(counted: float | None, games: list[dict], manual: str | None) -> tuple[str, str | None]:
     """("locked" | "maybe" | "no", locked game date). Your answer wins; otherwise from Sleeper's counted points:
     equal to an earlier game than his latest -> locked; equal to his latest with nothing later yet -> maybe."""
@@ -540,8 +566,7 @@ def locked_points(players) -> float:
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
     opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
-    from .weekplan import (_minus_minutes, decide_by_win_chance, lock_slots, plan_today, plan_week, scenario_total,
-                           swap_win_chance, team_total, win_chance)
+    from .weekplan import _minus_minutes, bench_lock_chance, decide_by_win_chance, lock_slots, plan_today, plan_week, scenario_total, swap_win_chance, team_total, win_chance
 
     team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
     if team is None:
@@ -560,6 +585,12 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
         oplan = plan_week(oplayers, counts)
         theirs = team_total(oplayers)
         chance = decide_by_win_chance(players, theirs)   # LOCK / PASS by the chance to win, not expected points
+        for q in players:   # a starter the plan benches can still lock his final game: win % locked vs the plan
+            if q.seat is None and q.locked is None and q.x is not None and q.x_final:
+                q.lock_at = lock_slots(q, players, counts)
+                if q.lock_at:
+                    q.win_lock = bench_lock_chance(q, players, counts, q.lock_at[0]["slot"], theirs)
+                    q.win_wait = chance
         mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         # this week's advice: the chance to win locking everything you can now (safe) vs waiting on later games (risky)
         outlook = {"safe": round(win_chance(scenario_total(players, True), theirs), 3),
