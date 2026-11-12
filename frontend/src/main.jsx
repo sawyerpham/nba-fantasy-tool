@@ -6,11 +6,9 @@ document.addEventListener("focusin", (e) => {
   if (e.target instanceof HTMLInputElement && e.target.type === "number") e.target.select();
 });
 
-// Settings > Appearance > UI (core/Shell.jsx UIS): "classic" loads the pre-makeover backup (src/classic, frozen: don't edit
-// it), "command" / "broadcast" the redesigns (src/ui-*, their stylesheets build on styles.css), else the New UI. Only one
-// UI's App and global stylesheet load per page, so switching reloads the page.
+// Settings > Appearance > UI (core/Shell.jsx UIS): "command" / "broadcast" load the redesigns (src/ui-*, their stylesheets
+// build on styles.css), else the default UI. Only one UI's App and global stylesheet load per page, so switching reloads the page.
 const LOADERS = {
-  classic: () => [import("./classic/App.jsx"), import("./classic/styles.css")],
   command: () => [import("./ui-command/App.jsx"), import("./ui-command/command.css")],
   broadcast: () => [import("./ui-broadcast/App.jsx"), import("./ui-broadcast/broadcast.css")],
 };

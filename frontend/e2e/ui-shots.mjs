@@ -1,6 +1,6 @@
 // Screenshots of every main screen in one UI, for before / after comparison during the redesign.
 // Prereqs: backend on :8000 and the Vite dev server on :5173, and a league with a Sleeper link.
-// Run:     node e2e/ui-shots.mjs [new|command|broadcast|classic] [width] [height]   (env: DA_URL, DA_LEAGUE, DA_BROWSER)
+// Run:     node e2e/ui-shots.mjs [new|command|broadcast] [width] [height]   (env: DA_URL, DA_LEAGUE, DA_BROWSER)
 // Output:  e2e/screenshots/ui-<ui>-<width>/<screen>.png (gitignored)
 // DUMP=<label> also writes every element's computed style per screen to e2e/screenshots/styles-<label>.json;
 // node e2e/ui-shots.mjs --diff a b compares two dumps (a pure CSS refactor must show no differences).

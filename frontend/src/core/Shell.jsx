@@ -8,7 +8,7 @@ import Icon from "./Icon.jsx";
 // What every UI's shell shares (src/App.jsx, src/ui-command, src/ui-broadcast): the app state kept in localStorage and the Settings popup.
 
 /** Settings > Appearance > UI: id ("" = New) and label; main.jsx loads the matching App and stylesheet. */
-export const UIS = [["", "New"], ["command", "Command Center"], ["broadcast", "Broadcast"], ["classic", "Classic (backup, Nov 2026)"]];
+export const UIS = [["", "New"], ["command", "Command Center"], ["broadcast", "Broadcast"]];
 // design presets (themes.css): fonts, surfaces, corners and effects; the first is the default
 const THEMES = [["courtside", "Courtside: broadcast scoreboard"], ["office", "Front Office: analyst terminal"], ["locker", "Locker Room: light"]];
 // pixelated photos behind the page (public/wallpapers, made by backgroundimages/pixelate.py)
