@@ -149,53 +149,6 @@ export default function SettingsPage({ leagueId }) {
       </div>
 
       <div className="panel">
-        <h3>Roster slots <span className="muted small">— {mandatory} mandatory (non-IR) slots must be filled by draft's end; IR is optional</span></h3>
-        <div className="row">
-          {SLOT_TYPES.map((slot) => <label key={slot} className="inline">{slot} <Num value={slotCount(slot)} onChange={(v) => setSlot(slot, v || 0)} step="1" data-testid={`slot-${slot}`} /></label>)}
-        </div>
-      </div>
-
-      <div className="panel">
-        <h3>Keepers</h3>
-        <div className="row">
-          <label className="inline"><input type="checkbox" checked={s.keeper.enabled} onChange={(e) => setDeep("keeper", { enabled: e.target.checked })} /> enabled</label>
-          <label className="inline">max per manager <Num value={s.keeper.max_per_manager} onChange={(v) => setDeep("keeper", { max_per_manager: v })} step="1" data-testid="max-keepers" /></label>
-          <label className="inline">deadline <input type="date" value={s.keeper.deadline || ""} onChange={(e) => setDeep("keeper", { deadline: e.target.value || null })} /></label>
-        </div>
-        <div className="row">
-          <span>Keeper price rule: this year's price = last year's price</span>
-          <label className="inline">+ $<Num value={s.keeper.escalation?.increase_per_step ?? 1} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, increase_per_step: v ?? 0 } })} step="1" data-testid="esc-increase" /></label>
-          <label className="inline">per full $<Num value={s.keeper.escalation?.step_dollars ?? 5} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, step_dollars: v ?? 1 } })} step="1" data-testid="esc-step" /></label>
-          <label className="inline"><input type="checkbox" checked={s.keeper.escalation?.enabled ?? true} onChange={(e) => setDeep("keeper", { escalation: { ...s.keeper.escalation, enabled: e.target.checked } })} /> enabled</label>
-          <span className="muted small">(e.g. $17 → ${(s.keeper.escalation?.enabled ?? true) ? 17 + (s.keeper.escalation?.increase_per_step ?? 1) * Math.floor(17 / Math.max(1, s.keeper.escalation?.step_dollars ?? 5)) : 17})</span>
-        </div>
-      </div>
-
-      <div className="panel">
-        <h3>Scoring — base values per stat <span className="badge">{s.scoring.source}</span></h3>
-        <div className="row">
-          {BASE_KEYS.map((k) => <label key={k} className="inline">{k} <Num value={s.scoring.base[k]} onChange={(v) => setDeep("scoring", { base: { ...s.scoring.base, [k]: v ?? 0 } })} data-testid={`base-${k}`} /></label>)}
-        </div>
-        <h3>Per-game bonuses <span className="muted small">(stack; triggered by a single game's line)</span></h3>
-        <table>
-          <thead><tr><th>id</th><th>kind</th><th>stat</th><th>threshold</th><th>bonus</th><th></th></tr></thead>
-          <tbody>
-            {bonus.map((b, i) => (
-              <tr key={i}>
-                <td><input type="text" value={b.id} onChange={(e) => setBonus(i, { id: e.target.value })} style={{ width: 110 }} /></td>
-                <td><select value={b.kind} onChange={(e) => setBonus(i, { kind: e.target.value })}><option value="stat_threshold">stat threshold</option><option value="triple_double">triple-double</option></select></td>
-                <td>{b.kind === "stat_threshold" && <select value={b.stat || "pts"} onChange={(e) => setBonus(i, { stat: e.target.value })}>{STATS.map((x) => <option key={x}>{x}</option>)}</select>}</td>
-                <td>{b.kind === "stat_threshold" && <Num value={b.threshold} onChange={(v) => setBonus(i, { threshold: v })} step="1" />}</td>
-                <td><Num value={b.bonus} onChange={(v) => setBonus(i, { bonus: v ?? 0 })} data-testid={`bonus-${b.id}`} /></td>
-                <td><button className="danger" onClick={() => setDeep("scoring", { bonuses: bonus.filter((_, j) => j !== i) })}>remove</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button onClick={() => setDeep("scoring", { bonuses: [...bonus, { id: `bonus_${bonus.length + 1}`, kind: "stat_threshold", stat: "pts", threshold: 30, bonus: 1 }] })}>Add bonus rule</button>
-      </div>
-
-      <div className="panel">
         <h3>Ranking</h3>
         <div className="small muted">Value = weight avg × FP/G + weight ceiling × ceiling, × games confidence × injury × age × availability. FP/G blends Sleeper's season projection with last season (projection weight). All in fantasy points under the scoring above.</div>
         <div className="row">
@@ -272,6 +225,57 @@ export default function SettingsPage({ leagueId }) {
           </div>
         )}
       </div>
+      <details className="panel panel-toggle" data-testid="advanced-settings">
+        <summary><h3>Advanced settings <span className="muted small">— roster slots, keepers and scoring: pulled from Sleeper automatically (hidden unless you need to override them)</span></h3></summary>
+        <div className="panel">
+          <h3>Roster slots <span className="muted small">— {mandatory} mandatory (non-IR) slots must be filled by draft's end; IR is optional</span></h3>
+          <div className="row">
+            {SLOT_TYPES.map((slot) => <label key={slot} className="inline">{slot} <Num value={slotCount(slot)} onChange={(v) => setSlot(slot, v || 0)} step="1" data-testid={`slot-${slot}`} /></label>)}
+          </div>
+        </div>
+
+        <div className="panel">
+          <h3>Keepers</h3>
+          <div className="row">
+            <label className="inline"><input type="checkbox" checked={s.keeper.enabled} onChange={(e) => setDeep("keeper", { enabled: e.target.checked })} /> enabled</label>
+            <label className="inline">max per manager <Num value={s.keeper.max_per_manager} onChange={(v) => setDeep("keeper", { max_per_manager: v })} step="1" data-testid="max-keepers" /></label>
+            <label className="inline">deadline <input type="date" value={s.keeper.deadline || ""} onChange={(e) => setDeep("keeper", { deadline: e.target.value || null })} /></label>
+          </div>
+          <div className="row">
+            <span>Keeper price rule: this year's price = last year's price</span>
+            <label className="inline">+ $<Num value={s.keeper.escalation?.increase_per_step ?? 1} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, increase_per_step: v ?? 0 } })} step="1" data-testid="esc-increase" /></label>
+            <label className="inline">per full $<Num value={s.keeper.escalation?.step_dollars ?? 5} onChange={(v) => setDeep("keeper", { escalation: { ...s.keeper.escalation, step_dollars: v ?? 1 } })} step="1" data-testid="esc-step" /></label>
+            <label className="inline"><input type="checkbox" checked={s.keeper.escalation?.enabled ?? true} onChange={(e) => setDeep("keeper", { escalation: { ...s.keeper.escalation, enabled: e.target.checked } })} /> enabled</label>
+            <span className="muted small">(e.g. $17 → ${(s.keeper.escalation?.enabled ?? true) ? 17 + (s.keeper.escalation?.increase_per_step ?? 1) * Math.floor(17 / Math.max(1, s.keeper.escalation?.step_dollars ?? 5)) : 17})</span>
+          </div>
+        </div>
+
+        <div className="panel">
+          <h3>Scoring — base values per stat <span className="badge">{s.scoring.source}</span></h3>
+          <div className="row">
+            {BASE_KEYS.map((k) => <label key={k} className="inline">{k} <Num value={s.scoring.base[k]} onChange={(v) => setDeep("scoring", { base: { ...s.scoring.base, [k]: v ?? 0 } })} data-testid={`base-${k}`} /></label>)}
+          </div>
+          <h3>Per-game bonuses <span className="muted small">(stack; triggered by a single game's line)</span></h3>
+          <table>
+            <thead><tr><th>id</th><th>kind</th><th>stat</th><th>threshold</th><th>bonus</th><th></th></tr></thead>
+            <tbody>
+              {bonus.map((b, i) => (
+                <tr key={i}>
+                  <td><input type="text" value={b.id} onChange={(e) => setBonus(i, { id: e.target.value })} style={{ width: 110 }} /></td>
+                  <td><select value={b.kind} onChange={(e) => setBonus(i, { kind: e.target.value })}><option value="stat_threshold">stat threshold</option><option value="triple_double">triple-double</option></select></td>
+                  <td>{b.kind === "stat_threshold" && <select value={b.stat || "pts"} onChange={(e) => setBonus(i, { stat: e.target.value })}>{STATS.map((x) => <option key={x}>{x}</option>)}</select>}</td>
+                  <td>{b.kind === "stat_threshold" && <Num value={b.threshold} onChange={(v) => setBonus(i, { threshold: v })} step="1" />}</td>
+                  <td><Num value={b.bonus} onChange={(v) => setBonus(i, { bonus: v ?? 0 })} data-testid={`bonus-${b.id}`} /></td>
+                  <td><button className="danger" onClick={() => setDeep("scoring", { bonuses: bonus.filter((_, j) => j !== i) })}>remove</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button onClick={() => setDeep("scoring", { bonuses: [...bonus, { id: `bonus_${bonus.length + 1}`, kind: "stat_threshold", stat: "pts", threshold: 30, bonus: 1 }] })}>Add bonus rule</button>
+        </div>
+
+      </details>
+
       <div className="row sticky-bar">
         <button className="primary" onClick={save} data-testid="settings-save">Save settings (Ctrl+S)</button>
         {dirty ? <span className="badge dirty" data-testid="settings-dirty">unsaved changes</span> : <span className="muted small">all changes saved</span>}

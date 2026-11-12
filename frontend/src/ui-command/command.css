@@ -10,8 +10,7 @@
   background: transparent; color: var(--muted); font-size: var(--fs-3xs); font-weight: 600; box-shadow: none; }
 .cc-rail-btn .icon { font-size: 22px; }
 .cc-rail-btn:hover { color: var(--text); background: var(--hover); filter: none; }
-.cc-rail-btn.active { color: var(--info-t); background: var(--primary-soft); }
-.cc-rail-btn.active::before { content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
+.cc-rail-btn.active { color: var(--info-t); background: var(--primary-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); }
 .cc-rail-gap { flex: 1; }
 .cc-health { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: var(--fs-3xs); font-weight: 700; margin-bottom: 6px; }
 .cc-health .icon { font-size: 20px; }
@@ -54,10 +53,10 @@ main.cc-main:has(.cc-page) { padding: 0; max-width: none; margin: 0; }
 .cc-pair > .panel { min-height: 0; overflow: auto; padding: 10px 14px; }
 .cc-pair h3 { margin: 0 0 8px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.06em; }
 .cc-call { display: grid; grid-template-columns: 22px 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px;
-  background: var(--panel-2); border-left: 3px solid var(--muted); }
+  --st: var(--muted); background: color-mix(in srgb, var(--st) 9%, var(--panel-2)); border: 1px solid color-mix(in srgb, var(--st) 45%, var(--border)); }
 .cc-call + .cc-call { margin-top: 6px; }
-.cc-call.bad { border-left-color: var(--danger); } .cc-call.bad .cc-call-icon { color: var(--danger); }
-.cc-call.even { border-left-color: var(--q); } .cc-call.even .cc-call-icon { color: var(--even-t); }
+.cc-call.bad { --st: var(--danger); } .cc-call.bad .cc-call-icon { color: var(--danger); }
+.cc-call.even { --st: var(--q); } .cc-call.even .cc-call-icon { color: var(--even-t); }
 .cc-call-icon { display: grid; place-items: center; font-size: 18px; }
 .cc-call-when { font-family: var(--font-num); font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
 .cc-call-body { min-width: 0; display: flex; flex-direction: column; }
