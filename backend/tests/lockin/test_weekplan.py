@@ -392,7 +392,7 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     spare = pp("spare", ["SF", "PF"], "BN", [Game("2026-10-23", 12.0), Game("2026-10-24", 8.0)])
     c_only = pp("big", ["C"], "BN", [Game("2026-10-23", 20.0)])                      # can't play SF: no help
     starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
-    w, src, _ = open_slot(jaq, [jaq, spare, c_only, starter])
+    w, src, *_ = open_slot(jaq, [jaq, spare, c_only, starter])
     assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12 * PROJ_SCALE
 
 
@@ -403,8 +403,8 @@ def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_da
 
     kes = pp("kessler", ["C"], "C", [Game("2026-11-04", 11.0, tip="2026-11-05T03:00Z")], seat="C")
     sharpe = pp("sharpe", ["C"], "BN", [Game("2026-11-04", 7.0, tip="2026-11-05T00:30Z")])
-    alone, _, _ = open_slot(kes, [kes])
-    w, src, _ = open_slot(kes, [kes, sharpe])
+    alone, *_ = open_slot(kes, [kes])
+    w, src, *_ = open_slot(kes, [kes, sharpe])
     assert src == [("2026-11-04", "sharpe"), ("2026-11-04", "kessler")] and w > alone
     sharpe.games[0].tip = "2026-11-05T02:50Z"                      # 10 min before his: no time to judge, one look
     assert open_slot(kes, [kes, sharpe])[1] == [("2026-11-04", "kessler")]
@@ -479,10 +479,11 @@ def test_one_games_variance_is_the_mix_of_playing_and_sitting():
 
     mu, sigma = 20 * PROJ_SCALE, 20 * PROJ_SCALE * 0.3
     for injury, p in (("healthy", 0.97), ("day_to_day", 0.6)):
-        mean, var = wait_moments(future(20), 0.3, injury)
+        mean, var, zero = wait_moments(future(20), 0.3, injury)
         assert mean == pytest.approx(p * mu) and var == pytest.approx(p * (sigma ** 2 + mu ** 2) - (p * mu) ** 2)
+        assert zero == pytest.approx(1 - p)                                # he sits: the slot gets nothing
     assert wait_moments(future(20), 0.3, "day_to_day")[1] > 2 * wait_moments(future(20), 0.3, "healthy")[1]
-    assert wait_moments(future(20), 0.3, "out_long_term") == (0.0, 0.0)   # never plays: a certain 0
+    assert wait_moments(future(20), 0.3, "out_long_term") == (0.0, 0.0, 1.0)   # never plays: a certain 0
 
 
 def test_wait_moments_match_the_lock_rule_played_out():
@@ -506,8 +507,9 @@ def test_wait_moments_match_the_lock_rule_played_out():
         got.append(banked)
     mean = sum(got) / runs
     var = sum((x - mean) ** 2 for x in got) / runs
-    m, v = wait_moments(games, swing, injury)
+    m, v, zero = wait_moments(games, swing, injury)
     assert m == pytest.approx(mean, rel=0.01) and v == pytest.approx(var, rel=0.03)
+    assert zero == pytest.approx(sum(x == 0.0 for x in got) / runs, abs=0.002)
 
 
 def test_a_live_games_spread_shrinks_with_the_square_root_of_the_share_left():
@@ -554,3 +556,16 @@ def test_swap_and_keep_are_valued_the_same_way():
     s.games[0] = Game(today, 14.0, fp=11.0, started=True, final=True, tip="2026-10-24T23:00Z")
     over = swap_call(s, b, today)
     assert over["keep"] == pytest.approx(max(11.0, over["bar"]), abs=0.05)   # final: a known score, no upside left
+
+
+def test_waiting_on_one_questionable_game_counts_the_zero_apart():
+    """Trailing by 5 with one questionable 20-projection game left: he plays 60 % of the time and then nearly always
+    clears 5, so waiting wins about 57 %. One bell curve through the 0 and the score said 71 %."""
+    from app.lockin.weekplan import decide_by_win_chance
+
+    # locking his 3 loses to their 5 for sure; left open, his slot takes his questionable game tomorrow instead
+    q = pp("q", ["PG"], "PG", [Game("2026-10-23", 9.0, fp=3.0, started=True, final=True), Game("2026-10-24", 20.0)], injury="day_to_day")
+    plan_week([q], {"PG": 1})
+    assert q.slot_zero == pytest.approx(0.4)                    # the open slot knows he is questionable
+    decide_by_win_chance([q], (5.0, 0.0))
+    assert q.win_lock == 0.0 and q.win_wait == pytest.approx(0.567, abs=0.01) and q.action == "PASS"

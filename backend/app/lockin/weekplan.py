@@ -94,6 +94,7 @@ class PlanPlayer:
     x_final: bool = False       # that game is over: only then can it be locked (no LOCK / PASS call before)
     w: float = 0.0              # value of waiting
     w_var: float = 0.0          # ...and the variance of what waiting ends up with (wait_moments)
+    w_zero: float = 0.0         # ...and the chance it ends up with nothing (he sits out what's left)
     value: float = 0.0
     seat: str | None = None
     action: str = ""            # LOCKED / LOCK / PASS / BENCH (not seated) / DONE
@@ -102,6 +103,7 @@ class PlanPlayer:
     win_wait: float | None = None
     slot_w: float | None = None     # a lockable starter's slot left open: what it can still get (open_slot)
     slot_var: float = 0.0           # ...and its variance
+    slot_zero: float = 0.0          # ...and the chance it gets nothing
     slot_from: list = field(default_factory=list)   # [(date, player name)]: whose game it would take each day
     lock_at: list = field(default_factory=list)     # where to lock him: lock_slots, best first
 
@@ -148,11 +150,12 @@ def expected_max(mu: float, sigma: float, v: float) -> float:
     return v + (mu - v) * _cdf(d) + sigma * _phi(d)
 
 
-def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]], float]:
-    """(value, whose game each look is, variance): what his slot is worth left open (not locking him): one look at every remaining tip, his games or a bench
+def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]], float, float]:
+    """(value, whose game each look is, variance, chance of nothing): what his slot is worth left open (not locking him): one look at every remaining tip, his games or a bench
     player's who fits the slot and isn't seated in the plan, earliest first, with the option to keep the best one
     (wait_value). Same-day looks count too: start the 6:30 bench player, and if his game flops swap in the 9:00 one.
     Tips CLOSE_TIPS_MIN or less apart are one look (no time to judge the first): the bigger projection.
+    Each look counts with its own player's swing and chance to play (a questionable player's game is a 60 % look).
     That's why locking a decent game can be wrong with a deep bench: it gives up every one of those chances.
     ponytail: two open slots can both count the same bench player; fine while one lock is decided at a time."""
     pool = [p] + [q for q in players if q is not p and q.seat is None and q.slot != "IR" and q.locked is None
@@ -165,8 +168,14 @@ def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tup
                 looks[-1] = (g, q)
         else:
             looks.append((g, q))
-    mean, var = wait_moments([g for g, _ in looks], p.swing, "healthy")
-    return mean, [(g.date, q.name) for g, q in looks], var
+    # each look is its own player's game: his swing, his chance to play (the first of his games listed is his next)
+    seen: set[str] = set()
+    dists = []
+    for g, q in looks:
+        dists.append((*game_dist(g, q.swing), play_chance(g, q.injury, q.sid not in seen)))
+        seen.add(q.sid)
+    mean, var, zero = _moments(dists)
+    return mean, [(g.date, q.name) for g, q in looks], var, zero
 
 
 def game_dist(g: Game, swing: float) -> tuple[float, float]:
@@ -191,17 +200,27 @@ def _above(mu: float, sigma: float, v: float) -> tuple[float, float, float]:
     return c, mu * c + sigma * f, (mu * mu + sigma * sigma) * c + (mu + v) * sigma * f
 
 
-def wait_moments(remaining: list[Game], swing: float, injury: str) -> tuple[float, float]:
-    """(mean, variance) of what his remaining games end up with under the optimal lock rule (see module doc): going
+def wait_moments(remaining: list[Game], swing: float, injury: str) -> tuple[float, float, float]:
+    """(mean, variance, chance of ending with nothing) of what his remaining games end up with under the optimal lock rule (see module doc): going
     backwards, a game he plays is locked when it beats the value of the games after it, else the wait goes on; a game
     he misses passes the wait on, and missing the final one leaves 0 (Sleeper counts an unlocked player's final game,
     even a zero). The variance is the real mix, not value × swing: a questionable player's 60 % of a 20 is far less
-    certain than a healthy player's 12. One game: mean p·μ, variance p·(σ² + μ²) − (p·μ)²."""
+    certain than a healthy player's 12. One game: mean p·μ, variance p·(σ² + μ²) − (p·μ)².
+    The chance of nothing (every game passed on or missed, the last one missed) is the lump at 0 a bell curve can't
+    show: decide_by_win_chance counts it apart."""
+    return _moments([(*game_dist(g, swing), play_chance(g, injury, i == 0)) for i, g in enumerate(remaining)])
+
+
+def _moments(dists: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+    """wait_moments for games given as (mean, spread, chance to play), in order."""
     v = m2 = 0.0   # mean and second moment of the games after this one
-    for i in range(len(remaining) - 1, -1, -1):
-        (mu, sigma), p = game_dist(remaining[i], swing), play_chance(remaining[i], injury, i == 0)
-        v, m2 = _then(mu, sigma, p, v, m2, last=i == len(remaining) - 1)
-    return v, max(0.0, m2 - v * v)
+    zero = 1.0     # chance the wait runs out with nothing banked
+    for i in range(len(dists) - 1, -1, -1):
+        mu, sigma, p = dists[i]
+        last = i == len(dists) - 1
+        zero *= 1 - p * (1.0 if last else _above(mu, sigma, v)[0])
+        v, m2 = _then(mu, sigma, p, v, m2, last)
+    return v, max(0.0, m2 - v * v), zero
 
 
 def _then(mu: float, sigma: float, p: float, v: float, m2: float, last: bool) -> tuple[float, float]:
@@ -301,7 +320,7 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
             later_started = any(g.started for g in p.games if g.date > last.date)
             if not later_started:
                 p.x, p.x_final = last.fp, not last.live   # a played game not in progress is over
-        p.w, p.w_var = wait_moments(remaining, p.swing, p.injury) if p.locked is None else (0.0, 0.0)
+        p.w, p.w_var, p.w_zero = wait_moments(remaining, p.swing, p.injury) if p.locked is None else (0.0, 0.0, 0.0)
         p.value = p.locked if p.locked is not None else max(p.x or 0.0, p.w)
 
     for p in players:
@@ -312,8 +331,8 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 
     for p in players:   # a lockable starter: locking him closes his slot, so waiting is worth what the open slot gets
         # only a final game is lockable; a game in progress keeps his own value (w: its projected finish counted)
-        p.slot_w, p.slot_from, p.slot_var = (open_slot(p, players) if p.seat and p.x is not None and p.x_final and p.locked is None
-                                             else (None, [], 0.0))
+        p.slot_w, p.slot_from, p.slot_var, p.slot_zero = (open_slot(p, players) if p.seat and p.x is not None and p.x_final
+                                                          and p.locked is None else (None, [], 0.0, 0.0))
     for p in players:
         if p.locked is not None:
             p.action, p.why = "LOCKED", f"locked {p.locked:.1f}"
@@ -533,7 +552,7 @@ def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
     keeps the upside it has left just as B's game does. gain = swap − keep, whatever state S's game is in."""
     gs, gb = _today(s, today), _today(b, today)
     later = [g for g in s.games if g.date > today and not g.started]
-    bar, bar_var = wait_moments(later, s.swing, s.injury)      # what S's later games are worth
+    bar, bar_var, _ = wait_moments(later, s.swing, s.injury)   # what S's later games are worth
     bar_m2 = bar_var + bar * bar
     (mu_b, sd_b), p_b = game_dist(gb, b.swing), play_chance(gb, b.injury, True)
     swap, swap_m2 = _then(mu_b, sd_b, p_b, bar, bar_m2, last=not later)
@@ -709,7 +728,18 @@ def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float])
         mean, var = team_total(players, skip=p)
         p.win_lock = win_chance((mean + p.x, var), theirs)
         w, w_var = slot_spread(p, lock=False)   # waiting = keeping his slot open (open_slot)
-        p.win_wait = win_chance((mean + w, var + w_var), theirs) if w > 0 else 0.0
+        # the open slot = a lump at 0 (it gets nothing: he sits out what's left) + a bell curve for the rest. One
+        # questionable game is part 0 and part real score, and a single bell curve through both misjudges it badly
+        # (71 % for a real 57 %, trailing by 5 with one questionable 20 left), so the two parts are counted apart.
+        zero = p.slot_zero if p.slot_w is not None else p.w_zero
+        if w <= 0:
+            p.win_wait = 0.0
+        elif zero >= 1:
+            p.win_wait = win_chance((mean, var), theirs)
+        else:
+            m = w / (1 - zero)                                   # mean and variance once it gets a game
+            v = max(0.0, (w_var + w * w) / (1 - zero) - m * m)
+            p.win_wait = zero * win_chance((mean, var), theirs) + (1 - zero) * win_chance((mean + m, var + v), theirs)
         p.action = "LOCK" if p.win_lock >= p.win_wait else "PASS"
         p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · keep the slot open (~{w:.1f} from games still to come): {p.win_wait:.0%}"
                  + (f" · lock in the {p.seat} slot" if p.action == "LOCK" else ""))

@@ -128,7 +128,7 @@ def report_policy(rows: list[dict]) -> None:
             if i == len(games) - 1 or g["fp"] >= wait_value(plan[i + 1:], swing, "healthy"):
                 banked = g["fp"]
                 break
-        mean, var = wait_moments(plan, swing, "healthy")
+        mean, var, _ = wait_moments(plan, swing, "healthy")
         out.append((len(games), mean, banked, sum(g["proj"] for g in games) / len(games), math.sqrt(var)))
     print("lock rule replayed on every player week: W promised on Monday against what the rule banked")
     for n in sorted({o[0] for o in out}):
