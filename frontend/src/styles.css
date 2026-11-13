@@ -1001,22 +1001,25 @@ main:has(.season-grid) { max-width: none; padding: 12px 16px; flex: 1; min-heigh
 .panel-toggle > summary h3 { display: inline; margin: 0; }
 .panel-toggle[open] > summary { margin-bottom: 10px; }
 
-.home { max-width: 1100px; margin: 0 auto; }
-.home-hero { text-align: center; padding: 36px 0 24px; }
-.home-hero h1 { font-size: var(--fs-6xl); font-weight: 900; letter-spacing: -0.02em; margin: 0 0 8px; }
-.home-pitch { font-size: var(--fs-lg); color: var(--muted); margin: 0 auto 26px; max-width: 640px; }
-.home-import { display: flex; gap: 10px; max-width: 760px; margin: 0 auto; }
-.home-import input { flex: 1; font-size: var(--fs-xl); padding: 16px 20px; border-radius: 14px; }
-.home-import button { font-size: var(--fs-lg); padding: 0 28px; border-radius: 14px; }
-.home-done { display: inline-flex; align-items: center; gap: 14px; margin-top: 22px; text-align: left; font-size: var(--fs-lg); }
-.home-check { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #22c55e; color: #fff; font-size: var(--fs-3xl); font-weight: 900; }
-.home-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; max-width: 900px; margin: 22px auto 0; }
-.home-card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 18px 20px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); }
-.home-card strong { font-size: var(--fs-xl); } .home-card:hover { border-color: var(--primary); }
-.home-features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.home-features ul { margin: 0; padding-left: 20px; line-height: 1.7; } .home-top { margin-bottom: 6px !important; }
-.home-rest { color: var(--muted); }
-@media (max-width: 800px) { .home-cards, .home-features { grid-template-columns: 1fr; } .home-import { flex-direction: column; } }
+/* home map: always black and white, whatever the theme */
+.home { position: fixed; inset: 0; z-index: 5; padding-top: 80px; display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); color: #fff; overflow: hidden; }
+.home h1 { margin: 14px 0 0; font-size: var(--fs-5xl); font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; z-index: 1; }
+.teammap { display: block; flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+.teammap path { fill: none; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: tm-draw 2.4s ease-out forwards; }
+.tm-state { stroke: #fff; stroke-width: 0.6; opacity: 0.55; } .tm-outline { stroke: #fff; stroke-width: 1.4; }
+.tm-canada { stroke: #fff; stroke-width: 0.9; opacity: 0.4; }
+.tm-arc { stroke: #fff; stroke-width: 1.6; animation: tm-fly 2.6s ease-in-out !important; stroke-dasharray: 0.35 1 !important; }
+.tm-pin { opacity: 0; animation: tm-pop 0.5s ease-out var(--d) forwards; }
+.tm-dot { fill: #fff; } .tm-lead { stroke: #fff; stroke-width: 0.8; opacity: 0.7; }
+.tm-disc { fill: #000; stroke: #fff; stroke-width: 1.2; } .tm-ring { fill: none; stroke: #fff; stroke-width: 1; opacity: 0; }
+.tm-pin image { pointer-events: none; } .tm-disc { filter: drop-shadow(0 0 3px #fff6); }
+.tm-pin.hot .tm-ring { animation: tm-ping 1.4s ease-out; transform-box: fill-box; transform-origin: center; }
+@keyframes tm-draw { to { stroke-dashoffset: 0; } }
+@keyframes tm-fly { from { stroke-dashoffset: 0.35; opacity: 1; } to { stroke-dashoffset: -1; opacity: 0.2; } }
+@keyframes tm-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes tm-ping { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(2.2); } }
+.tm-pin { transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .teammap *, .teammap { animation: none !important; } .teammap path { stroke-dashoffset: 0; } .tm-pin { opacity: 1; } }
 
 /* ---------- narrow windows (under 1600px; keep in step with NARROW in lockin/SeasonPage.jsx) ---------- */
 @media (max-width: 1599px) { .mu-sub .nick { display: none; } }
@@ -1102,4 +1105,3 @@ header.top .brand .logo .icon { width: 20px; height: 20px; }
 .notify-kind { align-items: flex-start; } .notify-kind input[type="checkbox"] { margin-top: 3px; flex: none; }
 .notify-wpa { margin-left: 23px; flex-wrap: wrap; } .notify-wpa input { width: 64px; margin: 0 4px; }
 .notify-setup { margin: 0 0 12px 18px; padding: 0; } .notify-setup li { margin: 3px 0; } .notify-setup code { word-break: break-all; }
-.home-telegram { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 10px; margin: 14px auto 0; color: var(--muted); }
