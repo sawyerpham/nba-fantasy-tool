@@ -508,3 +508,26 @@ def test_wait_moments_match_the_lock_rule_played_out():
     var = sum((x - mean) ** 2 for x in got) / runs
     m, v = wait_moments(games, swing, injury)
     assert m == pytest.approx(mean, rel=0.01) and v == pytest.approx(var, rel=0.03)
+
+
+def test_a_live_games_spread_shrinks_with_the_square_root_of_the_share_left():
+    """Half a game left keeps 71 % of the pre-game spread, not half of it; the mean is where the game is headed."""
+    from app.lockin.weekplan import game_dist, live_estimate
+
+    before = game_dist(Game("2026-10-24", 20.0), 0.4)
+    assert before == pytest.approx((20 * PROJ_SCALE, 20 * PROJ_SCALE * 0.4))
+    half = Game("2026-10-24", 20.0, fp=9.0, started=True, live=True, min=17, proj_min=34, period=3, clock=720)
+    mu, sd = game_dist(half, 0.4)
+    assert mu == live_estimate(half) and sd == pytest.approx(before[1] * 0.5 ** 0.5)
+    late = Game("2026-10-24", 20.0, fp=16.0, started=True, live=True, min=30, proj_min=34, period=4, clock=360)
+    assert game_dist(late, 0.4)[1] == pytest.approx(before[1] * 0.125 ** 0.5)
+
+
+def test_overtime_is_still_a_live_game():
+    """In overtime he is still scoring: the estimate sits above his points so far and the spread isn't zero."""
+    from app.lockin.weekplan import beat_chance, game_dist, live_estimate
+
+    ot = Game("2026-10-24", 20.0, fp=24.0, started=True, live=True, min=38, proj_min=34, period=5, clock=240)
+    assert live_estimate(ot) > 24.0 and game_dist(ot, 0.4)[1] > 0
+    assert 0 < beat_chance(25.0, [ot], 0.4, "healthy") < 1       # a 25 he hasn't reached yet is neither sure nor out
+    assert game_dist(Game("2026-10-24", 20.0, fp=24.0, started=True, live=True, min=43, proj_min=34, period=5, clock=0), 0.4)[1] == 0

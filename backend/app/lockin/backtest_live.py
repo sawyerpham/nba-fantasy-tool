@@ -1,5 +1,6 @@
 """Backtest of live_estimate (weekplan.py): replay finished games at fixed points on the game clock and compare the
-estimated finish with the real final, then fit PRIOR_MINUTES (the weight of his projected rate against tonight's).
+estimated finish with the real final, then fit PRIOR_MINUTES (the weight of his projected rate against tonight's)
+and check how fast the miss shrinks as the game goes on (game_dist's sqrt of the share left).
 
 Run from backend: python -m app.lockin.backtest_live [league_id]
 Box scores as of each checkpoint come from nba_api (BoxScoreTraditionalV3, range_type=2 = up to a game-clock time),
@@ -167,6 +168,15 @@ def report(rows: list[dict]) -> None:
         pred = sum(r["proj_min"] * (1 - m / 48) * weekplan.MINUTES_LEFT_SCALE for r in sub) / len(sub)
         real = sum(r["min_final"] - r["min_at"] for r in sub) / len(sub)
         print(f"  {m:>2}': predicted {pred:5.1f}  actual {real:5.1f}")
+    # how fast the miss shrinks as the game goes on: game_dist takes the pre-game spread x sqrt(share of the game left)
+    rms = lambda xs: (sum(x * x for x in xs) / len(xs)) ** 0.5   # noqa: E731
+    first = {(r["day"], r["pid"]): r for r in rows if r["proj"] > 5}.values()
+    pre = rms([(r["final"] - weekplan.PROJ_SCALE * r["proj"]) / r["proj"] for r in first])
+    print(f"\nmiss as a share of the projection: {pre:.3f} before the tip; then, as a share of that")
+    for m in CHECKPOINTS:
+        sub = [r for r in rows if r["at"] == m and r["proj"] > 5]
+        left = 1 - m / 48
+        print(f"  {m:>2}': {rms([(r['final'] - estimate(r, current)) / r['proj'] for r in sub]) / pre:.3f}   sqrt(share left) {left ** 0.5:.3f}   share left {left:.3f}")
 
 
 if __name__ == "__main__":

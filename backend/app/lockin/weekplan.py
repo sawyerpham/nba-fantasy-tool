@@ -169,6 +169,18 @@ def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tup
     return mean, [(g.date, q.name) for g, q in looks], var
 
 
+def game_dist(g: Game, swing: float) -> tuple[float, float]:
+    """(mean, spread) of a game that isn't over. Before the tip: Sleeper's scaled projection and swing × it. In
+    progress: where it is headed (live_estimate), and the whole game's spread shrunk by the square root of the share
+    left, since points pile up minute by minute. Fit by backtest_live.py on 2,843 player games: the miss at 12 / 24 /
+    36 / 42 minutes was 0.87 / 0.70 / 0.51 / 0.36 of the pre-game miss; √share left is 0.87 / 0.71 / 0.50 / 0.35."""
+    mu = _mu(g)
+    if not g.live:
+        return mu, mu * swing
+    est = live_estimate(g) if g.fp is not None else mu
+    return est, (mu or est) * swing * math.sqrt(_share_left(g))
+
+
 def _above(mu: float, sigma: float, v: float) -> tuple[float, float, float]:
     """For X ~ Normal(mu, sigma): P(X > v), E[X; X > v] and E[X²; X > v] (the part of X that beats v)."""
     if sigma <= 0:
@@ -187,8 +199,7 @@ def wait_moments(remaining: list[Game], swing: float, injury: str) -> tuple[floa
     certain than a healthy player's 12. One game: mean p·μ, variance p·(σ² + μ²) − (p·μ)²."""
     v = m2 = 0.0   # mean and second moment of the games after this one
     for i in range(len(remaining) - 1, -1, -1):
-        mu = _mu(remaining[i])
-        sigma, p = mu * swing, play_chance(remaining[i], injury, i == 0)
+        (mu, sigma), p = game_dist(remaining[i], swing), play_chance(remaining[i], injury, i == 0)
         if i == len(remaining) - 1:   # his last game counts whatever it is
             e1, e2 = mu, mu * mu + sigma * sigma
         else:
@@ -276,9 +287,7 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
         live = next((g for g in p.games if g.live), None)
         if live and p.locked is None and p.slot in starting:
             # a starter's game in progress counts where it's headed (no stats yet: its projection), not his points so far
-            # ponytail: valued like a game still to come, so its spread is too wide late in the game; shrink by _share_left if it matters
-            now = live_estimate(live) if live.fp is not None else _mu(live)
-            remaining = [replace(live, proj=now / PROJ_SCALE)] + remaining   # where it's headed, as it stands
+            remaining = [live] + remaining
         p.x, p.x_final = None, False
         if p.locked is None and p.slot in starting and played:
             last = played[-1]
@@ -434,7 +443,7 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     return TodayLineup(seats={s: [p.sid for p in ps] for s, ps in seats.items()}, moves=moves, watch=watch)
 
 
-GAME_SECONDS, QUARTER_SECONDS = 48 * 60, 12 * 60
+GAME_SECONDS, QUARTER_SECONDS, OT_SECONDS = 48 * 60, 12 * 60, 5 * 60
 # Fit by backtest_live.py on 1,782 player games (weeks 1-3, 2026-27): tonight's rate barely predicts the rest of his
 # game (MAE best at 60-80 vs 10), and projected minutes × share left ran ~0.7 min high (Sleeper's minutes run high,
 # starters sit late); 0.9 takes the +0.3-0.5 FP bias to ~0. Rerun the backtest to retune as the season goes on.
@@ -468,7 +477,7 @@ def live_estimate(g: Game) -> float | None:
     """Where his game will likely finish: points so far + his scoring rate × the minutes he has left. The rate is
     his rate tonight shrunk toward his projected rate (as if he'd played PRIOR_MINUTES more at it), so a hot or cold
     first few minutes don't swing the call; minutes left = his projected minutes × the share of the game left, cut by
-    MINUTES_LEFT_SCALE."""
+    MINUTES_LEFT_SCALE. In overtime the share left is the rest of that period."""
     if g.fp is None:
         return None
     if g.final or not g.live:
@@ -490,25 +499,21 @@ def given_up(p: PlanPlayer) -> float:
 
 
 def _share_left(g: Game) -> float:
-    """Share of a live game still to play (0 in overtime: whatever he plays then is a bonus)."""
+    """What is left of a live game, as a share of regulation: in overtime, the rest of that 5-minute period (a player
+    still on the floor is still scoring; 0 here would freeze his game as if it were final)."""
     if g.period > 4:
-        return 0.0
+        return min(OT_SECONDS, max(0.0, g.clock)) / GAME_SECONDS
     elapsed = min(GAME_SECONDS, (max(1, g.period) - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - g.clock)) if g.period else 0
     return 1 - elapsed / GAME_SECONDS
 
 
 def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> float:
-    """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(proj, proj × swing), played at his
+    """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(game_dist), played at his
     play_chance (injury, back-to-backs); a live game centres on his pace, its spread shrinking with the time left.
     ponytail: games taken as independent, so it runs a little high when hot / cold streaks carry over."""
     miss = 1.0
     for i, g in enumerate(games):
-        if g.live:
-            mu = live_estimate(g) if g.fp is not None else _mu(g)
-            sd, p = mu * swing * _share_left(g), 1.0
-        else:
-            mu = _mu(g)
-            sd, p = mu * swing, play_chance(g, injury, i == 0)
+        (mu, sd), p = game_dist(g, swing), play_chance(g, injury, i == 0)
         hit = (1.0 if mu > score else 0.0) if sd <= 0 else 1 - _cdf((score - mu) / sd)
         miss *= 1 - p * hit
     return 1 - miss
