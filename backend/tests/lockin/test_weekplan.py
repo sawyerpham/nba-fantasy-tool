@@ -375,7 +375,7 @@ def test_safe_locks_every_game_risky_waits_on_every_later_one():
     """Safe locks every game risky waits on every later one."""
     from app.lockin.weekplan import scenario_total
 
-    a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
+    a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, w_var=20.0, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
     done = pp("done", ["PG"], "PG", [], x=9.0, x_final=True, w=0.0, swing=0.3, seat="PG")   # no games left: locks either way
     assert scenario_total([a, done], True) == (26.5, 0.0)                  # certain
     mean, var = scenario_total([a, done], False)
@@ -392,7 +392,7 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     spare = pp("spare", ["SF", "PF"], "BN", [Game("2026-10-23", 12.0), Game("2026-10-24", 8.0)])
     c_only = pp("big", ["C"], "BN", [Game("2026-10-23", 20.0)])                      # can't play SF: no help
     starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
-    w, src = open_slot(jaq, [jaq, spare, c_only, starter])
+    w, src, _ = open_slot(jaq, [jaq, spare, c_only, starter])
     assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12 * PROJ_SCALE
 
 
@@ -403,8 +403,8 @@ def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_da
 
     kes = pp("kessler", ["C"], "C", [Game("2026-11-04", 11.0, tip="2026-11-05T03:00Z")], seat="C")
     sharpe = pp("sharpe", ["C"], "BN", [Game("2026-11-04", 7.0, tip="2026-11-05T00:30Z")])
-    alone, _ = open_slot(kes, [kes])
-    w, src = open_slot(kes, [kes, sharpe])
+    alone, _, _ = open_slot(kes, [kes])
+    w, src, _ = open_slot(kes, [kes, sharpe])
     assert src == [("2026-11-04", "sharpe"), ("2026-11-04", "kessler")] and w > alone
     sharpe.games[0].tip = "2026-11-05T02:50Z"                      # 10 min before his: no time to judge, one look
     assert open_slot(kes, [kes, sharpe])[1] == [("2026-11-04", "kessler")]
@@ -470,3 +470,41 @@ def test_win_chance_counts_a_live_game_at_its_projected_finish():
     plan_week([live], {"C": 1})
     mean, _ = slot_spread(live, lock=False)
     assert live.slot_w is None and mean == pytest.approx(live.value) and mean > 6.0   # not 0 for a slot with nothing left
+
+
+def test_one_games_variance_is_the_mix_of_playing_and_sitting():
+    """A game he may miss: mean p·μ, variance p·(σ² + μ²) − (p·μ)², so a questionable player's slot is the less
+    certain one, not the more certain (value × swing said the opposite)."""
+    from app.lockin.weekplan import wait_moments
+
+    mu, sigma = 20 * PROJ_SCALE, 20 * PROJ_SCALE * 0.3
+    for injury, p in (("healthy", 0.97), ("day_to_day", 0.6)):
+        mean, var = wait_moments(future(20), 0.3, injury)
+        assert mean == pytest.approx(p * mu) and var == pytest.approx(p * (sigma ** 2 + mu ** 2) - (p * mu) ** 2)
+    assert wait_moments(future(20), 0.3, "day_to_day")[1] > 2 * wait_moments(future(20), 0.3, "healthy")[1]
+    assert wait_moments(future(20), 0.3, "out_long_term") == (0.0, 0.0)   # never plays: a certain 0
+
+
+def test_wait_moments_match_the_lock_rule_played_out():
+    """The mean and variance of three games under the lock rule, against the same rule simulated 40,000 times."""
+    import random
+
+    from app.lockin.weekplan import play_chance, wait_moments
+
+    games, swing, injury = [Game("2026-10-22", 14.0), Game("2026-10-23", 18.0, b2b=True), Game("2026-10-25", 16.0)], 0.45, "healthy"
+    bar = [wait_value(games[i + 1:], swing, injury) for i in range(len(games))]   # what the games after each are worth
+    rng, runs, got = random.Random(7), 40_000, []
+    for _ in range(runs):
+        banked = 0.0
+        for i, g in enumerate(games):
+            if rng.random() >= play_chance(g, injury, i == 0):
+                continue
+            x = rng.gauss(g.proj * PROJ_SCALE, g.proj * PROJ_SCALE * swing)
+            if i == len(games) - 1 or x > bar[i]:
+                banked = x
+                break
+        got.append(banked)
+    mean = sum(got) / runs
+    var = sum((x - mean) ** 2 for x in got) / runs
+    m, v = wait_moments(games, swing, injury)
+    assert m == pytest.approx(mean, rel=0.01) and v == pytest.approx(var, rel=0.03)

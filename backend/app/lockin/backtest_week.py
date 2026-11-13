@@ -5,7 +5,8 @@ Run from backend: python -m app.lockin.backtest_week [league_id]
   games     every projected game of a rotation player: did he play, and how far from Sleeper's projection he landed.
             Fits the one-game spread (swing_of) and the chance to play (PLAY_CHANCE, B2B_PLAY).
   lock rule every player week replayed game by game with the plan's own rule (lock a game that beats what waiting is
-            worth): what the rule really banked against the wait value W it promised on Monday.
+            worth): what the rule really banked against the wait value W it promised on Monday, and how far off it
+            was against the spread wait_moments promised.
   matchups  each finished matchup replayed from Monday morning: every game still to come, the week planned for both
             teams, then the predicted totals and win chance against Sleeper's final score.
 
@@ -25,7 +26,7 @@ from ..main import build_default_state
 from . import weekplan
 from .backtest_live import cached
 from .service import SLEEPER, _slot_counts, actual_fp, projected_fp
-from .weekplan import MAX_SWING, MIN_GAMES_FOR_SWING, MIN_SWING, Game, PlanPlayer, plan_week, swing_of, team_total, wait_value, win_chance
+from .weekplan import MAX_SWING, MIN_GAMES_FOR_SWING, MIN_SWING, Game, PlanPlayer, plan_week, swing_of, team_total, wait_moments, wait_value, win_chance
 
 MIN_PROJ_MIN = 15.0   # rotation players only: the ones a lineup call is about
 
@@ -127,13 +128,15 @@ def report_policy(rows: list[dict]) -> None:
             if i == len(games) - 1 or g["fp"] >= wait_value(plan[i + 1:], swing, "healthy"):
                 banked = g["fp"]
                 break
-        out.append((len(games), wait_value(plan, swing, "healthy"), banked, sum(g["proj"] for g in games) / len(games)))
+        mean, var = wait_moments(plan, swing, "healthy")
+        out.append((len(games), mean, banked, sum(g["proj"] for g in games) / len(games), math.sqrt(var)))
     print("lock rule replayed on every player week: W promised on Monday against what the rule banked")
     for n in sorted({o[0] for o in out}):
         sub = [o for o in out if o[0] == n]
-        print(f"  {n} games  n={len(sub):4}  avg projection {sum(o[3] for o in sub) / len(sub):5.2f}  W {sum(o[1] for o in sub) / len(sub):5.2f}  banked {sum(o[2] for o in sub) / len(sub):5.2f}")
+        print(f"  {n} games  n={len(sub):4}  avg projection {sum(o[3] for o in sub) / len(sub):5.2f}  W {sum(o[1] for o in sub) / len(sub):5.2f}  banked {sum(o[2] for o in sub) / len(sub):5.2f}"
+              f"  miss / predicted spread {rms([(o[2] - o[1]) / o[4] for o in sub if o[4]]):.2f}")
     print(f"  all      n={len(out):4}  W {sum(o[1] for o in out) / len(out):5.2f}  banked {sum(o[2] for o in out) / len(out):5.2f}"
-          f"  spread of (banked - W) {rms([o[2] - o[1] for o in out]):.2f}\n")
+          f"  miss / predicted spread {rms([(o[2] - o[1]) / o[4] for o in out if o[4]]):.2f}   (1.0 = calibrated)\n")
 
 
 def matchup_rows(d: dict) -> list[dict]:
