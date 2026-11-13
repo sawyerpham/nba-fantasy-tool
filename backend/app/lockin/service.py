@@ -1019,10 +1019,26 @@ def faab_bid(up: float, faab_left: int, weeks_left: int, min_bid: int = 1, deman
     return min(faab_left, max(min_bid, min(round(faab_left * BID_CAP), round(pace * max(0.0, up) / 2 * demand))))
 
 
+FPG_PRIOR_GAMES = 10   # ponytail: a guess at how many games it takes for his own FP/G to weigh as much as the projection
+
+
+def steady_fpg(season: dict | None, proj: float | None) -> float:
+    """His FP/G for the demand ratio: this season's, pulled toward Sleeper's projection (scaled: it runs high) as if he
+    had played FPG_PRIOR_GAMES more games at it, so one bad or hot game of your drop candidate (or of the free agent)
+    doesn't swing every bid between the minimum and full. The projection alone before he plays; his own FP/G without one."""
+    from .weekplan import PROJ_SCALE
+
+    fp, gp = (season or {}).get("fp"), (season or {}).get("gp") or 0
+    if not proj:
+        return fp or 0.0
+    if fp is None:
+        return proj * PROJ_SCALE
+    return (gp * fp + FPG_PRIOR_GAMES * proj * PROJ_SCALE) / (gp + FPG_PRIOR_GAMES)
+
+
 def waiver_demand(fpg: float, drop_fpg: float) -> float:
     """How hard rivals chase him (0-1): nobody drops a player and pays for one who barely outscores him, so 0 up to 25 %
-    over your drop candidate's FP/G, full at 75 % over."""
-    # ponytail: actual FP/G only, a 1-game sample counts in full; blend in the projection if hot starts mislead
+    over your drop candidate's FP/G, full at 75 % over. Both FP/G are steady_fpg."""
     return 1.0 if drop_fpg <= 0 else min(1.0, max(0.0, (fpg / drop_fpg - 1.25) / 0.5))
 
 
@@ -1112,7 +1128,7 @@ def waivers(session, fetch: Fetch, view: dict) -> dict:
     done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
     avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown} | ({drop.sleeper_id} if drop else set()),
                           done, session.league.scoring)
-    fpg = lambda r: (avg.get(r.sleeper_id) or {}).get("fp", r.proj_fpts or 0.0)   # noqa: E731 - his actual FP/G, else projected
+    fpg = lambda r: steady_fpg(avg.get(r.sleeper_id), r.proj_fpts)   # noqa: E731
     drop_fpg = fpg(drop) if drop else 0.0
     weeks_left = max((int(g["week"]) for g in schedule), default=week) - week + 1
     out = []
