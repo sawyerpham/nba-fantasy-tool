@@ -22,6 +22,7 @@ import sys
 import requests
 
 from ..main import build_default_state
+from . import weekplan
 from .backtest_live import cached
 from .service import SLEEPER, _slot_counts, actual_fp, projected_fp
 from .weekplan import MAX_SWING, MIN_GAMES_FOR_SWING, MIN_SWING, Game, PlanPlayer, plan_week, swing_of, team_total, wait_value, win_chance
@@ -85,23 +86,25 @@ def game_rows(d: dict) -> list[dict]:
 
 
 def report_games(rows: list[dict]) -> None:
-    """The one-game spread against swing_of, Sleeper's projection bias, and how often a projected player played."""
+    """Sleeper's projection bias (PROJ_SCALE), the one-game spread against swing_of, and how often a projected player played."""
     played = [r for r in rows if r["fp"] is not None and r["proj"] > 5]
     print(f"{len(rows)} projected rotation games, {len(played)} played with a projection over 5 FP\n")
-    print("one-game spread, as a share of the projection: (actual - proj) / proj")
-    rel = [(r["fp"] - r["proj"]) / r["proj"] for r in played]
-    print(f"  all            n={len(rel):5}  bias {sum(rel) / len(rel):+.3f}  spread {rms(rel):.3f}")
+    k = weekplan.PROJ_SCALE
+    print(f"sum of actual FP / sum of projected FP = {sum(r['fp'] for r in played) / sum(r['proj'] for r in played):.3f}   (PROJ_SCALE {k:g} should match)")
+    for w in sorted({r["week"] for r in played}):
+        sub = [r for r in played if r["week"] == w]
+        print(f"  week {w}  n={len(sub):5}  {sum(r['fp'] for r in sub) / sum(r['proj'] for r in sub):.3f}")
+    rel = lambda r, swing=1.0: (r["fp"] - k * r["proj"]) / (k * r["proj"] * swing)   # noqa: E731 - miss as a share of the scaled projection
+    print("one-game spread around the scaled projection, as a share of it")
+    print(f"  all            n={len(played):5}  bias {sum(rel(r) for r in played) / len(played):+.3f}  spread {rms([rel(r) for r in played]):.3f}   (SWING_CENTER {weekplan.SWING_CENTER:g} should match)")
     hist = [r for r in played if r["cv"] is not None]
-    new = [r for r in played if r["cv"] is None]
-    print(f"  no history     n={len(new):5}  spread {rms([(r['fp'] - r['proj']) / r['proj'] for r in new]):.3f}   (DEFAULT_SWING x SWING_SCALE should match)")
-    fit = rms([(r["fp"] - r["proj"]) / (r["proj"] * r["cv"]) for r in hist])
-    print(f"  with history   n={len(hist):5}  spread / last season's std-over-mean = {fit:.3f}   (SWING_SCALE should match)")
+    print(f"  no history     n={len(played) - len(hist):5}  spread {rms([rel(r) for r in played if r['cv'] is None]):.3f}")
+    print("  actual spread / the plan's (swing_of), by last season's own std / mean: every row should read 1.0 (SWING_SHRINK)")
     for lo, hi in ((0, 0.3), (0.3, 0.4), (0.4, 0.5), (0.5, 9)):
         sub = [r for r in hist if lo <= r["cv"] < hi]
         if sub:
-            print(f"    std/mean {lo:.1f}-{min(hi, MAX_SWING):.1f}  n={len(sub):5}  ratio {rms([(r['fp'] - r['proj']) / (r['proj'] * r['cv']) for r in sub]):.3f}")
-    z = rms([(r["fp"] - r["proj"]) / (r["proj"] * r["swing"]) for r in played])
-    print(f"  the code's swing_of: actual spread / predicted spread = {z:.3f}   (1.0 = calibrated)\n")
+            print(f"    std/mean {lo:.1f}-{min(hi, MAX_SWING):.1f}  n={len(sub):5}  {rms([rel(r, r['swing']) for r in sub]):.3f}")
+    print(f"  all games: actual spread / the plan's = {rms([rel(r, r['swing']) for r in played]):.3f}   (1.0 = calibrated)\n")
     print("played, of projected rotation games")
     for label, sub in (("all", rows), ("back-to-back 2nd night", [r for r in rows if r["b2b"]]), ("other nights", [r for r in rows if not r["b2b"]])):
         print(f"  {label:<24} n={len(sub):5}  played {sum(r['fp'] is not None for r in sub) / len(sub):.3f}")

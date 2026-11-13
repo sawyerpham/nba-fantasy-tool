@@ -1,7 +1,7 @@
 
 import pytest
 
-from app.lockin.weekplan import Game, PlanPlayer, expected_max, plan_week, swing_of, wait_value
+from app.lockin.weekplan import PROJ_SCALE, Game, PlanPlayer, expected_max, plan_week, swing_of, wait_value
 
 SLOTS = {"PG": 2, "SG": 2}
 
@@ -20,11 +20,11 @@ def test_expected_max_and_wait_value_math():
     """Expected max and wait value math."""
     assert expected_max(0, 1, 0) == pytest.approx(0.3989, abs=1e-4)
     assert expected_max(10, 0, 12) == 12
-    assert wait_value(future(20), 0.3, "healthy") == pytest.approx(0.97 * 20)          # last game: just its projection
+    assert wait_value(future(20), 0.3, "healthy") == pytest.approx(0.97 * 20 * PROJ_SCALE)   # last game: just its (scaled) projection
     two = wait_value(future(20, 20), 0.3, "healthy")
-    assert two > 20                                                                      # two chances beat one
+    assert two > 20 * PROJ_SCALE                                                         # two chances beat one
     assert wait_value(future(20, 20), 0.3, "out_long_term") == 0                        # never plays: worth 0
-    assert wait_value(future(20), 0.3, "day_to_day") == pytest.approx(0.6 * 20)         # GTD last game: a DNP counts 0
+    assert wait_value(future(20), 0.3, "day_to_day") == pytest.approx(0.6 * 20 * PROJ_SCALE)   # GTD last game: a DNP counts 0
 
 
 def test_pg_sg_locks_in_the_sg_slot_so_both_great_pgs_still_fit():
@@ -68,10 +68,12 @@ def test_locked_players_keep_their_slot_and_others_fill_around_them():
 
 def test_swing_comes_from_his_own_games():
     """Swing comes from his own games."""
-    from app.lockin.weekplan import SWING_SCALE
-    assert swing_of([10.0] * 20) == pytest.approx(0.12 * SWING_SCALE)     # perfectly steady: the floor
-    assert swing_of([5.0, 25.0] * 10) == pytest.approx(0.6 * SWING_SCALE) # wild: the ceiling
-    assert swing_of([10.0] * 5) == pytest.approx(0.3 * SWING_SCALE)       # too few games: the default
+    from app.lockin.weekplan import SWING_CENTER, SWING_SHRINK
+    pulled = lambda own: SWING_CENTER + SWING_SHRINK * (own - SWING_CENTER)   # his own spread, pulled toward the league's
+    assert swing_of([10.0] * 20) == pytest.approx(pulled(0.12))           # perfectly steady: the floor
+    assert swing_of([5.0, 25.0] * 10) == pytest.approx(pulled(0.6))       # wild: the ceiling
+    assert swing_of([8.0, 12.0] * 10) == pytest.approx(pulled(0.2))       # his own std / mean in between
+    assert swing_of([10.0] * 5) == SWING_CENTER                           # too few games: the league's
 
 
 def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
@@ -362,10 +364,10 @@ def test_beat_chance_is_one_minus_every_game_missing():
     """Beat chance is one minus every game missing."""
     from app.lockin.weekplan import beat_chance
     assert beat_chance(17.5, [], 0.3, "healthy") == 0                            # no games left: can't beat it
-    one = beat_chance(14.6, future(14.6), 0.3, "healthy")
+    one = beat_chance(14.6 * PROJ_SCALE, future(14.6), 0.3, "healthy")
     assert one == pytest.approx(0.97 * 0.5)                                       # projection = score: a coin flip if he plays
     two = beat_chance(17.5, future(13.7, 14.6), 0.3, "healthy")
-    assert 0.25 < two < 0.4 and two > beat_chance(17.5, future(14.6), 0.3, "healthy")
+    assert 0.15 < two < 0.4 and two > beat_chance(17.5, future(14.6), 0.3, "healthy")
     assert beat_chance(17.5, future(13.7, 14.6), 0.3, "out_long_term") == 0
 
 
@@ -391,7 +393,7 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     c_only = pp("big", ["C"], "BN", [Game("2026-10-23", 20.0)])                      # can't play SF: no help
     starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
     w, src = open_slot(jaq, [jaq, spare, c_only, starter])
-    assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12
+    assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12 * PROJ_SCALE
 
 
 def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_day():
@@ -413,7 +415,7 @@ def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
     # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
     rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
     fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
-    assert rested < fresh and rested == pytest.approx(15.0 * 0.97 * 0.85)   # sitting the final game leaves 0
+    assert rested < fresh and rested == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.85)   # sitting the final game leaves 0
 
 
 def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
@@ -452,7 +454,7 @@ def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_f
                                              period=3, clock=550)])
     benched = pp("watson", ["PF"], "BN", [Game(today, 8.2, started=True, live=True)])            # on the bench: can't count
     plan = plan_week([tipped, cold, benched], {"PG": 1, "PF": 1})
-    assert tipped.value == pytest.approx(10.7) and tipped.seat == "PG"
+    assert tipped.value == pytest.approx(10.7 * PROJ_SCALE) and tipped.seat == "PG"
     assert 3.0 < cold.value < 8.1 and cold.seat == "PF"
     assert benched.value == 0
     assert plan.expected == pytest.approx(tipped.value + cold.value, abs=0.1)
