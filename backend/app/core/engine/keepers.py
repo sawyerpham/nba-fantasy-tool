@@ -93,18 +93,34 @@ def evaluate_keepers(session, candidates: Iterable[KeeperCandidate]) -> list[Kee
 
 # next price = the escalation rule applied to his market price now (what you'd likely pay)
 # next worth = fair value of his healthy value a year older, at this year's draft-start $ per point (after keepers):
-#              current injury removed, the age penalty for next year's age (31+ loses 3 %/year)
+#              current injury removed, next_year_factor for his age (31+ loses 3 %/year, 20 and under gains 10 %)
 # call       = verdict_for(next worth - next price): the same GOOD / EVEN / BAD keep as the keeper menu
 # good_up_to = the highest price now that still makes him a GOOD keep next year (None if no price does)
 # stash      = he is out now (hurts this season) but a GOOD keep next year
-# ponytail: next year's projection is this year's; young players who improve are flagged, not modelled.
 OUT_NOW = ("out_short_term", "out_long_term", "out_season")
+# Growth: this season's projection over last season's FP/G (players with 40+ games), against the 0.955 all ages share:
+# 1.08 at 20 (6 players) and 1.07 at 21 (11), then 0.92 / 0.95 / 0.96 at 22 / 23 / 24, level with everyone else. So a
+# season played at 21 or younger is worth about a tenth more than the one before it, and nothing shows after that.
+# ponytail: 17 players; one flat step, fit it per age once more seasons of projections are saved.
+YOUNG_GROWTH, YOUNG_AGE = 1.10, 21
+
+
+def next_year_factor(age: float | None, ranking) -> float:
+    """What a year does to his value: the age penalty moving one year on (nothing before the start age or past its cap;
+    the raw multiplier, so it applies even while a projection keeps this season's value free of it), and YOUNG_GROWTH
+    when next season is still one he plays at YOUNG_AGE or younger. 1 with no age on file."""
+    from .ranking import age_multiplier
+
+    if not age:
+        return 1.0
+    grow = YOUNG_GROWTH if int(age) + 1 <= YOUNG_AGE else 1.0
+    return grow * age_multiplier(age + 1, ranking) / age_multiplier(age, ranking)
 
 
 def keeper_outlook(session, row, buy_price: int) -> dict:
     """How good a keeper this player would be next year if bought now at `buy_price`: next year's price and worth, the call, the highest price that still makes him a good keep, and whether he is a stash (out now, good keep next year)."""
     from .bidding import replacement_value
-    from .ranking import age_multiplier, player_value
+    from .ranking import player_value
 
     lg = session.league
     rec = session.players[row.player_id]
@@ -112,8 +128,7 @@ def keeper_outlook(session, row, buy_price: int) -> dict:
     healthy = override.model_copy(update={"injury_status": "healthy"}) if override else None
     value = player_value(rec, healthy, session.valuations.get(row.player_id), lg.ranking, lg.scoring,
                          session.schedule().get(rec.team_abbr or "", 1.0))[0]
-    if rec.bio.age:
-        value *= age_multiplier(rec.bio.age + 1, lg.ranking) / age_multiplier(rec.bio.age, lg.ranking)
+    value *= next_year_factor(rec.bio.age, lg.ranking)
     value += session._scarcity.get(row.player_id, 0.0)
     pool = session.pool_values()
     mandatory = lg.mandatory_slot_count()

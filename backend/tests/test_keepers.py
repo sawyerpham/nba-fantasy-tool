@@ -68,3 +68,36 @@ def test_unknown_player_is_a_draft_error(session):
     from app.core.engine.draft_state import DraftError
     with pytest.raises(DraftError):
         evaluate_keepers(session, [KeeperCandidate("m1", 1, 5)])
+
+
+def test_next_years_value_ages_him_even_when_a_projection_keeps_this_years_free_of_it():
+    """With projection_weight 1 this season's value carries no age penalty (the projection prices age in), but next
+    year's still moves one year down the curve: 31+ loses 3 % a year until the cap."""
+    from app.core.engine.keepers import YOUNG_GROWTH, next_year_factor
+    from app.core.engine.ranking import age_multiplier
+    from nba_fantasy_shared.models.league import RankingSettings
+
+    r = RankingSettings()
+    assert r.projection_weight == 1.0 and r.age_penalty_start == 31
+    assert next_year_factor(33, r) == pytest.approx(age_multiplier(34, r) / age_multiplier(33, r)) == pytest.approx(0.91 / 0.94)
+    assert next_year_factor(31, r) == pytest.approx(0.97)
+    assert next_year_factor(30, r) == 1.0 and next_year_factor(26, r) == 1.0   # next season is still at or under the start age
+    assert next_year_factor(41, r) == 1.0                                      # past the 25 % cap: nothing more to lose
+    assert next_year_factor(None, r) == 1.0
+    # growth: only while next season is one he plays at 21 or younger
+    assert next_year_factor(19.6, r) == YOUNG_GROWTH and next_year_factor(20.9, r) == YOUNG_GROWTH
+    assert next_year_factor(21.0, r) == 1.0 and next_year_factor(23, r) == 1.0
+
+
+def test_keeper_outlook_grows_a_teenager_and_ages_a_veteran(session):
+    """The same player bought at the same price is worth more next year at 19 than at 26, and less at 34."""
+    from app.core.engine.keepers import keeper_outlook
+
+    row = next(r for r in session.rank([], session.available_ids()) if r.player_id == JOKIC)
+    rec = session.players[JOKIC]
+    worth = {}
+    for age in (19, 26, 34):
+        session.players[JOKIC] = rec.model_copy(update={"bio": rec.bio.model_copy(update={"age": age})})
+        worth[age] = keeper_outlook(session, row, 20)["next_worth"]
+    session.players[JOKIC] = rec
+    assert worth[19] > worth[26] > worth[34]
