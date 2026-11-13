@@ -531,3 +531,26 @@ def test_overtime_is_still_a_live_game():
     assert live_estimate(ot) > 24.0 and game_dist(ot, 0.4)[1] > 0
     assert 0 < beat_chance(25.0, [ot], 0.4, "healthy") < 1       # a 25 he hasn't reached yet is neither sure nor out
     assert game_dist(Game("2026-10-24", 20.0, fp=24.0, started=True, live=True, min=43, proj_min=34, period=5, clock=0), 0.4)[1] == 0
+
+
+def test_swap_and_keep_are_valued_the_same_way():
+    """Two identical games tonight are a wash, and a game in progress keeps the upside it has left."""
+    from app.lockin.weekplan import swap_call
+
+    today, later = "2026-10-24", "2026-10-26"
+    s = pp("starter", ["PG"], "PG", [Game(today, 14.0, tip="2026-10-24T23:00Z"), Game(later, 12.0)], swing=0.4)
+    b = pp("backup", ["PG"], "BN", [Game(today, 14.0, tip="2026-10-25T02:00Z")], swing=0.4)
+    call = swap_call(s, b, today)
+    assert call["decision"] == "PENDING" and call["gain"] == 0          # same game, same fallback: nothing to gain
+    b.games[0].proj = 17.0
+    assert swap_call(s, b, today)["gain"] > 0                             # the better game is the gain, on one baseline
+
+    # under way and headed for ~his later games' value: keeping is worth more than either number alone, because the
+    # game can still beat the fallback (it used to count max(pace, bar), a point, against a swap priced with upside)
+    s.games[0] = Game(today, 14.0, fp=5.5, started=True, live=True, min=17, proj_min=34, period=3, clock=720, tip="2026-10-24T23:00Z")
+    live = swap_call(s, b, today)
+    assert live["keep"] > max(live["est"], live["bar"]) and live["keep_var"] > 0
+    assert live["gain"] == pytest.approx(live["swap"] - live["keep"], abs=0.11)   # gain and the call share a baseline
+    s.games[0] = Game(today, 14.0, fp=11.0, started=True, final=True, tip="2026-10-24T23:00Z")
+    over = swap_call(s, b, today)
+    assert over["keep"] == pytest.approx(max(11.0, over["bar"]), abs=0.05)   # final: a known score, no upside left

@@ -566,7 +566,7 @@ def locked_points(players) -> float:
 def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[str, str] | None = None) -> dict:
     """The week plan (engine/weekplan.py) for one team of a week_view (default: yours), with lock status, the
     opponent's outlook, every lock / pass / swap decided by the chance to win the week, and today's lineup."""
-    from .weekplan import SWING_CENTER, _minus_minutes, bench_lock_chance, decide_by_win_chance, lock_slots, plan_today, plan_week, scenario_total, swap_win_chance, team_total, win_chance
+    from .weekplan import _minus_minutes, bench_lock_chance, decide_by_win_chance, lock_slots, plan_today, plan_week, scenario_total, swap_win_chance, team_total, win_chance
 
     team = next((t for t in view["teams"] if (t["roster_id"] == roster_id if roster_id else t["is_user"])), None)
     if team is None:
@@ -613,10 +613,9 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     today = view.get("day", view["today"])
     t = plan_today(players, counts, today, view.get("now")) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
-        swings = {q.name: q.swing for q in players}
         for w in t.watch:
             if w["kind"] == "swap" and w["decision"] in ("KEEP", "SWAP"):
-                both = swap_win_chance(players, w["sid"], w, swings.get(w["backup"], SWING_CENTER), theirs)
+                both = swap_win_chance(players, w["sid"], w, theirs)
                 if both:
                     w["win_keep"], w["win_swap"] = round(both[0], 3), round(both[1], 3)
                     w["decision"] = "SWAP" if both[1] > both[0] else "KEEP"

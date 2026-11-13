@@ -200,13 +200,20 @@ def wait_moments(remaining: list[Game], swing: float, injury: str) -> tuple[floa
     v = m2 = 0.0   # mean and second moment of the games after this one
     for i in range(len(remaining) - 1, -1, -1):
         (mu, sigma), p = game_dist(remaining[i], swing), play_chance(remaining[i], injury, i == 0)
-        if i == len(remaining) - 1:   # his last game counts whatever it is
-            e1, e2 = mu, mu * mu + sigma * sigma
-        else:
-            c, a, b = _above(mu, sigma, v)
-            e1, e2 = a + (1 - c) * v, b + (1 - c) * m2
-        v, m2 = p * e1 + (1 - p) * v, p * e2 + (1 - p) * m2
+        v, m2 = _then(mu, sigma, p, v, m2, last=i == len(remaining) - 1)
     return v, max(0.0, m2 - v * v)
+
+
+def _then(mu: float, sigma: float, p: float, v: float, m2: float, last: bool) -> tuple[float, float]:
+    """One game ~ Normal(mu, sigma), played with chance p, ahead of games worth (mean v, second moment m2): the mean
+    and second moment of the two together. Played, it is locked when it beats v, else the wait goes on; `last` = there
+    is nothing after it, so it counts whatever it is. Missed, the wait goes on."""
+    if last:
+        e1, e2 = mu, mu * mu + sigma * sigma
+    else:
+        c, a, b = _above(mu, sigma, v)
+        e1, e2 = a + (1 - c) * v, b + (1 - c) * m2
+    return p * e1 + (1 - p) * v, p * e2 + (1 - p) * m2
 
 
 def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
@@ -521,29 +528,35 @@ def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> f
 
 def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
     """Keep S (his game tonight is the slot's chance; pass on it if his later games are worth more) or swap B in
-    (S's game tonight is forfeited, the slot gets B's game, S still has his later games)."""
+    (S's game tonight is forfeited, the slot gets B's game, S still has his later games). Both sides are valued the
+    same way (_then): tonight's game, with S's later games behind it as the fallback, so a game still in progress
+    keeps the upside it has left just as B's game does. gain = swap − keep, whatever state S's game is in."""
     gs, gb = _today(s, today), _today(b, today)
     later = [g for g in s.games if g.date > today and not g.started]
-    bar = wait_value(later, s.swing, s.injury)                 # what S's later games are worth
-    nxt = play_chance(gb, b.injury, True)
-    mu_b = _mu(gb)
-    swap = nxt * expected_max(mu_b, mu_b * b.swing, bar) + (1 - nxt) * bar
+    bar, bar_var = wait_moments(later, s.swing, s.injury)      # what S's later games are worth
+    bar_m2 = bar_var + bar * bar
+    (mu_b, sd_b), p_b = game_dist(gb, b.swing), play_chance(gb, b.injury, True)
+    swap, swap_m2 = _then(mu_b, sd_b, p_b, bar, bar_m2, last=not later)
     # a game the timeline's check treats as over but that isn't final yet: judge it at its projected finish
-    est = live_estimate(replace(gs, live=True) if gs.started and not gs.final and gs.period else gs)
-    if est is None and gs.started and s.injury in OUT:   # ruled out, his game under way without him: he scores 0
-        est = 0.0
-    # before a live score, keeping him is worth his game tonight (taken only if it beats his later games) or those games
-    p_s, mu_s = play_chance(gs, s.injury, True), _mu(gs)
-    gain = swap - (p_s * expected_max(mu_s, mu_s * s.swing, bar) + (1 - p_s) * bar)
-    # keep_if: the finish S must be headed for to beat swapping (below his later-games bar, any finish loses to it)
-    keep_if = round(swap, 1)
-    if est is None:                                            # not started: judge it at the alarm
-        return {"decision": "PENDING", "est": None, "keep": None, "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if,
-                "gain": round(gain, 2)}
-    keep = max(est, bar)
+    now = replace(gs, live=True) if gs.started and not gs.final and gs.period else gs
+    if not gs.started:                                         # not started: judge it at the alarm
+        est = None
+        keep, keep_m2 = _then(*game_dist(gs, s.swing), play_chance(gs, s.injury, True), bar, bar_m2, last=not later)
+    elif now.live and now.fp is not None and not sits_out(s, gs):   # under way: where it is headed, and the spread it has left
+        (est, sd_s) = game_dist(now, s.swing)
+        keep, keep_m2 = _then(est, sd_s, 1.0, bar, bar_m2, last=not later)
+    elif now.live and s.injury not in OUT:                     # tipped, no stats yet: no score to judge
+        est = None
+        keep, keep_m2 = _then(*game_dist(now, s.swing), 1.0, bar, bar_m2, last=not later)
+    else:                                                      # over (or under way without him: he scores 0): a known score
+        est = gs.fp or 0.0
+        keep, keep_m2 = (est, est * est) if est >= bar else (bar, bar_m2)
+    out = {"swap": round(swap, 1), "bar": round(bar, 1), "keep_if": round(swap, 1),   # keep_if: the finish S must be headed for
+           "gain": round(swap - keep, 2), "swap_var": max(0.0, swap_m2 - swap * swap), "keep_var": max(0.0, keep_m2 - keep * keep)}
+    if est is None:
+        return {"decision": "PENDING", "est": None, "keep": None, **out}
     # his game is under way: headed past the backup's own projection, the swap is off (whatever the option math says)
-    return {"decision": "SWAP" if swap > keep and est <= mu_b else "KEEP", "est": round(est, 1), "keep": round(keep, 1),
-            "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if, "gain": round(gain, 2)}
+    return {"decision": "SWAP" if swap > keep and est <= mu_b else "KEEP", "est": round(est, 1), "keep": round(keep, 1), **out}
 
 
 def _minus_minutes(iso: str | None, minutes: int) -> str | None:
@@ -714,14 +727,12 @@ def bench_lock_chance(p: PlanPlayer, players: list[PlanPlayer], slot_counts: dic
     return decide_by_win_chance(clones, theirs)
 
 
-def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, backup_swing: float,
-                    theirs: tuple[float, float]) -> tuple[float, float] | None:
+def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, theirs: tuple[float, float]) -> tuple[float, float] | None:
     """(win chance keeping the starter, win chance swapping the later player in) for one watch line."""
     s = next((p for p in players if p.sid == starter_sid), None)
     if s is None or call.get("keep") is None:
         return None
     mean, var = team_total(players, skip=s)
-    keep_var = 0.0 if call["est"] is not None and call["keep"] == call["est"] else (call["keep"] * s.swing) ** 2
-    keep = win_chance((mean + call["keep"], var + keep_var), theirs)
-    swap = win_chance((mean + call["swap"], var + (call["swap"] * backup_swing) ** 2), theirs)
+    keep = win_chance((mean + call["keep"], var + call["keep_var"]), theirs)
+    swap = win_chance((mean + call["swap"], var + call["swap_var"]), theirs)
     return keep, swap
