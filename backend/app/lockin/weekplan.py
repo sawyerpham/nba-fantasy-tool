@@ -54,9 +54,13 @@ B2B_PLAY = 0.85
 
 
 def play_chance(g: "Game", injury: str, first: bool) -> float:
-    """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night."""
-    if g.started:   # it has tipped: he's in it (a live game counted in plan_week)
-        return 1.0
+    """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night.
+    A game that has tipped: 1 once he has stats; 0 if he is ruled out, or still has none by the second half (an
+    inactive or a DNP: his projection must not count as if he were on the floor)."""
+    if g.started:
+        if g.fp is not None or g.min:
+            return 1.0
+        return 0.0 if injury in OUT or g.period >= 3 or g.final else 1.0   # just tipped, no stats yet: he's in it
     nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
     return (nxt if first else later) * (B2B_PLAY if g.b2b else 1.0)
 

@@ -569,3 +569,14 @@ def test_waiting_on_one_questionable_game_counts_the_zero_apart():
     assert q.slot_zero == pytest.approx(0.4)                    # the open slot knows he is questionable
     decide_by_win_chance([q], (5.0, 0.0))
     assert q.win_lock == 0.0 and q.win_wait == pytest.approx(0.567, abs=0.01) and q.action == "PASS"
+
+
+def test_a_tipped_game_he_isnt_in_counts_for_nothing():
+    """Ruled out, or no stats by the second half: the game under way is a 0, not his projection."""
+    today = "2026-10-24"
+    out = pp("out", ["PG"], "PG", [Game(today, 18.0, started=True, live=True, period=1, clock=600)], injury="out_short_term")
+    dnp = pp("dnp", ["SG"], "SG", [Game(today, 12.0, started=True, live=True, period=3, clock=600)])
+    fine = pp("fine", ["PG"], "PG", [Game(today, 10.0, started=True, live=True, period=1, clock=700)])   # just tipped
+    plan_week([out, dnp, fine], SLOTS)
+    assert out.value == 0 and dnp.value == 0
+    assert fine.value == pytest.approx(10.0 * PROJ_SCALE)
