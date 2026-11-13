@@ -415,7 +415,12 @@ def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
     # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
     rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
     fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
-    assert rested < fresh and rested == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.85)   # sitting the final game leaves 0
+    assert rested < fresh and rested == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.95)   # sitting the final game leaves 0
+    old = wait_value([Game("2026-10-24", 15.0, b2b=True, vet=True)], 0.3, "healthy")
+    assert old == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.85)                          # 31 and up sit second nights more
+    # a healthy player's later games: 0.93 each (he played the game before), his next one 0.97
+    two = wait_value([Game("2026-10-24", 0.0), Game("2026-10-26", 15.0)], 0.3, "healthy")
+    assert two == pytest.approx(15.0 * PROJ_SCALE * 0.93)
 
 
 def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
@@ -490,17 +495,18 @@ def test_wait_moments_match_the_lock_rule_played_out():
     """The mean and variance of three games under the lock rule, against the same rule simulated 40,000 times."""
     import random
 
-    from app.lockin.weekplan import play_chance, wait_moments
+    from app.lockin.weekplan import _moments, game_dist, play_chance, wait_moments
 
-    games, swing, injury = [Game("2026-10-22", 14.0), Game("2026-10-23", 18.0, b2b=True), Game("2026-10-25", 16.0)], 0.45, "healthy"
-    bar = [wait_value(games[i + 1:], swing, injury) for i in range(len(games))]   # what the games after each are worth
+    games, swing, injury = [Game("2026-10-22", 14.0), Game("2026-10-23", 18.0, b2b=True), Game("2026-10-25", 16.0)], 0.45, "day_to_day"
+    dists = [(*game_dist(g, swing), play_chance(g, injury, i == 0)) for i, g in enumerate(games)]
+    bar = [_moments(dists[i + 1:])[0] for i in range(len(games))]   # what the games after each are worth
     rng, runs, got = random.Random(7), 40_000, []
     for _ in range(runs):
         banked = 0.0
-        for i, g in enumerate(games):
-            if rng.random() >= play_chance(g, injury, i == 0):
+        for i, (mu, sigma, p) in enumerate(dists):
+            if rng.random() >= p:
                 continue
-            x = rng.gauss(g.proj * PROJ_SCALE, g.proj * PROJ_SCALE * swing)
+            x = rng.gauss(mu, sigma)
             if i == len(games) - 1 or x > bar[i]:
                 banked = x
                 break

@@ -131,7 +131,7 @@ SLEEPER_FLIP_HOUR = 4   # ponytail: guessed hour (ET) Sleeper's lineup day rolls
 
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
     """The fantasy week view: matchups, standings, every rostered player's games with projections, scores, injuries and locks, the lineup day and the Sleeper gap. Reads Sleeper and ESPN through the cached fetcher."""
-    from .weekplan import Game, beat_chance, live_estimate, swing_of
+    from .weekplan import VET_AGE, Game, beat_chance, live_estimate, swing_of
 
     lg = session.league
     if not lg.sleeper_league_id:
@@ -252,9 +252,10 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                 g["pace"] = round(live_estimate(Game(date=d, proj=g["proj"], fp=g["fp"], started=True, live=True, min=g["min"],
                                                      proj_min=g["proj_min"], period=g["period"], clock=g["clock"])), 2)
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
+        vet = bool(rec and rec.bio.age and rec.bio.age >= VET_AGE)
         # each final game: the chance one of his unfinished games this week beats it (the chip's hover)
         left = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre", live=g["state"] == "in",
-                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"], b2b=g["b2b"]) for g in games if g["state"] != "post"]
+                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"], b2b=g["b2b"], vet=vet) for g in games if g["state"] != "post"]
         swing = swing_of(val.per_game_fpts if val else [])
         for g in games:
             if g["state"] == "post" and g["fp"] is not None:
@@ -262,7 +263,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
                         "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games,
-                        "nick": nicks.get(sid)}
+                        "nick": nicks.get(sid), "vet": vet}
 
     team_games: dict[str, int] = {}
     for (d, team) in plays:
@@ -463,7 +464,7 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
         slot = "IR" if sid in reserve else slot_of.get(sid, "BN")
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
                       live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
-                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False))
+                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False), vet=p.get("vet", False))
                  for g in p["games"]]
         swing = swing_of(val.per_game_fpts) if val else swing_of([])
         status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
@@ -578,7 +579,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     opp = None
     pair = next((pr for pr in view["matchups"] if any(m["roster_id"] == team["roster_id"] for m in pr)), [])
     other = next((m for m in pair if m["roster_id"] != team["roster_id"]), None)
-    mode, chance, theirs, outlook = "even", None, None, None
+    chance, theirs, outlook = None, None, None
     if other:
         oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
         oplayers, olocks, _ = _plan_players(session, view, oteam, manual or {})   # your answers about their locks too
@@ -591,7 +592,6 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                 if q.lock_at:
                     q.win_lock = bench_lock_chance(q, players, counts, q.lock_at[0]["slot"], theirs)
                     q.win_wait = chance
-        mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         # this week's advice: the chance to win locking everything you can now (safe) vs waiting on later games (risky)
         outlook = {"safe": round(win_chance(scenario_total(players, True), theirs), 3),
                    "risky": round(win_chance(scenario_total(players, False), theirs), 3)}
@@ -644,7 +644,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
     return {**_team_tag(team),
             "expected": plan.expected, "slots": counts,
-            "points": locked_points(players), "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
+            "points": locked_points(players), "win_chance": round(chance, 3) if chance is not None else None,
             "outlook": outlook,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],

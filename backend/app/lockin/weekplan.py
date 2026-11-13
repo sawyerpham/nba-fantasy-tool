@@ -44,13 +44,17 @@ MIN_SWING, MAX_SWING, MIN_GAMES_FOR_SWING = 0.12, 0.6, 15
 PROJ_SCALE = 0.925
 SWING_CENTER, SWING_SHRINK = 0.45, 0.4
 # Chance he plays a game, by Sleeper injury status: next game / later games this week.
-# ponytail: flat guesses; tune from what actually happens once the season runs.
-PLAY_CHANCE = {"healthy": (0.97, 0.97), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
+# Healthy, later games: last season a rotation player (20+ minutes, 30+ games) who played his team's previous game
+# played the next one 92.7 % of the time when it wasn't a back-to-back (11,587 games). The next game stays at 0.97:
+# with no tag this close to it he is nearly sure to play, and Sleeper keeps no tag history to measure it.
+# ponytail: the tagged rows are still flat guesses; tune them once a season of tags against games played is saved.
+PLAY_CHANCE = {"healthy": (0.97, 0.93), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
                "out_long_term": (0.0, 0.0), "out_season": (0.0, 0.0)}
 # The second night of a back-to-back: rest days land there (RotoWire: passing on a good early game backfires when he
 # sits later, and an unlocked player's final game counts even at zero). His chance to play it is scaled by this.
-# ponytail: one flat factor for everyone; stars rest more than role players, tune per player if it matters.
-B2B_PLAY = 0.85
+# Same logs: 87.3 % on second nights against 92.7 % otherwise. Minutes made no difference (0.95 / 0.92 / 0.96 for
+# 20-28 / 28-33 / 33+ a game); age did: 0.95 under 31 (2,247 second nights), 0.85 from 31 (295).
+B2B_PLAY, B2B_PLAY_VET, VET_AGE = 0.95, 0.85, 31
 
 
 def play_chance(g: "Game", injury: str, first: bool) -> float:
@@ -62,7 +66,7 @@ def play_chance(g: "Game", injury: str, first: bool) -> float:
             return 1.0
         return 0.0 if injury in OUT or g.period >= 3 or g.final else 1.0   # just tipped, no stats yet: he's in it
     nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
-    return (nxt if first else later) * (B2B_PLAY if g.b2b else 1.0)
+    return (nxt if first else later) * ((B2B_PLAY_VET if g.vet else B2B_PLAY) if g.b2b else 1.0)
 
 
 @dataclass
@@ -80,6 +84,7 @@ class Game:
     period: int = 0             # live game clock (ESPN): quarter and seconds left in it
     clock: float = 0.0
     b2b: bool = False           # his team played the day before (second night of a back-to-back)
+    vet: bool = False           # he is VET_AGE or older: sits second nights more often
 
 
 @dataclass
