@@ -80,10 +80,13 @@ computed backwards from his last game:
     V_last = p · μ_last
     V_k    = p · E[max(X_k, V_k+1)] + (1 − p) · V_k+1,     X_k ~ Normal(μ_k, μ_k · swing)
 
-where *p* is his chance to play (from his injury tag) and *swing* is his own game-to-game variation under the league's
-scoring. The call is not "which is bigger" but which gives the higher chance to win the matchup: every open slot is a
-normal, the week's totals are summed, and P(win) = Φ(Δ / √(σ²<sub>me</sub> + σ²<sub>opp</sub>)). Both chances are shown
-on every card (`weekplan.py: wait_value, decide_by_win_chance`).
+where *p* is his chance to play (from his injury tag, back-to-backs and age), *μ* is Sleeper's projection scaled by
+0.925 (it runs high) and *swing* is one game's spread as a share of its mean: his own game-to-game variation pulled
+toward the league's 0.45. The same recursion carries the second moment, so every open slot has its real variance:
+a questionable player's 60 % of a 20 is far less certain than a healthy player's 12. The call is not "which is
+bigger" but which gives the higher chance to win the matchup: the week's totals are summed and
+P(win) = Φ(Δ / √(σ²<sub>me</sub> + σ²<sub>opp</sub>)), with the deciding slot's chance of scoring nothing counted
+apart from the bell curve. Both chances are shown on every card (`weekplan.py: wait_moments, decide_by_win_chance`).
 
 **Seating a lineup under multi-position eligibility.** Slots are PG PG SG SG SF SF PF PF C C and most players fit
 two or three. Seating highest value first and sliding already-seated players along augmenting paths is optimal here
@@ -127,7 +130,24 @@ Mean absolute error of the predicted final; bias is within 0.15 FP at every chec
 left are within about a minute of the actual at each checkpoint. Two findings worth knowing: shrinking the live rate
 cuts the first-quarter error by a third against naive extrapolation, and a player's live rate adds almost nothing
 over his projection on average, so the engine leans on the projection and lets the actual score, not the rate, move
-the keep-or-swap call. Reproduce with `python -m app.lockin.backtest_live` from `backend`.
+the keep-or-swap call. The miss shrinks with the square root of the share of the game left (0.87 / 0.70 / 0.51 /
+0.36 of the pregame miss at those four checkpoints, against √share = 0.87 / 0.71 / 0.50 / 0.35), which is how a live
+game's spread is modelled. Reproduce with `python -m app.lockin.backtest_live` from `backend`.
+
+The week plan's inputs were fit on the first three weeks (**2,048 played games, 882 player weeks, 18 matchups**),
+replayed from Sleeper's own history. Reproduce with `python -m app.lockin.backtest_week` from `backend`.
+
+| Check                                                        | before | now  | calibrated |
+|--------------------------------------------------------------|-------:|-----:|-----------:|
+| actual FP ÷ the plan's mean for a game                       | 0.926  | 1.00 | 1.00       |
+| actual one-game spread ÷ the plan's                          | 2.13   | 1.02 | 1.00       |
+| lock rule replayed: FP banked vs the wait value promised     | 8.58 vs 8.55 | 8.57 vs 8.71 | equal |
+| lock rule replayed: miss ÷ the plan's spread for the slot    | n/a    | 1.07 | 1.00       |
+| Monday win chance, Brier score (0.25 = coin flip)            | 0.246  | 0.247 | lower     |
+| real matchup margin ÷ the plan's spread for it               | 1.39   | 1.25 | 1.00       |
+
+The game-level numbers are solid; 18 matchups are too few to judge the win chance itself (its Brier score moves by
+about 0.03 from sample noise alone), and real margins still run wider than the plan expects.
 
 ## Testing and CI
 
@@ -198,7 +218,7 @@ backend/app/
   core/      api/ (leagues, players, data pull)   engine/ (session, ranking, bidding, budget, roster, keepers)
              services/ (app state, pull, valuations, Sleeper league link and changelog)
   draft/     auction routes, fit, market, room
-  lockin/    api, service (week view, plans, game and team cards), weekplan (the engine), backtest_live
+  lockin/    api, service (week view, plans, game and team cards), weekplan (the engine), backtest_live, backtest_week
   main.py    notify.py (Telegram)   pull.py / valuate.py (CLIs)
 backend/tests/      pytest suite; fixtures/ holds captured API responses
 frontend/src/

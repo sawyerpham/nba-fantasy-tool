@@ -18,8 +18,9 @@ with augmenting paths is optimal for this kind of slot filling (a transversal ma
 PG/SG's lock in the SG slot when two better PGs still have games: they claim the PG slots first.
 Players left without a slot don't count this week.
 
-swing = the player's own game-to-game variation under the league's scoring (std / mean of last season's games),
-clamped to [MIN_SWING, MAX_SWING]; DEFAULT_SWING when he has too few games (rookies).
+swing = one game's spread as a share of its mean: the player's own game-to-game variation under the league's scoring
+(std / mean of last season's games) pulled toward the league's, which is what real games show (swing_of); a game's
+mean is Sleeper's projection scaled by PROJ_SCALE (the projections run high).
 ponytail: games are independent normals and the plan ignores the option of swapping several later players
 through one slot; good enough to rank lock/pass, revisit if the calls look off in practice.
 """
@@ -32,34 +33,47 @@ from dataclasses import dataclass, field, replace
 
 from ..core.engine import roster
 
-DEFAULT_SWING, MIN_SWING, MAX_SWING, MIN_GAMES_FOR_SWING = 0.3, 0.12, 0.6, 15
-# Last season's spread overstates one game's: it mixes in role changes, blowouts and injury-shortened nights, which a
-# game's own projection already knows about. Expected FP ran ~140 against real weeks of 105-122 at full swing.
-# ponytail: one flat factor, tune it from the week-start vs final backtest (PROPOSALS.md) once a few weeks are in.
-SWING_SCALE = 0.5
+MIN_SWING, MAX_SWING, MIN_GAMES_FOR_SWING = 0.12, 0.6, 15
+# One source for how far a game lands from its projection, fit by backtest_week.py on 2,048 played games (weeks 1-3,
+# 2026-27). Sleeper's projections ran 7.5 % high in each of the three weeks, and around the corrected mean a game's
+# spread was 0.45 of it. Last season's own std / mean predicts only part of that (steady players came in wilder than
+# their record, wild ones steadier), so it is pulled 60 % of the way to 0.45. Expected FP once ran ~140 against real
+# weeks of 105-122 because the projections were taken at face value; halving the swing hid that and left every win
+# chance too sure of itself (real margins 1.39x wider than predicted).
+# ponytail: three flat numbers from three weeks; rerun the backtest to retune as the season goes on.
+PROJ_SCALE = 0.925
+SWING_CENTER, SWING_SHRINK = 0.45, 0.4
 # Chance he plays a game, by Sleeper injury status: next game / later games this week.
-# ponytail: flat guesses; tune from what actually happens once the season runs.
-PLAY_CHANCE = {"healthy": (0.97, 0.97), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
+# Healthy, later games: last season a rotation player (20+ minutes, 30+ games) who played his team's previous game
+# played the next one 92.7 % of the time when it wasn't a back-to-back (11,587 games). The next game stays at 0.97:
+# with no tag this close to it he is nearly sure to play, and Sleeper keeps no tag history to measure it.
+# ponytail: the tagged rows are still flat guesses; tune them once a season of tags against games played is saved.
+PLAY_CHANCE = {"healthy": (0.97, 0.93), "day_to_day": (0.6, 0.9), "out_short_term": (0.0, 0.3),
                "out_long_term": (0.0, 0.0), "out_season": (0.0, 0.0)}
 # The second night of a back-to-back: rest days land there (RotoWire: passing on a good early game backfires when he
 # sits later, and an unlocked player's final game counts even at zero). His chance to play it is scaled by this.
-# ponytail: one flat factor for everyone; stars rest more than role players, tune per player if it matters.
-B2B_PLAY = 0.85
+# Same logs: 87.3 % on second nights against 92.7 % otherwise. Minutes made no difference (0.95 / 0.92 / 0.96 for
+# 20-28 / 28-33 / 33+ a game); age did: 0.95 under 31 (2,247 second nights), 0.85 from 31 (295).
+B2B_PLAY, B2B_PLAY_VET, VET_AGE = 0.95, 0.85, 31
 
 
 def play_chance(g: "Game", injury: str, first: bool) -> float:
-    """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night."""
-    if g.started:   # it has tipped: he's in it (a live game counted in plan_week)
-        return 1.0
+    """Chance he plays game g: his injury status (next game / later ones), lower on a back-to-back's second night.
+    A game that has tipped: 1 once he has stats; 0 if he is ruled out, or still has none by the second half (an
+    inactive or a DNP: his projection must not count as if he were on the floor)."""
+    if g.started:
+        if g.fp is not None or g.min:
+            return 1.0
+        return 0.0 if injury in OUT or g.period >= 3 or g.final else 1.0   # just tipped, no stats yet: he's in it
     nxt, later = PLAY_CHANCE.get(injury, PLAY_CHANCE["healthy"])
-    return (nxt if first else later) * (B2B_PLAY if g.b2b else 1.0)
+    return (nxt if first else later) * ((B2B_PLAY_VET if g.vet else B2B_PLAY) if g.b2b else 1.0)
 
 
 @dataclass
 class Game:
     """One game of a player's week: projection, actual points, tip-off, whether it is in progress or over, minutes and clock, and whether his team played the night before."""
     date: str
-    proj: float | None          # Sleeper projection in league FP; None = no projection
+    proj: float | None          # Sleeper projection in league FP; None = no projection (the plan counts PROJ_SCALE of it: _mu)
     fp: float | None = None     # actual FP once played
     started: bool = False       # tipped off (in progress or final)
     live: bool = False          # in progress right now
@@ -70,6 +84,7 @@ class Game:
     period: int = 0             # live game clock (ESPN): quarter and seconds left in it
     clock: float = 0.0
     b2b: bool = False           # his team played the day before (second night of a back-to-back)
+    vet: bool = False           # he is VET_AGE or older: sits second nights more often
 
 
 @dataclass
@@ -80,13 +95,15 @@ class PlanPlayer:
     eligibility: list[str]
     slot: str                   # where he sits now: a starting slot, "BN" or "IR"
     games: list[Game]
-    swing: float = DEFAULT_SWING
+    swing: float = SWING_CENTER
     injury: str = "healthy"
     locked: float | None = None # locked score, if he's locked this week
     # filled by plan_week
     x: float | None = None      # his latest game's score (counting now; lockable once that game is final)
     x_final: bool = False       # that game is over: only then can it be locked (no LOCK / PASS call before)
     w: float = 0.0              # value of waiting
+    w_var: float = 0.0          # ...and the variance of what waiting ends up with (wait_moments)
+    w_zero: float = 0.0         # ...and the chance it ends up with nothing (he sits out what's left)
     value: float = 0.0
     seat: str | None = None
     action: str = ""            # LOCKED / LOCK / PASS / BENCH (not seated) / DONE
@@ -94,6 +111,8 @@ class PlanPlayer:
     win_lock: float | None = None   # chance to win the week if he locks now / if he waits (decide_by_win_chance)
     win_wait: float | None = None
     slot_w: float | None = None     # a lockable starter's slot left open: what it can still get (open_slot)
+    slot_var: float = 0.0           # ...and its variance
+    slot_zero: float = 0.0          # ...and the chance it gets nothing
     slot_from: list = field(default_factory=list)   # [(date, player name)]: whose game it would take each day
     lock_at: list = field(default_factory=list)     # where to lock him: lock_slots, best first
 
@@ -107,12 +126,19 @@ class WeekPlan:
 
 
 def swing_of(per_game_fpts: list[float]) -> float:
-    """How much one game can swing a player's night: the spread of his per-game fantasy points (0 with too few games)."""
+    """How much one game can swing a player's night, as a share of its mean: last season's std / mean of his per-game
+    fantasy points, pulled toward the league's (SWING_CENTER; that alone with too few games)."""
     games = [f for f in per_game_fpts if f is not None]
     m = sum(games) / len(games) if games else 0.0   # float math: statistics.mean/pstdev run exact fractions, ~400 calls a page
     if len(games) < MIN_GAMES_FOR_SWING or m <= 0:
-        return DEFAULT_SWING * SWING_SCALE
-    return SWING_SCALE * min(MAX_SWING, max(MIN_SWING, math.sqrt(sum((f - m) ** 2 for f in games) / len(games)) / m))
+        return SWING_CENTER
+    own = min(MAX_SWING, max(MIN_SWING, math.sqrt(sum((f - m) ** 2 for f in games) / len(games)) / m))
+    return SWING_CENTER + SWING_SHRINK * (own - SWING_CENTER)
+
+
+def _mu(g: "Game") -> float:
+    """The mean of a game still to come: Sleeper's projection, scaled down (it runs high: PROJ_SCALE)."""
+    return max(0.0, (g.proj or 0.0) * PROJ_SCALE)
 
 
 def _phi(z: float) -> float:
@@ -133,11 +159,12 @@ def expected_max(mu: float, sigma: float, v: float) -> float:
     return v + (mu - v) * _cdf(d) + sigma * _phi(d)
 
 
-def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]]]:
-    """What his slot is worth left open (not locking him): one look at every remaining tip, his games or a bench
+def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tuple[str, str]], float, float]:
+    """(value, whose game each look is, variance, chance of nothing): what his slot is worth left open (not locking him): one look at every remaining tip, his games or a bench
     player's who fits the slot and isn't seated in the plan, earliest first, with the option to keep the best one
     (wait_value). Same-day looks count too: start the 6:30 bench player, and if his game flops swap in the 9:00 one.
     Tips CLOSE_TIPS_MIN or less apart are one look (no time to judge the first): the bigger projection.
+    Each look counts with its own player's swing and chance to play (a questionable player's game is a 60 % look).
     That's why locking a decent game can be wrong with a deep bench: it gives up every one of those chances.
     ponytail: two open slots can both count the same bench player; fine while one lock is decided at a time."""
     pool = [p] + [q for q in players if q is not p and q.seat is None and q.slot != "IR" and q.locked is None
@@ -150,18 +177,76 @@ def open_slot(p: PlanPlayer, players: list[PlanPlayer]) -> tuple[float, list[tup
                 looks[-1] = (g, q)
         else:
             looks.append((g, q))
-    return wait_value([g for g, _ in looks], p.swing, "healthy"), [(g.date, q.name) for g, q in looks]
+    # each look is its own player's game: his swing, his chance to play (the first of his games listed is his next)
+    seen: set[str] = set()
+    dists = []
+    for g, q in looks:
+        dists.append((*game_dist(g, q.swing), play_chance(g, q.injury, q.sid not in seen)))
+        seen.add(q.sid)
+    mean, var, zero = _moments(dists)
+    return mean, [(g.date, q.name) for g, q in looks], var, zero
+
+
+def game_dist(g: Game, swing: float) -> tuple[float, float]:
+    """(mean, spread) of a game that isn't over. Before the tip: Sleeper's scaled projection and swing × it. In
+    progress: where it is headed (live_estimate), and the whole game's spread shrunk by the square root of the share
+    left, since points pile up minute by minute. Fit by backtest_live.py on 2,843 player games: the miss at 12 / 24 /
+    36 / 42 minutes was 0.87 / 0.70 / 0.51 / 0.36 of the pre-game miss; √share left is 0.87 / 0.71 / 0.50 / 0.35."""
+    mu = _mu(g)
+    if not g.live:
+        return mu, mu * swing
+    est = live_estimate(g) if g.fp is not None else mu
+    return est, (mu or est) * swing * math.sqrt(_share_left(g))
+
+
+def _above(mu: float, sigma: float, v: float) -> tuple[float, float, float]:
+    """For X ~ Normal(mu, sigma): P(X > v), E[X; X > v] and E[X²; X > v] (the part of X that beats v)."""
+    if sigma <= 0:
+        hit = 1.0 if mu > v else 0.0
+        return hit, hit * mu, hit * mu * mu
+    d = (mu - v) / sigma
+    c, f = _cdf(d), _phi(d)
+    return c, mu * c + sigma * f, (mu * mu + sigma * sigma) * c + (mu + v) * sigma * f
+
+
+def wait_moments(remaining: list[Game], swing: float, injury: str) -> tuple[float, float, float]:
+    """(mean, variance, chance of ending with nothing) of what his remaining games end up with under the optimal lock rule (see module doc): going
+    backwards, a game he plays is locked when it beats the value of the games after it, else the wait goes on; a game
+    he misses passes the wait on, and missing the final one leaves 0 (Sleeper counts an unlocked player's final game,
+    even a zero). The variance is the real mix, not value × swing: a questionable player's 60 % of a 20 is far less
+    certain than a healthy player's 12. One game: mean p·μ, variance p·(σ² + μ²) − (p·μ)².
+    The chance of nothing (every game passed on or missed, the last one missed) is the lump at 0 a bell curve can't
+    show: decide_by_win_chance counts it apart."""
+    return _moments([(*game_dist(g, swing), play_chance(g, injury, i == 0)) for i, g in enumerate(remaining)])
+
+
+def _moments(dists: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+    """wait_moments for games given as (mean, spread, chance to play), in order."""
+    v = m2 = 0.0   # mean and second moment of the games after this one
+    zero = 1.0     # chance the wait runs out with nothing banked
+    for i in range(len(dists) - 1, -1, -1):
+        mu, sigma, p = dists[i]
+        last = i == len(dists) - 1
+        zero *= 1 - p * (1.0 if last else _above(mu, sigma, v)[0])
+        v, m2 = _then(mu, sigma, p, v, m2, last)
+    return v, max(0.0, m2 - v * v), zero
+
+
+def _then(mu: float, sigma: float, p: float, v: float, m2: float, last: bool) -> tuple[float, float]:
+    """One game ~ Normal(mu, sigma), played with chance p, ahead of games worth (mean v, second moment m2): the mean
+    and second moment of the two together. Played, it is locked when it beats v, else the wait goes on; `last` = there
+    is nothing after it, so it counts whatever it is. Missed, the wait goes on."""
+    if last:
+        e1, e2 = mu, mu * mu + sigma * sigma
+    else:
+        c, a, b = _above(mu, sigma, v)
+        e1, e2 = a + (1 - c) * v, b + (1 - c) * m2
+    return p * e1 + (1 - p) * v, p * e2 + (1 - p) * m2
 
 
 def wait_value(remaining: list[Game], swing: float, injury: str) -> float:
-    """Value of his remaining games played with the optimal lock rule (see module doc). Sitting out the final game
-    leaves 0 (v starts at 0: Sleeper counts an unlocked player's final game, even a zero)."""
-    v = 0.0
-    for i in range(len(remaining) - 1, -1, -1):
-        mu = max(0.0, remaining[i].proj or 0.0)
-        p = play_chance(remaining[i], injury, i == 0)
-        v = p * (mu if i == len(remaining) - 1 else expected_max(mu, mu * swing, v)) + (1 - p) * v
-    return v
+    """Value of his remaining games played with the optimal lock rule: wait_moments' mean."""
+    return wait_moments(remaining, swing, injury)[0]
 
 
 def lock_slots(p: PlanPlayer, players: list[PlanPlayer], slot_counts: dict[str, int]) -> list[dict]:
@@ -237,16 +322,14 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
         live = next((g for g in p.games if g.live), None)
         if live and p.locked is None and p.slot in starting:
             # a starter's game in progress counts where it's headed (no stats yet: its projection), not his points so far
-            # ponytail: valued like a game still to come, so its spread is too wide late in the game; shrink by _share_left if it matters
-            now = live_estimate(live) if live.fp is not None else max(0.0, live.proj or 0.0)
-            remaining = [replace(live, proj=now)] + remaining
+            remaining = [live] + remaining
         p.x, p.x_final = None, False
         if p.locked is None and p.slot in starting and played:
             last = played[-1]
             later_started = any(g.started for g in p.games if g.date > last.date)
             if not later_started:
                 p.x, p.x_final = last.fp, not last.live   # a played game not in progress is over
-        p.w = wait_value(remaining, p.swing, p.injury) if p.locked is None else 0.0
+        p.w, p.w_var, p.w_zero = wait_moments(remaining, p.swing, p.injury) if p.locked is None else (0.0, 0.0, 0.0)
         p.value = p.locked if p.locked is not None else max(p.x or 0.0, p.w)
 
     for p in players:
@@ -257,7 +340,8 @@ def plan_week(players: list[PlanPlayer], slot_counts: dict[str, int]) -> WeekPla
 
     for p in players:   # a lockable starter: locking him closes his slot, so waiting is worth what the open slot gets
         # only a final game is lockable; a game in progress keeps his own value (w: its projected finish counted)
-        p.slot_w, p.slot_from = open_slot(p, players) if p.seat and p.x is not None and p.x_final and p.locked is None else (None, [])
+        p.slot_w, p.slot_from, p.slot_var, p.slot_zero = (open_slot(p, players) if p.seat and p.x is not None and p.x_final
+                                                          and p.locked is None else (None, [], 0.0, 0.0))
     for p in players:
         if p.locked is not None:
             p.action, p.why = "LOCKED", f"locked {p.locked:.1f}"
@@ -394,7 +478,7 @@ def plan_today(players: list[PlanPlayer], slot_counts: dict[str, int], today: st
     return TodayLineup(seats={s: [p.sid for p in ps] for s, ps in seats.items()}, moves=moves, watch=watch)
 
 
-GAME_SECONDS, QUARTER_SECONDS = 48 * 60, 12 * 60
+GAME_SECONDS, QUARTER_SECONDS, OT_SECONDS = 48 * 60, 12 * 60, 5 * 60
 # Fit by backtest_live.py on 1,782 player games (weeks 1-3, 2026-27): tonight's rate barely predicts the rest of his
 # game (MAE best at 60-80 vs 10), and projected minutes × share left ran ~0.7 min high (Sleeper's minutes run high,
 # starters sit late); 0.9 takes the +0.3-0.5 FP bias to ~0. Rerun the backtest to retune as the season goes on.
@@ -428,7 +512,7 @@ def live_estimate(g: Game) -> float | None:
     """Where his game will likely finish: points so far + his scoring rate × the minutes he has left. The rate is
     his rate tonight shrunk toward his projected rate (as if he'd played PRIOR_MINUTES more at it), so a hot or cold
     first few minutes don't swing the call; minutes left = his projected minutes × the share of the game left, cut by
-    MINUTES_LEFT_SCALE."""
+    MINUTES_LEFT_SCALE. In overtime the share left is the rest of that period."""
     if g.fp is None:
         return None
     if g.final or not g.live:
@@ -450,25 +534,21 @@ def given_up(p: PlanPlayer) -> float:
 
 
 def _share_left(g: Game) -> float:
-    """Share of a live game still to play (0 in overtime: whatever he plays then is a bonus)."""
+    """What is left of a live game, as a share of regulation: in overtime, the rest of that 5-minute period (a player
+    still on the floor is still scoring; 0 here would freeze his game as if it were final)."""
     if g.period > 4:
-        return 0.0
+        return min(OT_SECONDS, max(0.0, g.clock)) / GAME_SECONDS
     elapsed = min(GAME_SECONDS, (max(1, g.period) - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - g.clock)) if g.period else 0
     return 1 - elapsed / GAME_SECONDS
 
 
 def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> float:
-    """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(proj, proj × swing), played at his
+    """Chance at least one of his unfinished games beats `score`. Each game ~ Normal(game_dist), played at his
     play_chance (injury, back-to-backs); a live game centres on his pace, its spread shrinking with the time left.
     ponytail: games taken as independent, so it runs a little high when hot / cold streaks carry over."""
     miss = 1.0
     for i, g in enumerate(games):
-        if g.live:
-            mu = live_estimate(g) if g.fp is not None else max(0.0, g.proj or 0.0)
-            sd, p = mu * swing * _share_left(g), 1.0
-        else:
-            mu = max(0.0, g.proj or 0.0)
-            sd, p = mu * swing, play_chance(g, injury, i == 0)
+        (mu, sd), p = game_dist(g, swing), play_chance(g, injury, i == 0)
         hit = (1.0 if mu > score else 0.0) if sd <= 0 else 1 - _cdf((score - mu) / sd)
         miss *= 1 - p * hit
     return 1 - miss
@@ -476,29 +556,35 @@ def beat_chance(score: float, games: list[Game], swing: float, injury: str) -> f
 
 def swap_call(s: PlanPlayer, b: PlanPlayer, today: str) -> dict:
     """Keep S (his game tonight is the slot's chance; pass on it if his later games are worth more) or swap B in
-    (S's game tonight is forfeited, the slot gets B's game, S still has his later games)."""
+    (S's game tonight is forfeited, the slot gets B's game, S still has his later games). Both sides are valued the
+    same way (_then): tonight's game, with S's later games behind it as the fallback, so a game still in progress
+    keeps the upside it has left just as B's game does. gain = swap − keep, whatever state S's game is in."""
     gs, gb = _today(s, today), _today(b, today)
     later = [g for g in s.games if g.date > today and not g.started]
-    bar = wait_value(later, s.swing, s.injury)                 # what S's later games are worth
-    nxt = play_chance(gb, b.injury, True)
-    mu_b = max(0.0, gb.proj or 0.0)
-    swap = nxt * expected_max(mu_b, mu_b * b.swing, bar) + (1 - nxt) * bar
+    bar, bar_var, _ = wait_moments(later, s.swing, s.injury)   # what S's later games are worth
+    bar_m2 = bar_var + bar * bar
+    (mu_b, sd_b), p_b = game_dist(gb, b.swing), play_chance(gb, b.injury, True)
+    swap, swap_m2 = _then(mu_b, sd_b, p_b, bar, bar_m2, last=not later)
     # a game the timeline's check treats as over but that isn't final yet: judge it at its projected finish
-    est = live_estimate(replace(gs, live=True) if gs.started and not gs.final and gs.period else gs)
-    if est is None and gs.started and s.injury in OUT:   # ruled out, his game under way without him: he scores 0
-        est = 0.0
-    # before a live score, keeping him is worth his game tonight (taken only if it beats his later games) or those games
-    p_s, mu_s = play_chance(gs, s.injury, True), max(0.0, gs.proj or 0.0)
-    gain = swap - (p_s * expected_max(mu_s, mu_s * s.swing, bar) + (1 - p_s) * bar)
-    # keep_if: the finish S must be headed for to beat swapping (below his later-games bar, any finish loses to it)
-    keep_if = round(swap, 1)
-    if est is None:                                            # not started: judge it at the alarm
-        return {"decision": "PENDING", "est": None, "keep": None, "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if,
-                "gain": round(gain, 2)}
-    keep = max(est, bar)
+    now = replace(gs, live=True) if gs.started and not gs.final and gs.period else gs
+    if not gs.started:                                         # not started: judge it at the alarm
+        est = None
+        keep, keep_m2 = _then(*game_dist(gs, s.swing), play_chance(gs, s.injury, True), bar, bar_m2, last=not later)
+    elif now.live and now.fp is not None and not sits_out(s, gs):   # under way: where it is headed, and the spread it has left
+        (est, sd_s) = game_dist(now, s.swing)
+        keep, keep_m2 = _then(est, sd_s, 1.0, bar, bar_m2, last=not later)
+    elif now.live and s.injury not in OUT:                     # tipped, no stats yet: no score to judge
+        est = None
+        keep, keep_m2 = _then(*game_dist(now, s.swing), 1.0, bar, bar_m2, last=not later)
+    else:                                                      # over (or under way without him: he scores 0): a known score
+        est = gs.fp or 0.0
+        keep, keep_m2 = (est, est * est) if est >= bar else (bar, bar_m2)
+    out = {"swap": round(swap, 1), "bar": round(bar, 1), "keep_if": round(swap, 1),   # keep_if: the finish S must be headed for
+           "gain": round(swap - keep, 2), "swap_var": max(0.0, swap_m2 - swap * swap), "keep_var": max(0.0, keep_m2 - keep * keep)}
+    if est is None:
+        return {"decision": "PENDING", "est": None, "keep": None, **out}
     # his game is under way: headed past the backup's own projection, the swap is off (whatever the option math says)
-    return {"decision": "SWAP" if swap > keep and est <= mu_b else "KEEP", "est": round(est, 1), "keep": round(keep, 1),
-            "swap": round(swap, 1), "bar": round(bar, 1), "keep_if": keep_if, "gain": round(gain, 2)}
+    return {"decision": "SWAP" if swap > keep and est <= mu_b else "KEEP", "est": round(est, 1), "keep": round(keep, 1), **out}
 
 
 def _minus_minutes(iso: str | None, minutes: int) -> str | None:
@@ -597,13 +683,10 @@ def today_watch(players: list[PlanPlayer], today: str, seat: dict[int, str | Non
 
 # The decision rule for locks, passes and swaps: the choice with the higher chance to win the week, not the higher
 # expected points. Each team's final = its counted/locked points (certain) + every other slot's value, which is
-# uncertain while it still waits on games (spread = value × the player's swing × SPREAD). Chance to win =
+# uncertain while it still waits on games (its variance: wait_moments). Chance to win =
 # Φ((my total − their total) / √(my spread² + their spread²)). Example: everyone else locked, you need 13 more:
 # locking 15 wins unless they beat their estimate by 2; waiting on a 20-proj game wins unless it lands under 13,
 # and the site shows both chances side by side.
-# ponytail: a slot's spread ≈ one game's swing at full scale (0.8 / SWING_SCALE), shrunk a bit for the option of locking the best game
-SPREAD = 0.8 / SWING_SCALE
-
 
 def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
     """(expected FP, variance) a seated player adds to his team's final: certain once locked (or locking now)."""
@@ -611,8 +694,8 @@ def slot_spread(p: PlanPlayer, lock: bool) -> tuple[float, float]:
         return p.locked, 0.0
     if lock and p.x is not None:
         return p.x, 0.0
-    w = p.slot_w if p.slot_w is not None else p.w   # waiting on a lockable game: the open slot's value (open_slot)
-    return w, (w * p.swing * SPREAD) ** 2
+    # waiting on a lockable game: the open slot's value (open_slot)
+    return (p.slot_w, p.slot_var) if p.slot_w is not None else (p.w, p.w_var)
 
 
 def team_total(players: list[PlanPlayer], skip: PlanPlayer | None = None) -> tuple[float, float]:
@@ -653,8 +736,19 @@ def decide_by_win_chance(players: list[PlanPlayer], theirs: tuple[float, float])
             continue
         mean, var = team_total(players, skip=p)
         p.win_lock = win_chance((mean + p.x, var), theirs)
-        w = p.slot_w if p.slot_w is not None else p.w   # waiting = keeping his slot open (open_slot)
-        p.win_wait = win_chance((mean + w, var + (w * p.swing * SPREAD) ** 2), theirs) if w > 0 else 0.0
+        w, w_var = slot_spread(p, lock=False)   # waiting = keeping his slot open (open_slot)
+        # the open slot = a lump at 0 (it gets nothing: he sits out what's left) + a bell curve for the rest. One
+        # questionable game is part 0 and part real score, and a single bell curve through both misjudges it badly
+        # (71 % for a real 57 %, trailing by 5 with one questionable 20 left), so the two parts are counted apart.
+        zero = p.slot_zero if p.slot_w is not None else p.w_zero
+        if w <= 0:
+            p.win_wait = 0.0
+        elif zero >= 1:
+            p.win_wait = win_chance((mean, var), theirs)
+        else:
+            m = w / (1 - zero)                                   # mean and variance once it gets a game
+            v = max(0.0, (w_var + w * w) / (1 - zero) - m * m)
+            p.win_wait = zero * win_chance((mean, var), theirs) + (1 - zero) * win_chance((mean + m, var + v), theirs)
         p.action = "LOCK" if p.win_lock >= p.win_wait else "PASS"
         p.why = (f"Lock {p.x:.1f}: {p.win_lock:.0%} to win · keep the slot open (~{w:.1f} from games still to come): {p.win_wait:.0%}"
                  + (f" · lock in the {p.seat} slot" if p.action == "LOCK" else ""))
@@ -672,14 +766,12 @@ def bench_lock_chance(p: PlanPlayer, players: list[PlanPlayer], slot_counts: dic
     return decide_by_win_chance(clones, theirs)
 
 
-def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, backup_swing: float,
-                    theirs: tuple[float, float]) -> tuple[float, float] | None:
+def swap_win_chance(players: list[PlanPlayer], starter_sid: str, call: dict, theirs: tuple[float, float]) -> tuple[float, float] | None:
     """(win chance keeping the starter, win chance swapping the later player in) for one watch line."""
     s = next((p for p in players if p.sid == starter_sid), None)
     if s is None or call.get("keep") is None:
         return None
     mean, var = team_total(players, skip=s)
-    keep_var = 0.0 if call["est"] is not None and call["keep"] == call["est"] else (call["keep"] * s.swing * SPREAD) ** 2
-    keep = win_chance((mean + call["keep"], var + keep_var), theirs)
-    swap = win_chance((mean + call["swap"], var + (call["swap"] * backup_swing * SPREAD) ** 2), theirs)
+    keep = win_chance((mean + call["keep"], var + call["keep_var"]), theirs)
+    swap = win_chance((mean + call["swap"], var + call["swap_var"]), theirs)
     return keep, swap

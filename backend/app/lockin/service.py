@@ -131,7 +131,7 @@ SLEEPER_FLIP_HOUR = 4   # ponytail: guessed hour (ET) Sleeper's lineup day rolls
 
 def week_view(session, fetch: Fetch, week: int | None = None, today: date | None = None, extra: tuple[str, ...] = ()) -> dict:
     """The fantasy week view: matchups, standings, every rostered player's games with projections, scores, injuries and locks, the lineup day and the Sleeper gap. Reads Sleeper and ESPN through the cached fetcher."""
-    from .weekplan import Game, beat_chance, live_estimate, swing_of
+    from .weekplan import VET_AGE, Game, beat_chance, live_estimate, swing_of
 
     lg = session.league
     if not lg.sleeper_league_id:
@@ -252,9 +252,10 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
                 g["pace"] = round(live_estimate(Game(date=d, proj=g["proj"], fp=g["fp"], started=True, live=True, min=g["min"],
                                                      proj_min=g["proj_min"], period=g["period"], clock=g["clock"])), 2)
         inj, note = injury.get(sid, ("healthy", ""))   # Sleeper's live tag; none = healthy
+        vet = bool(rec and rec.bio.age and rec.bio.age >= VET_AGE)
         # each final game: the chance one of his unfinished games this week beats it (the chip's hover)
         left = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre", live=g["state"] == "in",
-                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"], b2b=g["b2b"]) for g in games if g["state"] != "post"]
+                     min=g["min"], proj_min=g["proj_min"], period=g["period"], clock=g["clock"], b2b=g["b2b"], vet=vet) for g in games if g["state"] != "post"]
         swing = swing_of(val.per_game_fpts if val else [])
         for g in games:
             if g["state"] == "post" and g["fp"] is not None:
@@ -262,7 +263,7 @@ def week_view(session, fetch: Fetch, week: int | None = None, today: date | None
         players[sid] = {"sleeper_id": sid, "player_id": rec.player_id if rec else None, "name": rec.full_name if rec else sid,
                         "team": team, "pos": list(ov.eligibility) if ov else [], "injury": inj,
                         "injury_tag": injury_tags.get(sid), "injury_note": note, "retired": retired, "games": games,
-                        "nick": nicks.get(sid)}
+                        "nick": nicks.get(sid), "vet": vet}
 
     team_games: dict[str, int] = {}
     for (d, team) in plays:
@@ -463,7 +464,7 @@ def _plan_players(session, view: dict, team: dict, manual: dict[str, str]):
         slot = "IR" if sid in reserve else slot_of.get(sid, "BN")
         games = [Game(date=g["date"], proj=g["proj"], fp=g["fp"], started=g["state"] != "pre" or g["fp"] is not None or tipped(g),
                       live=g["state"] == "in" or (g["state"] == "pre" and tipped(g)), tip=g["tip"], final=g["state"] == "post", min=g.get("min"),
-                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False))
+                      proj_min=g.get("proj_min"), period=g.get("period", 0), clock=g.get("clock", 0.0), b2b=g.get("b2b", False), vet=p.get("vet", False))
                  for g in p["games"]]
         swing = swing_of(val.per_game_fpts) if val else swing_of([])
         status, when = detect_lock(counted.get(sid), p["games"], manual.get(sid)) if slot not in ("BN", "IR") else ("no", None)
@@ -578,7 +579,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     opp = None
     pair = next((pr for pr in view["matchups"] if any(m["roster_id"] == team["roster_id"] for m in pr)), [])
     other = next((m for m in pair if m["roster_id"] != team["roster_id"]), None)
-    mode, chance, theirs, outlook = "even", None, None, None
+    chance, theirs, outlook = None, None, None
     if other:
         oteam = next(t for t in view["teams"] if t["roster_id"] == other["roster_id"])
         oplayers, olocks, _ = _plan_players(session, view, oteam, manual or {})   # your answers about their locks too
@@ -591,7 +592,6 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                 if q.lock_at:
                     q.win_lock = bench_lock_chance(q, players, counts, q.lock_at[0]["slot"], theirs)
                     q.win_wait = chance
-        mode = "ahead" if chance >= 0.6 else "behind" if chance <= 0.4 else "even"
         # this week's advice: the chance to win locking everything you can now (safe) vs waiting on later games (risky)
         outlook = {"safe": round(win_chance(scenario_total(players, True), theirs), 3),
                    "risky": round(win_chance(scenario_total(players, False), theirs), 3)}
@@ -613,10 +613,9 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
     today = view.get("day", view["today"])
     t = plan_today(players, counts, today, view.get("now")) if today in view["dates"] else None
     if t and theirs:   # KEEP / SWAP by the chance to win as well
-        swings = {q.name: q.swing for q in players}
         for w in t.watch:
             if w["kind"] == "swap" and w["decision"] in ("KEEP", "SWAP"):
-                both = swap_win_chance(players, w["sid"], w, swings.get(w["backup"], 0.3), theirs)
+                both = swap_win_chance(players, w["sid"], w, theirs)
                 if both:
                     w["win_keep"], w["win_swap"] = round(both[0], 3), round(both[1], 3)
                     w["decision"] = "SWAP" if both[1] > both[0] else "KEEP"
@@ -645,7 +644,7 @@ def team_plan(session, view: dict, roster_id: int | None = None, manual: dict[st
                     "ir_candidates": [q.name for q in active if q.injury in out_now] if ir_open else []}
     return {**_team_tag(team),
             "expected": plan.expected, "slots": counts,
-            "points": locked_points(players), "mode": mode, "win_chance": round(chance, 3) if chance is not None else None,
+            "points": locked_points(players), "win_chance": round(chance, 3) if chance is not None else None,
             "outlook": outlook,
             "games_left": sum(1 for q in players if q.slot != "IR" for g in q.games if not g.started),
             "players": [_player_out(q, locks) for q in sorted(plan.players, key=lambda q: (q.seat is None, -q.value))],
@@ -1020,10 +1019,26 @@ def faab_bid(up: float, faab_left: int, weeks_left: int, min_bid: int = 1, deman
     return min(faab_left, max(min_bid, min(round(faab_left * BID_CAP), round(pace * max(0.0, up) / 2 * demand))))
 
 
+FPG_PRIOR_GAMES = 10   # ponytail: a guess at how many games it takes for his own FP/G to weigh as much as the projection
+
+
+def steady_fpg(season: dict | None, proj: float | None) -> float:
+    """His FP/G for the demand ratio: this season's, pulled toward Sleeper's projection (scaled: it runs high) as if he
+    had played FPG_PRIOR_GAMES more games at it, so one bad or hot game of your drop candidate (or of the free agent)
+    doesn't swing every bid between the minimum and full. The projection alone before he plays; his own FP/G without one."""
+    from .weekplan import PROJ_SCALE
+
+    fp, gp = (season or {}).get("fp"), (season or {}).get("gp") or 0
+    if not proj:
+        return fp or 0.0
+    if fp is None:
+        return proj * PROJ_SCALE
+    return (gp * fp + FPG_PRIOR_GAMES * proj * PROJ_SCALE) / (gp + FPG_PRIOR_GAMES)
+
+
 def waiver_demand(fpg: float, drop_fpg: float) -> float:
     """How hard rivals chase him (0-1): nobody drops a player and pays for one who barely outscores him, so 0 up to 25 %
-    over your drop candidate's FP/G, full at 75 % over."""
-    # ponytail: actual FP/G only, a 1-game sample counts in full; blend in the projection if hot starts mislead
+    over your drop candidate's FP/G, full at 75 % over. Both FP/G are steady_fpg."""
     return 1.0 if drop_fpg <= 0 else min(1.0, max(0.0, (fpg / drop_fpg - 1.25) / 0.5))
 
 
@@ -1113,7 +1128,7 @@ def waivers(session, fetch: Fetch, view: dict) -> dict:
     done = {g.get("game_id") for g in schedule if g.get("status") == "complete"}
     avg = season_averages(stat_rows, {rows[pid].sleeper_id for pid in shown} | ({drop.sleeper_id} if drop else set()),
                           done, session.league.scoring)
-    fpg = lambda r: (avg.get(r.sleeper_id) or {}).get("fp", r.proj_fpts or 0.0)   # noqa: E731 - his actual FP/G, else projected
+    fpg = lambda r: steady_fpg(avg.get(r.sleeper_id), r.proj_fpts)   # noqa: E731
     drop_fpg = fpg(drop) if drop else 0.0
     weeks_left = max((int(g["week"]) for g in schedule), default=week) - week + 1
     out = []

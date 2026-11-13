@@ -1,6 +1,8 @@
 
 from datetime import date
 
+import pytest
+
 from app.lockin.service import actual_fp, current_week, week_view
 from tests.test_session import JOKIC, fixture_world, make_session  # noqa: F401 - fixture_world is a pytest fixture
 
@@ -224,6 +226,20 @@ def test_waiver_demand_needs_him_to_outscore_your_drop():
     assert waiver_demand(4.0, 5.0) == 0.0
     assert waiver_demand(7.5, 5.0) == 0.5
     assert waiver_demand(3.0, 0.0) == 1.0           # drop has no games and no projection
+
+
+def test_the_demand_ratio_uses_fpg_steadied_by_the_projection():
+    """One bad game of your drop candidate must not send every free agent's bid to full."""
+    from app.lockin.service import FPG_PRIOR_GAMES, steady_fpg, waiver_demand
+    from app.lockin.weekplan import PROJ_SCALE
+
+    proj = 8.0 * PROJ_SCALE                                              # the projection, scaled (it runs high)
+    one_bad_game = steady_fpg({"fp": 1.0, "gp": 1}, 8.0)
+    assert one_bad_game == pytest.approx((1.0 + FPG_PRIOR_GAMES * proj) / (1 + FPG_PRIOR_GAMES))
+    assert waiver_demand(8.0, 1.0) == 1.0 and waiver_demand(8.0, one_bad_game) == 0.0   # raw: full bids; steadied: none
+    assert steady_fpg({"fp": 6.0, "gp": 30}, 8.0) == pytest.approx((180 + FPG_PRIOR_GAMES * proj) / 40)   # a month in: mostly his own
+    assert steady_fpg(None, 8.0) == pytest.approx(proj)                 # hasn't played: the projection
+    assert steady_fpg({"fp": 6.0, "gp": 4}, None) == 6.0                # no projection: his own
 
 
 def test_long_out_reads_the_tag_and_the_latest_notes():

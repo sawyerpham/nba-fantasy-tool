@@ -1,115 +1,12 @@
-import React, { useState } from "react";
-import { api } from "../api.js";
-import { TelegramLink, useNotify } from "./NotifyPage.jsx";
+import React from "react";
+import TeamMap from "./TeamMap.jsx";
 
-// top (bold): only this app; rest: Sleeper has it too, brought alongside
-const FEATURES = {
-  Draft: {
-    top: ["Live bid calls on the nominee", "Rival drafting habits from past leagues", "Worth and max bid per player",
-      "Budget plan for open roster spots", "Position scarcity and tier cliffs", "Fantasy team strength estimates",
-      "NBA team win totals and fantasy talent", "Keeper keep-or-cut verdicts"],
-    rest: ["Live Sleeper draft sync", "Auction value rankings", "Rival manager money and needs"],
-  },
-  "Season Advisor": {
-    top: ["Optimal lineup at any time of the week", "Live keep-or-swap calls", "Swap and lock alarms", "Next Sleeper check-in",
-      "Lineup swap instructions", "Lock-or-wait calls", "Win probability by strategy", "Game stream links",
-      "NBA team offense and defense ranks", "Waiver targets with FAAB bids"],
-    rest: ["Live NBA game cards", "Injury watch", "Lockable games", "Opponent lineups", "Box scores and top performers",
-      "Player game logs and news", "NBA depth charts", "League standings and FAAB"],
-  },
-};
-const APPLY = ["name", "scoring", "roster_slots", "num_managers", "keepers"];
-/** Pull a Sleeper league id (a run of 12+ digits) out of pasted text, alone or inside a league link. Returns null when there is none. */
-const sleeperId = (text) => (String(text).match(/\d{12,}/) || [])[0] || null;
-
-/** One line under the import box: where Telegram alerts go (with a link to the chat), or that they aren't set up; a button opens Settings > Notifications. */
-function TelegramLine({ setTab }) {
-  const [st] = useNotify();
-  if (!st) return null;
-  return (
-    <div className="home-telegram small" data-testid="home-telegram">
-      <TelegramLink st={st} />
-      <button className="small ghost" onClick={() => setTab("settings")} data-testid="home-notify-settings">{st.configured ? "Notification settings" : "Set up in Settings"}</button>
-    </div>
-  );
-}
-
-/** Landing page: import a Sleeper league by id or link, then jump into the app. Also lists what the Draft and Season Advisor tabs offer. */
-export default function HomePage({ setLeagueId, setTab }) {
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(null);   // { id, name } once imported
-
-  /**
-   * Create (or refresh) the league from the pasted Sleeper id, apply its name, scoring, roster slots and keepers, and sync managers.
-   * A league imported before is refreshed without touching its manager count.
-   */
-  const importLeague = async () => {
-    const sid = sleeperId(input);
-    if (!sid) return setError("Paste your Sleeper league ID or its link (the long number in sleeper.com/leagues/…).");
-    setBusy(true); setError(""); setDone(null);
-    const id = `sleeper-${sid}`;
-    try {
-      let fresh = true;
-      try {
-        await api.post("/leagues", { league_id: id, name: `Sleeper ${sid}` });
-      } catch (e) {
-        if (!/already exists/.test(e.message)) throw e;
-        fresh = false;   // imported before: refresh it (the team count can't change once its draft started)
-      }
-      const league = await api.post(`/leagues/${id}/sleeper/apply`, { sleeper_league_id: sid, apply: fresh ? APPLY : APPLY.filter((f) => f !== "num_managers") });
-      try { await api.post(`/leagues/${id}/sleeper/sync`); } catch { /* managers and keepers: the League tab's Sync retries */ }
-      setLeagueId(id);
-      setDone({ id, name: league.name });
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const cards = [
-    ["settings", "Settings", "Managers, keepers, rules and settings: pick which team is you."],
-    ["draft", "Draft", "Rankings, bid calls and live sync for your auction."],
-    ["season", "Season Advisor", "Your best lineup, lock calls, alarms and live games each week."],
-  ];
+/** Landing page: the title over an animated map of every NBA team, filling the screen. */
+export default function HomePage() {
   return (
     <div className="home" data-testid="home-page">
-      <section className="home-hero">
-        <h1>NBA Fantasy Tool</h1>
-        <p className="home-pitch">Tool for Sleeper NBA lock-in leagues.
-          <br />No account, no data kept, and free forever.</p>
-            <div className="home-import">
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !busy && importLeague()}
-            placeholder="Import Sleeper league: paste its ID or link" aria-label="Sleeper league ID or link" data-testid="home-import-input" />
-          <button className="primary" onClick={importLeague} disabled={busy || !input.trim()} data-testid="home-import">{busy ? "Importing…" : "Import"}</button>
-        </div>
-        {error && <div className="error">{error}</div>}
-        <TelegramLine setTab={setTab} />
-        {done && (
-          <div className="home-done" data-testid="home-imported">
-            <div className="home-check" aria-hidden="true">✓</div>
-            <div><strong>{done.name}</strong> imported<div className="small muted">Saved as league “{done.id}”. Pick which team is you on the Settings tab.</div></div>
-          </div>
-        )}
-        {done && (
-          <div className="home-cards">{cards.map(([id, title, text]) => (
-            <button key={id} className="home-card" onClick={() => setTab(id)} data-testid={`home-card-${id}`}>
-              <strong>{title} →</strong><span className="small muted">{text}</span>
-            </button>
-          ))}</div>
-        )}
-      </section>
-      <section className="home-features">
-        {Object.entries(FEATURES).map(([group, { top, rest }]) => (
-          <div key={group} className="panel">
-            <h3>{group}</h3>
-            <ul className="home-top">{top.map((f) => <li key={f}><strong>{f}</strong></li>)}</ul>
-            <ul className="home-rest">{rest.map((f) => <li key={f}>{f}</li>)}</ul>
-          </div>
-        ))}
-      </section>
+      <h1>NBA Fantasy Tool</h1>
+      <TeamMap />
     </div>
   );
 }

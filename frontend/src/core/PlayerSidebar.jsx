@@ -180,7 +180,7 @@ export default function PlayerSidebar({ leagueId, playerId, live, refreshKey, on
             {k.stash && <> <Term k="stash" className="verdict even" /></>}
             <span className="muted"> at his Max ${k.buy_price} → keep at <strong>${k.next_price}</strong> · worth ~${k.next_worth} ({k.surplus >= 0 ? "+" : "−"}${Math.abs(k.surplus)})</span>
             {k.good_up_to != null && <div className="muted">GOOD keep if you get him for <strong>≤ ${k.good_up_to}</strong></div>}
-            {k.young && <span className="muted" data-tip="23 or younger: young players usually improve, which this estimate doesn't model."> · young, may improve</span>}
+            {k.young && <span className="muted" data-tip="23 or younger: he may still improve. This estimate counts growth only through his age-21 season (+10%)."> · young, may improve</span>}
           </div>
         );
       })()}

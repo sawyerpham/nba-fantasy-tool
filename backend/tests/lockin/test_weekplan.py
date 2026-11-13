@@ -1,7 +1,7 @@
 
 import pytest
 
-from app.lockin.weekplan import Game, PlanPlayer, expected_max, plan_week, swing_of, wait_value
+from app.lockin.weekplan import PROJ_SCALE, Game, PlanPlayer, expected_max, plan_week, swing_of, wait_value
 
 SLOTS = {"PG": 2, "SG": 2}
 
@@ -20,11 +20,11 @@ def test_expected_max_and_wait_value_math():
     """Expected max and wait value math."""
     assert expected_max(0, 1, 0) == pytest.approx(0.3989, abs=1e-4)
     assert expected_max(10, 0, 12) == 12
-    assert wait_value(future(20), 0.3, "healthy") == pytest.approx(0.97 * 20)          # last game: just its projection
+    assert wait_value(future(20), 0.3, "healthy") == pytest.approx(0.97 * 20 * PROJ_SCALE)   # last game: just its (scaled) projection
     two = wait_value(future(20, 20), 0.3, "healthy")
-    assert two > 20                                                                      # two chances beat one
+    assert two > 20 * PROJ_SCALE                                                         # two chances beat one
     assert wait_value(future(20, 20), 0.3, "out_long_term") == 0                        # never plays: worth 0
-    assert wait_value(future(20), 0.3, "day_to_day") == pytest.approx(0.6 * 20)         # GTD last game: a DNP counts 0
+    assert wait_value(future(20), 0.3, "day_to_day") == pytest.approx(0.6 * 20 * PROJ_SCALE)   # GTD last game: a DNP counts 0
 
 
 def test_pg_sg_locks_in_the_sg_slot_so_both_great_pgs_still_fit():
@@ -68,10 +68,12 @@ def test_locked_players_keep_their_slot_and_others_fill_around_them():
 
 def test_swing_comes_from_his_own_games():
     """Swing comes from his own games."""
-    from app.lockin.weekplan import SWING_SCALE
-    assert swing_of([10.0] * 20) == pytest.approx(0.12 * SWING_SCALE)     # perfectly steady: the floor
-    assert swing_of([5.0, 25.0] * 10) == pytest.approx(0.6 * SWING_SCALE) # wild: the ceiling
-    assert swing_of([10.0] * 5) == pytest.approx(0.3 * SWING_SCALE)       # too few games: the default
+    from app.lockin.weekplan import SWING_CENTER, SWING_SHRINK
+    pulled = lambda own: SWING_CENTER + SWING_SHRINK * (own - SWING_CENTER)   # his own spread, pulled toward the league's
+    assert swing_of([10.0] * 20) == pytest.approx(pulled(0.12))           # perfectly steady: the floor
+    assert swing_of([5.0, 25.0] * 10) == pytest.approx(pulled(0.6))       # wild: the ceiling
+    assert swing_of([8.0, 12.0] * 10) == pytest.approx(pulled(0.2))       # his own std / mean in between
+    assert swing_of([10.0] * 5) == SWING_CENTER                           # too few games: the league's
 
 
 def test_today_starts_whoever_plays_today_and_keeps_lock_candidates():
@@ -362,10 +364,10 @@ def test_beat_chance_is_one_minus_every_game_missing():
     """Beat chance is one minus every game missing."""
     from app.lockin.weekplan import beat_chance
     assert beat_chance(17.5, [], 0.3, "healthy") == 0                            # no games left: can't beat it
-    one = beat_chance(14.6, future(14.6), 0.3, "healthy")
+    one = beat_chance(14.6 * PROJ_SCALE, future(14.6), 0.3, "healthy")
     assert one == pytest.approx(0.97 * 0.5)                                       # projection = score: a coin flip if he plays
     two = beat_chance(17.5, future(13.7, 14.6), 0.3, "healthy")
-    assert 0.25 < two < 0.4 and two > beat_chance(17.5, future(14.6), 0.3, "healthy")
+    assert 0.15 < two < 0.4 and two > beat_chance(17.5, future(14.6), 0.3, "healthy")
     assert beat_chance(17.5, future(13.7, 14.6), 0.3, "out_long_term") == 0
 
 
@@ -373,7 +375,7 @@ def test_safe_locks_every_game_risky_waits_on_every_later_one():
     """Safe locks every game risky waits on every later one."""
     from app.lockin.weekplan import scenario_total
 
-    a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
+    a = pp("a", ["PG"], "PG", [], x=17.5, x_final=True, w=15.5, w_var=20.0, swing=0.3, seat="PG")   # can lock 17.5 or wait ~15.5
     done = pp("done", ["PG"], "PG", [], x=9.0, x_final=True, w=0.0, swing=0.3, seat="PG")   # no games left: locks either way
     assert scenario_total([a, done], True) == (26.5, 0.0)                  # certain
     mean, var = scenario_total([a, done], False)
@@ -390,8 +392,8 @@ def test_an_open_slot_counts_spare_bench_players_games_not_just_his_own():
     spare = pp("spare", ["SF", "PF"], "BN", [Game("2026-10-23", 12.0), Game("2026-10-24", 8.0)])
     c_only = pp("big", ["C"], "BN", [Game("2026-10-23", 20.0)])                      # can't play SF: no help
     starter = pp("coward", ["SG", "SF"], "SF", [Game("2026-10-24", 15.0)], seat="SF")  # has his own slot: no help
-    w, src = open_slot(jaq, [jaq, spare, c_only, starter])
-    assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12
+    w, src, *_ = open_slot(jaq, [jaq, spare, c_only, starter])
+    assert src == [("2026-10-23", "spare"), ("2026-10-24", "spare")] and w > 12 * PROJ_SCALE
 
 
 def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_day():
@@ -401,8 +403,8 @@ def test_an_open_slot_gets_an_early_bench_look_before_his_own_later_game_that_da
 
     kes = pp("kessler", ["C"], "C", [Game("2026-11-04", 11.0, tip="2026-11-05T03:00Z")], seat="C")
     sharpe = pp("sharpe", ["C"], "BN", [Game("2026-11-04", 7.0, tip="2026-11-05T00:30Z")])
-    alone, _ = open_slot(kes, [kes])
-    w, src = open_slot(kes, [kes, sharpe])
+    alone, *_ = open_slot(kes, [kes])
+    w, src, *_ = open_slot(kes, [kes, sharpe])
     assert src == [("2026-11-04", "sharpe"), ("2026-11-04", "kessler")] and w > alone
     sharpe.games[0].tip = "2026-11-05T02:50Z"                      # 10 min before his: no time to judge, one look
     assert open_slot(kes, [kes, sharpe])[1] == [("2026-11-04", "kessler")]
@@ -413,7 +415,12 @@ def test_a_back_to_backs_second_night_is_worth_less_to_wait_on():
     # RotoWire: rest days land on back-to-backs, and an unlocked player's final game counts even at zero
     rested = wait_value([Game("2026-10-24", 15.0, b2b=True)], 0.3, "healthy")
     fresh = wait_value([Game("2026-10-24", 15.0)], 0.3, "healthy")
-    assert rested < fresh and rested == pytest.approx(15.0 * 0.97 * 0.85)   # sitting the final game leaves 0
+    assert rested < fresh and rested == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.95)   # sitting the final game leaves 0
+    old = wait_value([Game("2026-10-24", 15.0, b2b=True, vet=True)], 0.3, "healthy")
+    assert old == pytest.approx(15.0 * PROJ_SCALE * 0.97 * 0.85)                          # 31 and up sit second nights more
+    # a healthy player's later games: 0.93 each (he played the game before), his next one 0.97
+    two = wait_value([Game("2026-10-24", 0.0), Game("2026-10-26", 15.0)], 0.3, "healthy")
+    assert two == pytest.approx(15.0 * PROJ_SCALE * 0.93)
 
 
 def test_lock_a_pf_c_player_at_pf_when_the_centers_need_the_c_slots():
@@ -452,7 +459,7 @@ def test_a_starters_game_in_progress_counts_where_its_headed_not_his_points_so_f
                                              period=3, clock=550)])
     benched = pp("watson", ["PF"], "BN", [Game(today, 8.2, started=True, live=True)])            # on the bench: can't count
     plan = plan_week([tipped, cold, benched], {"PG": 1, "PF": 1})
-    assert tipped.value == pytest.approx(10.7) and tipped.seat == "PG"
+    assert tipped.value == pytest.approx(10.7 * PROJ_SCALE) and tipped.seat == "PG"
     assert 3.0 < cold.value < 8.1 and cold.seat == "PF"
     assert benched.value == 0
     assert plan.expected == pytest.approx(tipped.value + cold.value, abs=0.1)
@@ -468,3 +475,114 @@ def test_win_chance_counts_a_live_game_at_its_projected_finish():
     plan_week([live], {"C": 1})
     mean, _ = slot_spread(live, lock=False)
     assert live.slot_w is None and mean == pytest.approx(live.value) and mean > 6.0   # not 0 for a slot with nothing left
+
+
+def test_one_games_variance_is_the_mix_of_playing_and_sitting():
+    """A game he may miss: mean p·μ, variance p·(σ² + μ²) − (p·μ)², so a questionable player's slot is the less
+    certain one, not the more certain (value × swing said the opposite)."""
+    from app.lockin.weekplan import wait_moments
+
+    mu, sigma = 20 * PROJ_SCALE, 20 * PROJ_SCALE * 0.3
+    for injury, p in (("healthy", 0.97), ("day_to_day", 0.6)):
+        mean, var, zero = wait_moments(future(20), 0.3, injury)
+        assert mean == pytest.approx(p * mu) and var == pytest.approx(p * (sigma ** 2 + mu ** 2) - (p * mu) ** 2)
+        assert zero == pytest.approx(1 - p)                                # he sits: the slot gets nothing
+    assert wait_moments(future(20), 0.3, "day_to_day")[1] > 2 * wait_moments(future(20), 0.3, "healthy")[1]
+    assert wait_moments(future(20), 0.3, "out_long_term") == (0.0, 0.0, 1.0)   # never plays: a certain 0
+
+
+def test_wait_moments_match_the_lock_rule_played_out():
+    """The mean and variance of three games under the lock rule, against the same rule simulated 40,000 times."""
+    import random
+
+    from app.lockin.weekplan import _moments, game_dist, play_chance, wait_moments
+
+    games, swing, injury = [Game("2026-10-22", 14.0), Game("2026-10-23", 18.0, b2b=True), Game("2026-10-25", 16.0)], 0.45, "day_to_day"
+    dists = [(*game_dist(g, swing), play_chance(g, injury, i == 0)) for i, g in enumerate(games)]
+    bar = [_moments(dists[i + 1:])[0] for i in range(len(games))]   # what the games after each are worth
+    rng, runs, got = random.Random(7), 40_000, []
+    for _ in range(runs):
+        banked = 0.0
+        for i, (mu, sigma, p) in enumerate(dists):
+            if rng.random() >= p:
+                continue
+            x = rng.gauss(mu, sigma)
+            if i == len(games) - 1 or x > bar[i]:
+                banked = x
+                break
+        got.append(banked)
+    mean = sum(got) / runs
+    var = sum((x - mean) ** 2 for x in got) / runs
+    m, v, zero = wait_moments(games, swing, injury)
+    assert m == pytest.approx(mean, rel=0.01) and v == pytest.approx(var, rel=0.03)
+    assert zero == pytest.approx(sum(x == 0.0 for x in got) / runs, abs=0.002)
+
+
+def test_a_live_games_spread_shrinks_with_the_square_root_of_the_share_left():
+    """Half a game left keeps 71 % of the pre-game spread, not half of it; the mean is where the game is headed."""
+    from app.lockin.weekplan import game_dist, live_estimate
+
+    before = game_dist(Game("2026-10-24", 20.0), 0.4)
+    assert before == pytest.approx((20 * PROJ_SCALE, 20 * PROJ_SCALE * 0.4))
+    half = Game("2026-10-24", 20.0, fp=9.0, started=True, live=True, min=17, proj_min=34, period=3, clock=720)
+    mu, sd = game_dist(half, 0.4)
+    assert mu == live_estimate(half) and sd == pytest.approx(before[1] * 0.5 ** 0.5)
+    late = Game("2026-10-24", 20.0, fp=16.0, started=True, live=True, min=30, proj_min=34, period=4, clock=360)
+    assert game_dist(late, 0.4)[1] == pytest.approx(before[1] * 0.125 ** 0.5)
+
+
+def test_overtime_is_still_a_live_game():
+    """In overtime he is still scoring: the estimate sits above his points so far and the spread isn't zero."""
+    from app.lockin.weekplan import beat_chance, game_dist, live_estimate
+
+    ot = Game("2026-10-24", 20.0, fp=24.0, started=True, live=True, min=38, proj_min=34, period=5, clock=240)
+    assert live_estimate(ot) > 24.0 and game_dist(ot, 0.4)[1] > 0
+    assert 0 < beat_chance(25.0, [ot], 0.4, "healthy") < 1       # a 25 he hasn't reached yet is neither sure nor out
+    assert game_dist(Game("2026-10-24", 20.0, fp=24.0, started=True, live=True, min=43, proj_min=34, period=5, clock=0), 0.4)[1] == 0
+
+
+def test_swap_and_keep_are_valued_the_same_way():
+    """Two identical games tonight are a wash, and a game in progress keeps the upside it has left."""
+    from app.lockin.weekplan import swap_call
+
+    today, later = "2026-10-24", "2026-10-26"
+    s = pp("starter", ["PG"], "PG", [Game(today, 14.0, tip="2026-10-24T23:00Z"), Game(later, 12.0)], swing=0.4)
+    b = pp("backup", ["PG"], "BN", [Game(today, 14.0, tip="2026-10-25T02:00Z")], swing=0.4)
+    call = swap_call(s, b, today)
+    assert call["decision"] == "PENDING" and call["gain"] == 0          # same game, same fallback: nothing to gain
+    b.games[0].proj = 17.0
+    assert swap_call(s, b, today)["gain"] > 0                             # the better game is the gain, on one baseline
+
+    # under way and headed for ~his later games' value: keeping is worth more than either number alone, because the
+    # game can still beat the fallback (it used to count max(pace, bar), a point, against a swap priced with upside)
+    s.games[0] = Game(today, 14.0, fp=5.5, started=True, live=True, min=17, proj_min=34, period=3, clock=720, tip="2026-10-24T23:00Z")
+    live = swap_call(s, b, today)
+    assert live["keep"] > max(live["est"], live["bar"]) and live["keep_var"] > 0
+    assert live["gain"] == pytest.approx(live["swap"] - live["keep"], abs=0.11)   # gain and the call share a baseline
+    s.games[0] = Game(today, 14.0, fp=11.0, started=True, final=True, tip="2026-10-24T23:00Z")
+    over = swap_call(s, b, today)
+    assert over["keep"] == pytest.approx(max(11.0, over["bar"]), abs=0.05)   # final: a known score, no upside left
+
+
+def test_waiting_on_one_questionable_game_counts_the_zero_apart():
+    """Trailing by 5 with one questionable 20-projection game left: he plays 60 % of the time and then nearly always
+    clears 5, so waiting wins about 57 %. One bell curve through the 0 and the score said 71 %."""
+    from app.lockin.weekplan import decide_by_win_chance
+
+    # locking his 3 loses to their 5 for sure; left open, his slot takes his questionable game tomorrow instead
+    q = pp("q", ["PG"], "PG", [Game("2026-10-23", 9.0, fp=3.0, started=True, final=True), Game("2026-10-24", 20.0)], injury="day_to_day")
+    plan_week([q], {"PG": 1})
+    assert q.slot_zero == pytest.approx(0.4)                    # the open slot knows he is questionable
+    decide_by_win_chance([q], (5.0, 0.0))
+    assert q.win_lock == 0.0 and q.win_wait == pytest.approx(0.567, abs=0.01) and q.action == "PASS"
+
+
+def test_a_tipped_game_he_isnt_in_counts_for_nothing():
+    """Ruled out, or no stats by the second half: the game under way is a 0, not his projection."""
+    today = "2026-10-24"
+    out = pp("out", ["PG"], "PG", [Game(today, 18.0, started=True, live=True, period=1, clock=600)], injury="out_short_term")
+    dnp = pp("dnp", ["SG"], "SG", [Game(today, 12.0, started=True, live=True, period=3, clock=600)])
+    fine = pp("fine", ["PG"], "PG", [Game(today, 10.0, started=True, live=True, period=1, clock=700)])   # just tipped
+    plan_week([out, dnp, fine], SLOTS)
+    assert out.value == 0 and dnp.value == 0
+    assert fine.value == pytest.approx(10.0 * PROJ_SCALE)
